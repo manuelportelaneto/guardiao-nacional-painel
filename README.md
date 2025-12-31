@@ -205,14 +205,18 @@ O projeto utiliza **Tailwind CSS v4** com tema customizado:
 
 ## 🚧 Roadmap
 
-- [ ] Integração completa com Firestore (dados reais)
+- [x] Integração com Firestore (dados reais) ✅
+- [x] Hierarquia Geográfica (Brasil > Região > Estado > Cidade) ✅
+- [x] Gestão Avançada de Usuários (Cards, Busca CPF, Badges) ✅
 - [ ] CRUD de tarefas no kanban
 - [ ] Drag-and-drop no kanban
 - [ ] CRUD de secretarias e servidores
+- [ ] Moderação de Conteúdo
 - [ ] Sistema de notificações
 - [ ] Relatórios exportáveis
 - [ ] Dark mode
 - [x] Testes automatizados ✅
+- [x] CI/CD com GitHub Actions ✅
 
 ## 🧪 Testes Automatizados
 
