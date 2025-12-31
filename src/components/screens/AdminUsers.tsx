@@ -20,7 +20,7 @@ import {
 import { toast } from 'sonner';
 import { toggleUserBlock, promoteUser, removeUser } from '../../services/userService';
 import type { UserManagement } from '../../services/userService';
-import { USER_RANKS } from '../../../../guardiao-nacional/src/types/userRanks';
+import { USER_RANKS } from '../../types/userRanks';
 
 const AdminUsers: React.FC = () => {
     const [users, setUsers] = useState<UserManagement[]>([]);
