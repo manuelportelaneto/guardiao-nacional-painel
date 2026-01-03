@@ -149,6 +149,14 @@ const AdminDashboard: React.FC = () => {
                                     Cidades
                                 </Button>
                                 <Button
+                                    variant={location.pathname.includes('moderation') ? "secondary" : "ghost"}
+                                    className="justify-start hover:bg-red-50 hover:text-red-600"
+                                    onClick={() => { navigate('/admin/moderation'); setSidebarOpen(false); }}
+                                >
+                                    <AlertTriangle className="mr-2 h-4 w-4" />
+                                    Moderação
+                                </Button>
+                                <Button
                                     variant="ghost"
                                     className="justify-start opacity-50 cursor-not-allowed"
                                     disabled
