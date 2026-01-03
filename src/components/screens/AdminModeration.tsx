@@ -35,6 +35,7 @@ import {
     DialogFooter
 } from '../ui/dialog';
 import { toast } from 'sonner';
+import { notificationService } from '../../services/notificationService';
 
 interface Report {
     id: string;
@@ -184,6 +185,16 @@ const AdminModeration: React.FC = () => {
                     removedAt: Timestamp.now(),
                     removedReason: report.reason
                 });
+
+                // Send notification email to the contributor
+                if (report.contributorEmail && report.contribution?.title) {
+                    await notificationService.sendContentRemovedEmail(
+                        report.contributorEmail,
+                        'Cidadão', // Generic name as we only fetched email
+                        report.contribution.title,
+                        report.reason
+                    );
+                }
             }
 
             toast.success('Denúncia aprovada. Conteúdo removido.');
