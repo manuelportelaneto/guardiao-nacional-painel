@@ -231,6 +231,7 @@ O projeto utiliza **Tailwind CSS v4** com tema customizado:
 - [ ] Dark mode
 - [x] Testes automatizados ✅
 - [x] CI/CD com GitHub Actions ✅
+- [ ] Criação de Índices Compostos no Firestore (Status + Data)
 
 ## 🧪 Testes Automatizados
 

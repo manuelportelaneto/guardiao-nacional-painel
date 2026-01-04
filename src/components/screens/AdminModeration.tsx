@@ -190,33 +190,52 @@ const AdminModeration: React.FC = () => {
                     setLoading(false);
                 });
 
-                // Contributions Queues (Load all for counters)
+                // Contributions Queues
                 const contributionsRef = collection(db, 'contributions');
 
-                // Queue
+                // 1. Queue (Em Análise) - dedicated query to ensure we see ALL pending items
+                // Using basic query without composite index requirement if possible, or just standard
                 const unsubscribeQueue = onSnapshot(query(contributionsRef, where('status', '==', 'Em Análise')), (snapshot) => {
-                    setModerationQueue(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
+                    const queueItems = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+                    // Client-side sort to be safe
+                    queueItems.sort((a, b) => {
+                        const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
+                        const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
+                        return timeA - timeB; // Oldest first for queue usually? Or newest? Let's do Oldest first for "FIFO" feel, or User preference. Actually code used default which is random. Let's do Newest first for consistency.
+                        return timeB - timeA;
+                    });
+                    setModerationQueue(queueItems);
+                }, (error) => {
+                    console.error("Queue subscribe error:", error);
+                    toast.error("Erro ao carregar fila.");
                 });
-                // Approved
-                const unsubscribeApproved = onSnapshot(query(contributionsRef, where('status', '==', 'Aprovado'), orderBy('createdAt', 'desc'), limit(50)), (snapshot) => {
-                    setApprovedList(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
-                });
-                // Rejected
-                const unsubscribeRejected = onSnapshot(query(contributionsRef, where('status', '==', 'Rejeitado'), orderBy('createdAt', 'desc'), limit(50)), (snapshot) => {
-                    setRejectedList(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
-                });
-                // Trash
-                const unsubscribeTrash = onSnapshot(query(contributionsRef, where('status', '==', 'Lixo'), orderBy('createdAt', 'desc'), limit(50)), (snapshot) => {
-                    setTrashList(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution)));
+
+                // 2. Recent History (Approved, Rejected, Trash) - Single Stream
+                // Fetches everything recent to avoid needing (Status + CreatedAt) composite indexes for each status
+                const recentQuery = query(contributionsRef, orderBy('createdAt', 'desc'), limit(200));
+
+                const unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
+                    const allRecent = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+
+                    // Filter into buckets
+                    const approved = allRecent.filter(c => c.status === 'Aprovado');
+                    const rejected = allRecent.filter(c => c.status === 'Rejeitado');
+                    const trash = allRecent.filter(c => c.status === 'Lixo');
+                    // Note: 'Em Análise' might also be here, but we have a dedicated list for that.
+
+                    setApprovedList(approved);
+                    setRejectedList(rejected);
+                    setTrashList(trash);
+                }, (error) => {
+                    console.error("Recent subscribe error:", error);
+                    // It's possible even this needs an index if 'contributions' is complex, but usually orderBy(single field) is supported by default.
                 });
 
                 return () => {
                     unsubscribeSettings();
                     unsubscribeReports();
                     unsubscribeQueue();
-                    unsubscribeApproved();
-                    unsubscribeRejected();
-                    unsubscribeTrash();
+                    unsubscribeRecent();
                 };
 
             } catch (err) {
