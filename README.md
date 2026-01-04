@@ -34,7 +34,21 @@ O **Procuradoria Cidadã Painel** é uma aplicação web administrativa que perm
   - Busca por Nome, Email ou CPF
   - Badges de Gamificação e Status de Doador
   - Suporte a Níveis Profissionais (Servidor, Empresa Lvl 1-3)
+  - Suporte a Níveis Profissionais (Servidor, Empresa Lvl 1-3)
   - Ações: Promover, Demover, Bloquear, Remover
+
+- **Moderação de Conteúdo Refinada** ✨ IMPROVED
+  - Fluxos claros para "Remover Conteúdo" (Punição) vs "Ignorar Denúncia" (Manter aprovado)
+  - Filtros avançados por localização e categoria
+  - Visualização detalhada de denúncias com ID do reporter e conteúdo original completo
+  - Auditoria com ID completo do usuário e metadados de IA
+
+- **Sistema de Alertas e Engajamento** ✨ NEW
+  - Envio de broadcast para cidadãos
+  - Segmentação por Geolocalização (Estado, Cidade, Bairro)
+  - Segmentação por Faixa Etária
+  - Targeting baseado em residência ou última localização
+  - Histórico de envios com métricas
 
 - **Sistema de Painéis Municipais**
   - Seleção automática ou manual de município

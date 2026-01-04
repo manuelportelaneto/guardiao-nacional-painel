@@ -171,10 +171,9 @@ const AdminUsers: React.FC = () => {
                                 <div className="flex justify-between items-start">
                                     <div className="flex flex-col">
                                         <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                            {user.displayName || 'Sem nome'}
+                                            {user.displayName ? user.displayName.split(' ')[0] : 'Usuário'}
                                         </CardTitle>
-                                        <span className="text-xs font-mono text-gray-500 mt-0.5">{user.email}</span>
-                                        {user.cpf && <span className="text-xs text-gray-400 font-mono">CPF: {user.cpf}</span>}
+                                        <span className="text-xs font-mono text-gray-500 mt-0.5">ID: {user.id.substring(0, 8)}...</span>
                                     </div>
                                     <Badge variant={user.role === 'super_admin' ? 'destructive' : user.role === 'city_admin' ? 'secondary' : 'outline'}>
                                         {user.role}

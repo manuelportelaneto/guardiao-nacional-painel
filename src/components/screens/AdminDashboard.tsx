@@ -1,9 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../firebaseConfig';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import {
     BarChart,
     Bar,
@@ -12,8 +11,12 @@ import {
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell,
     LineChart,
-    Line
+    Line,
+    Legend
 } from 'recharts';
 import {
     Users,
@@ -26,23 +29,35 @@ import {
     BarChart3,
     Settings,
     LogOut,
-    ArrowLeft
+    ArrowLeft,
+    Share2,
+    ThumbsUp,
+    MapPin,
+    Building2,
+    Calendar as CalendarIcon,
+    Filter,
+    Bell
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Calendar } from '../ui/calendar';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-const data = [
-    { name: 'Seg', ocorrencias: 4, resolvidos: 2 },
-    { name: 'Ter', ocorrencias: 3, resolvidos: 1 },
-    { name: 'Qua', ocorrencias: 2, resolvidos: 3 },
-    { name: 'Qui', ocorrencias: 7, resolvidos: 4 },
-    { name: 'Sex', ocorrencias: 5, resolvidos: 2 },
-    { name: 'Sab', ocorrencias: 6, resolvidos: 3 },
-    { name: 'Dom', ocorrencias: 4, resolvidos: 4 },
-];
+interface Contribution {
+    id: string;
+    city?: string;
+    status: string;
+    likes?: number;
+    shares?: number;
+    createdAt?: any;
+    category?: string;
+}
 
-const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, description: string, color: string }> = ({ title, value, icon, description, color }) => (
+const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, description?: string, color: string }> = ({ title, value, icon, description, color }) => (
     <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -52,7 +67,7 @@ const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, 
         </CardHeader>
         <CardContent>
             <div className="text-2xl font-bold">{value}</div>
-            <p className="text-xs text-muted-foreground">{description}</p>
+            {description && <p className="text-xs text-muted-foreground">{description}</p>}
         </CardContent>
     </Card>
 );
@@ -63,227 +78,400 @@ const AdminDashboard: React.FC = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Real-time stats
     const [stats, setStats] = useState({
         users: 0,
-        contributions: 0,
+        totalContributions: 0,
         resolved: 0,
-        cities: 0
+        citiesCount: 0,
+        likesToday: 0,
+        newContribsToday: 0,
+        sharesTotal: 0,
+        positiveContribs: 0,
+        negativeContribs: 0
     });
 
+    const [chartData, setChartData] = useState<{
+        cityRanking: any[];
+        likesRanking: any[];
+        statusOverview: any[];
+    }>({ cityRanking: [], likesRanking: [], statusOverview: [] });
+
+    const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
+    const [regionFilter, setRegionFilter] = useState('all');
+
     useEffect(() => {
-        // Simple counts. In production, these should be cached or use cloud function aggregates for huge DBs.
-        // For current scale, onSnapshot works fine.
+        // Real-time listeners for aggregated stats
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const unsubContribs = onSnapshot(collection(db, 'contributions'), (snap) => {
+            const contribs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+
+            // Basic Counts
+            const total = contribs.length;
+            const resolved = contribs.filter(c => ['Resolvido', 'Concluído'].includes(c.status)).length;
+            const cities = new Set(contribs.map(c => c.city).filter(Boolean)).size;
+            const shares = contribs.reduce((acc, curr) => acc + (curr.shares || 0), 0);
+
+            // Comparisons
+            const positive = contribs.filter(c => c.status === 'Aprovado' || c.status === 'Resolvido').length;
+            const negative = contribs.filter(c => c.status === 'Rejeitado' || c.status === 'Lixo').length;
+
+            // Daily Stats (Mocking/Simulating if field missing)
+            const newToday = contribs.filter(c => {
+                if (!c.createdAt) return false;
+                // Handle Firestore Timestamp or Date
+                const date = c.createdAt.toDate ? c.createdAt.toDate() : new Date(c.createdAt);
+                return date >= today;
+            }).length;
+
+            // Likes (Assuming we track likes on doc)
+            const likesToday = contribs.reduce((acc, c) => acc + (c.likes || 0), 0);
+
+            setStats(prev => ({
+                ...prev,
+                totalContributions: total,
+                resolved,
+                citiesCount: cities,
+                sharesTotal: shares,
+                positiveContribs: positive,
+                negativeContribs: negative,
+                newContribsToday: newToday,
+                likesToday: likesToday
+            }));
+
+            // Prepare Chart Data
+
+            // 1. City Ranking (Occurrences)
+            const cityMap: Record<string, number> = {};
+            contribs.forEach(c => {
+                const city = c.city || 'Desconhecido';
+                cityMap[city] = (cityMap[city] || 0) + 1;
+            });
+            const cityRanking = Object.entries(cityMap)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 5);
+
+            // 2. City Ranking (Likes)
+            const cityLikesMap: Record<string, number> = {};
+            contribs.forEach(c => {
+                const city = c.city || 'Desconhecido';
+                cityLikesMap[city] = (cityLikesMap[city] || 0) + (c.likes || 0);
+            });
+            const likesRanking = Object.entries(cityLikesMap)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 5);
+
+
+            // 3. Status Overview
+            const statusMap: Record<string, number> = {};
+            contribs.forEach(c => {
+                const status = c.status || 'Pendente';
+                statusMap[status] = (statusMap[status] || 0) + 1;
+            });
+            const statusOverview = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
+
+            setChartData({
+                cityRanking,
+                likesRanking,
+                statusOverview
+            });
+        });
+
         const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
             setStats(prev => ({ ...prev, users: snap.size }));
         });
 
-        const unsubContribs = onSnapshot(collection(db, 'contributions'), (snap) => {
-            setStats(prev => ({ ...prev, contributions: snap.size }));
-            const resolvedCount = snap.docs.filter(doc => doc.data().status === 'resolved' || doc.data().status === 'concluded').length;
-            setStats(prev => ({ ...prev, resolved: resolvedCount }));
-        });
-
-        const unsubCities = onSnapshot(collection(db, 'cities'), (snap) => {
-            setStats(prev => ({ ...prev, cities: snap.size }));
-        });
-
         return () => {
-            unsubUsers();
             unsubContribs();
-            unsubCities();
+            unsubUsers();
         };
     }, []);
 
     const isMainDashboard = location.pathname === '/admin' || location.pathname === '/admin/dashboard';
+    const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
     const handleLogout = async () => {
         await logout();
         navigate('/');
     };
 
-    const handleBack = () => {
-        navigate('/hub');
-    };
-
     return (
-        <div className="p-8 space-y-8 bg-gray-50 min-h-screen">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    {/* Sidebar Menu */}
-                    <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                        <SheetTrigger asChild>
-                            <Button variant="ghost" size="icon" className="hover:bg-gray-100">
-                                <Menu className="h-6 w-6" />
+        <div className="flex bg-gray-50 min-h-screen">
+            {/* Sidebar Content (Shared) */}
+            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                <SheetTrigger asChild>
+                    <Button variant="ghost" className="md:hidden fixed top-4 left-4 z-50">
+                        <Menu />
+                    </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-64 p-0">
+                    <div className="h-full bg-slate-900 text-white p-4">
+                        <div className="text-xl font-bold mb-8">Guardião Painel</div>
+                        <nav className="space-y-2">
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/dashboard'); setSidebarOpen(false); }}>
+                                <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
                             </Button>
-                        </SheetTrigger>
-                        <SheetContent side="left" className="w-80">
-                            <SheetHeader>
-                                <SheetTitle>Menu de Navegação</SheetTitle>
-                            </SheetHeader>
-
-                            {/* Navigation Menu */}
-                            <nav className="flex flex-col gap-2 mt-6">
-                                <Button
-                                    variant={isMainDashboard ? "secondary" : "ghost"}
-                                    className="justify-start hover:bg-blue-50 hover:text-blue-600"
-                                    onClick={() => { navigate('/admin'); setSidebarOpen(false); }}
-                                >
-                                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                                    Dashboard
-                                </Button>
-                                <Button
-                                    variant={location.pathname.includes('users') ? "secondary" : "ghost"}
-                                    className="justify-start hover:bg-blue-50 hover:text-blue-600"
-                                    onClick={() => { navigate('/admin/users'); setSidebarOpen(false); }}
-                                >
-                                    <UsersIcon className="mr-2 h-4 w-4" />
-                                    Usuários
-                                </Button>
-                                <Button
-                                    variant={location.pathname.includes('cities') ? "secondary" : "ghost"}
-                                    className="justify-start hover:bg-blue-50 hover:text-blue-600"
-                                    onClick={() => { navigate('/admin/cities'); setSidebarOpen(false); }}
-                                >
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    Cidades
-                                </Button>
-                                <Button
-                                    variant={location.pathname.includes('moderation') ? "secondary" : "ghost"}
-                                    className="justify-start hover:bg-red-50 hover:text-red-600"
-                                    onClick={() => { navigate('/admin/moderation'); setSidebarOpen(false); }}
-                                >
-                                    <AlertTriangle className="mr-2 h-4 w-4" />
-                                    Moderação
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    className="justify-start opacity-50 cursor-not-allowed"
-                                    disabled
-                                >
-                                    <BarChart3 className="mr-2 h-4 w-4" />
-                                    Relatórios Avançados
-                                    <span className="ml-auto text-xs bg-gray-100 px-2 py-0.5 rounded">Em breve</span>
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    className="justify-start opacity-50 cursor-not-allowed"
-                                    disabled
-                                >
-                                    <Settings className="mr-2 h-4 w-4" />
-                                    Configurações
-                                    <span className="ml-auto text-xs bg-gray-100 px-2 py-0.5 rounded">Em breve</span>
-                                </Button>
-                            </nav>
-
-                            {/* Footer Buttons */}
-                            <div className="absolute bottom-6 left-6 right-6 space-y-2">
-                                <Button
-                                    variant="outline"
-                                    className="w-full"
-                                    onClick={handleBack}
-                                >
-                                    <ArrowLeft className="mr-2 h-4 w-4" />
-                                    Voltar
-                                </Button>
-                                <Button
-                                    variant="destructive"
-                                    className="w-full"
-                                    onClick={handleLogout}
-                                >
-                                    <LogOut className="mr-2 h-4 w-4" />
-                                    Sair
-                                </Button>
-                            </div>
-                        </SheetContent>
-                    </Sheet>
-
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard Geral</h1>
-                        <p className="text-gray-500">Visão unificada de todas as prefeituras.</p>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/users'); setSidebarOpen(false); }}>
+                                <UsersIcon className="mr-2 h-4 w-4" /> Usuários
+                            </Button>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/cities'); setSidebarOpen(false); }}>
+                                <BarChart3 className="mr-2 h-4 w-4" /> Cidades
+                            </Button>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/moderation'); setSidebarOpen(false); }}>
+                                <AlertTriangle className="mr-2 h-4 w-4" /> Moderação
+                            </Button>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/alerts'); setSidebarOpen(false); }}>
+                                <Bell className="mr-2 h-4 w-4" /> Alertas
+                            </Button>
+                        </nav>
+                        <div className="absolute bottom-4 left-4 right-4">
+                            <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/20" onClick={handleLogout}>
+                                <LogOut className="mr-2 h-4 w-4" /> Sair
+                            </Button>
+                        </div>
                     </div>
+                </SheetContent>
+            </Sheet>
+
+            {/* Desktop Sidebar */}
+            <div className="hidden md:flex w-64 bg-slate-900 text-white flex-col fixed inset-y-0">
+                <div className="p-6">
+                    <h1 className="text-xl font-bold">Guardião Painel</h1>
+                    <p className="text-xs text-slate-400 mt-1">Administração Nacional</p>
                 </div>
-                <div className="text-sm text-gray-500 bg-white px-4 py-2 rounded-lg border shadow-sm">
-                    Última atualização: Agora mesmo
+                <nav className="flex-1 px-4 space-y-2">
+                    <Button
+                        variant={location.pathname.includes('dashboard') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('dashboard') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/dashboard')}
+                    >
+                        <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('users') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('users') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/users')}
+                    >
+                        <UsersIcon className="mr-2 h-4 w-4" /> Usuários
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('cities') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('cities') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/cities')}
+                    >
+                        <BarChart3 className="mr-2 h-4 w-4" /> Cidades
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('moderation') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('moderation') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/moderation')}
+                    >
+                        <AlertTriangle className="mr-2 h-4 w-4" /> Moderação
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('alerts') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('alerts') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/alerts')}
+                    >
+                        <Bell className="mr-2 h-4 w-4" /> Alertas
+                    </Button>
+                </nav>
+                <div className="p-4 border-t border-slate-800">
+                    <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/20" onClick={handleLogout}>
+                        <LogOut className="mr-2 h-4 w-4" /> Sair
+                    </Button>
                 </div>
             </div>
 
-            {isMainDashboard ? (
-                <>
-                    {/* Stats Grid */}
-                    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-                        <StatCard
-                            title="Total de Usuários"
-                            value={stats.users.toLocaleString()}
-                            icon={<Users className="h-4 w-4 text-white" />}
-                            description="Base de usuários ativa"
-                            color="bg-blue-600"
-                        />
-                        <StatCard
-                            title="Ocorrências Totais"
-                            value={stats.contributions.toLocaleString()}
-                            icon={<AlertTriangle className="h-4 w-4 text-white" />}
-                            description="Acúmulo histórico"
-                            color="bg-orange-500"
-                        />
-                        <StatCard
-                            title="Resolvidos"
-                            value={stats.resolved.toLocaleString()}
-                            icon={<CheckCircle className="h-4 w-4 text-white" />}
-                            description={`${stats.contributions > 0 ? ((stats.resolved / stats.contributions) * 100).toFixed(1) : 0}% de resolução`}
-                            color="bg-green-500"
-                        />
-                        <StatCard
-                            title="Municípios"
-                            value={stats.cities.toLocaleString()}
-                            icon={<FileText className="h-4 w-4 text-white" />}
-                            description="Cidades em implantação"
-                            color="bg-purple-600"
-                        />
-                    </div>
+            {/* Main Content */}
+            <div className="flex-1 md:ml-64 p-8">
+                {isMainDashboard ? (
+                    <div className="space-y-6">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div>
+                                <h1 className="text-3xl font-bold tracking-tight">Dashboard Geral</h1>
+                                <p className="text-muted-foreground">Visão unificada de métricas e indicadores.</p>
+                            </div>
 
-                    {/* Charts Row */}
-                    <div className="grid gap-6 md:grid-cols-2">
-                        <Card className="col-span-1 shadow-sm border-0">
-                            <CardHeader>
-                                <CardTitle>Monitoramento de Fluxo</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pl-2">
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={data}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                                        <Tooltip
-                                            contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                            {/* Filters Toolbar */}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="outline" className="w-[240px] justification-start text-left font-normal">
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {dateRange.from ? (
+                                                dateRange.to ? (
+                                                    <>
+                                                        {format(dateRange.from, "P", { locale: ptBR })} -{" "}
+                                                        {format(dateRange.to, "P", { locale: ptBR })}
+                                                    </>
+                                                ) : (
+                                                    format(dateRange.from, "P", { locale: ptBR })
+                                                )
+                                            ) : (
+                                                <span>Selecione um período</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="end">
+                                        <Calendar
+                                            initialFocus
+                                            mode="range"
+                                            defaultMonth={dateRange.from}
+                                            selected={dateRange as any}
+                                            onSelect={(range: any) => setDateRange(range)}
+                                            numberOfMonths={2}
                                         />
-                                        <Bar dataKey="ocorrencias" fill="#3b82f6" radius={[4, 4, 0, 0]} name="Ocorrências" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
+                                    </PopoverContent>
+                                </Popover>
 
-                        <Card className="col-span-1 shadow-sm border-0">
-                            <CardHeader>
-                                <CardTitle>Nível de Engajamento</CardTitle>
-                            </CardHeader>
-                            <CardContent className="pl-2">
-                                <ResponsiveContainer width="100%" height={300}>
-                                    <LineChart data={data}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                                        <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
-                                        <YAxis fontSize={12} tickLine={false} axisLine={false} />
-                                        <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                                        <Line type="monotone" dataKey="resolvidos" stroke="#10b981" name="Resolvidos" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </CardContent>
-                        </Card>
+                                <Select value={regionFilter} onValueChange={setRegionFilter}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Região/Cidade" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">Todas as Regiões</SelectItem>
+                                        <SelectItem value="sp">São Paulo</SelectItem>
+                                        <SelectItem value="rj">Rio de Janeiro</SelectItem>
+                                    </SelectContent>
+                                </Select>
+
+                                <Button variant="ghost" size="icon">
+                                    <Filter className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        </div>
+
+                        {/* Main Stats Grid */}
+                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <StatCard
+                                title="Municípios Atendidos"
+                                value={stats.citiesCount.toString()}
+                                icon={<Building2 className="h-4 w-4 text-blue-600" />}
+                                description="Cidades com ocorrências registradas"
+                                color="bg-blue-100"
+                            />
+                            <StatCard
+                                title="Ocorrências"
+                                value={stats.totalContributions.toString()}
+                                icon={<FileText className="h-4 w-4 text-orange-600" />}
+                                description={`+${stats.newContribsToday} hoje`}
+                                color="bg-orange-100"
+                            />
+                            <StatCard
+                                title="Usuários Ativos"
+                                value={stats.users.toString()}
+                                icon={<UsersIcon className="h-4 w-4 text-green-600" />}
+                                color="bg-green-100"
+                            />
+                            <StatCard
+                                title="Interações"
+                                value={(stats.likesToday + stats.sharesTotal).toString()}
+                                icon={<Share2 className="h-4 w-4 text-purple-600" />}
+                                description={`${stats.likesToday} curtidas, ${stats.sharesTotal} compartilhamentos`}
+                                color="bg-purple-100"
+                            />
+                        </div>
+
+                        {/* Secondary Stats Grid */}
+                        <div className="grid gap-4 md:grid-cols-3">
+                            <StatCard
+                                title="Resultados Positivos"
+                                value={stats.positiveContribs.toString()}
+                                icon={<CheckCircle className="h-4 w-4 text-green-600" />}
+                                description="Aprovadas ou Resolvidas"
+                                color="bg-green-50"
+                            />
+                            <StatCard
+                                title="Resultados Negativos"
+                                value={stats.negativeContribs.toString()}
+                                icon={<AlertTriangle className="h-4 w-4 text-red-600" />}
+                                description="Rejeitadas ou Lixo"
+                                color="bg-red-50"
+                            />
+                            <StatCard
+                                title="Resolvidos"
+                                value={stats.resolved.toString()}
+                                icon={<CheckCircle className="h-4 w-4 text-blue-600" />}
+                                description="Problemas solucionados"
+                                color="bg-blue-50"
+                            />
+                        </div>
+
+                        {/* Charts Section */}
+                        <div className="grid gap-4 md:grid-cols-2">
+                            {/* Ranking de Ocorrências por Cidade */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Ranking de Ocorrências (Cidade)</CardTitle>
+                                </CardHeader>
+                                <CardContent className="h-[300px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData.cityRanking} layout="vertical" margin={{ left: 20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                            <XAxis type="number" />
+                                            <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 12 }} />
+                                            <Tooltip />
+                                            <Bar dataKey="value" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Ocorrências" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+
+                            {/* Status Overview */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>Status das Contribuições</CardTitle>
+                                </CardHeader>
+                                <CardContent className="h-[300px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={chartData.statusOverview}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={60}
+                                                outerRadius={80}
+                                                paddingAngle={5}
+                                                dataKey="value"
+                                            >
+                                                {chartData.statusOverview.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                            <Legend />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+
+                            {/* Ranking de Curtidas por Cidade */}
+                            <Card className="md:col-span-2">
+                                <CardHeader>
+                                    <CardTitle>Engajamento por Cidade (Curtidas Totais)</CardTitle>
+                                </CardHeader>
+                                <CardContent className="h-[250px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData.likesRanking}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                            <YAxis />
+                                            <Tooltip />
+                                            <Bar dataKey="value" fill="#8884d8" radius={[4, 4, 0, 0]} name="Curtidas" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
-                </>
-            ) : (
-                <Outlet />
-            )}
+                ) : (
+                    <Outlet />
+                )}
+            </div>
         </div>
     );
 };

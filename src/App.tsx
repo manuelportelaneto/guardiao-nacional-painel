@@ -8,6 +8,7 @@ import AdminDashboard from './components/screens/AdminDashboard';
 import AdminUsers from './components/screens/AdminUsers';
 import AdminCities from './components/screens/AdminCities';
 import AdminModeration from './components/screens/AdminModeration';
+import AdminAlerts from './components/screens/AdminAlerts';
 import CitySelector from './components/screens/CitySelector';
 import CityDashboard from './components/screens/CityDashboard';
 import TasksKanban from './components/screens/TasksKanban';
@@ -57,6 +58,7 @@ function App() {
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="cities" element={<AdminCities />} />
                         <Route path="moderation" element={<AdminModeration />} />
+                        <Route path="alerts" element={<AdminAlerts />} />
                     </Route>
 
                     {/* City Selection */}
