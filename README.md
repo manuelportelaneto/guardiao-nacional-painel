@@ -1,10 +1,10 @@
-# Procuradoria Cidadã - Painel Administrativo
+# Guardião Nacional - Painel Administrativo
 
-Painel de administração web para gerenciamento de ocorrências e serviços municipais da plataforma Procuradoria Cidadã.
+Painel de administração web para gerenciamento de ocorrências e serviços municipais da plataforma Guardião Nacional.
 
 ## 📋 Sobre o Projeto
 
-O **Procuradoria Cidadã Painel** é uma aplicação web administrativa que permite gestores públicos e administradores monitorarem, gerenciarem e responderem às ocorrências recebidas através do aplicativo móvel Procuradoria Cidadã.
+O **Guardião Nacional Painel** é uma aplicação web administrativa que permite gestores públicos e administradores monitorarem, gerenciarem e responderem às ocorrências recebidas através do aplicativo móvel Guardião Nacional.
 
 ### Principais Funcionalidades
 
@@ -55,6 +55,11 @@ O **Procuradoria Cidadã Painel** é uma aplicação web administrativa que perm
   - Dashboard específico por cidade
   - Kanban de tarefas (ocorrências)
   - CRM de secretarias e servidores
+  - **Relatórios Técnicos (PDF/Excel)** ✨ NEW
+    - Exportação de ocorrências filtradas por período e categoria
+    - PDF técnico com cabeçalho e rodapé oficial
+    - Excel completo para auditoria interna da prefeitura
+    - Conformidade com anonimização de dados pessoais
 
 ## 🚀 Tecnologias
 
@@ -222,12 +227,12 @@ O projeto utiliza **Tailwind CSS v4** com tema customizado:
 - [x] Integração com Firestore (dados reais) ✅
 - [x] Hierarquia Geográfica (Brasil > Região > Estado > Cidade) ✅
 - [x] Gestão Avançada de Usuários (Cards, Busca CPF, Badges) ✅
+- [x] Relatórios exportáveis (PDF/Excel) ✅
 - [ ] CRUD de tarefas no kanban
 - [ ] Drag-and-drop no kanban
 - [ ] CRUD de secretarias e servidores
-- [ ] Moderação de Conteúdo
-- [ ] Sistema de notificações
-- [ ] Relatórios exportáveis
+- [x] Moderação de Conteúdo ✅
+- [x] Sistema de notificações ✅
 - [ ] Dark mode
 - [x] Testes automatizados ✅
 - [x] CI/CD com GitHub Actions ✅

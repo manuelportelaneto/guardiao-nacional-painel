@@ -29,6 +29,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
+import { ReportDialog } from '../common/ReportDialog';
 
 const data = [
     { name: 'Seg', ocorrencias: 2, resolvidos: 1 },
@@ -65,6 +66,7 @@ const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, 
 const CityDashboard: React.FC = () => {
     const { cityId } = useParams<{ cityId: string }>();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
     const { logout } = useAuth();
     const navigate = useNavigate();
 
@@ -133,12 +135,14 @@ const CityDashboard: React.FC = () => {
                                 </Button>
                                 <Button
                                     variant="ghost"
-                                    className="justify-start opacity-50 cursor-not-allowed"
-                                    disabled
+                                    className="justify-start hover:bg-orange-50 hover:text-orange-600"
+                                    onClick={() => {
+                                        setSidebarOpen(false);
+                                        setReportDialogOpen(true);
+                                    }}
                                 >
                                     <BarChart3 className="mr-2 h-4 w-4" />
                                     Relatórios
-                                    <span className="ml-auto text-xs bg-gray-100 px-2 py-0.5 rounded">Em breve</span>
                                 </Button>
                                 <Button
                                     variant="ghost"
@@ -253,6 +257,12 @@ const CityDashboard: React.FC = () => {
                     </CardContent>
                 </Card>
             </div>
+            <ReportDialog
+                open={reportDialogOpen}
+                onOpenChange={setReportDialogOpen}
+                cityId={cityId}
+                cityName={cityName}
+            />
         </div>
     );
 };

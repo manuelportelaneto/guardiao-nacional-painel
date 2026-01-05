@@ -5,14 +5,16 @@
  * Ranks are awarded based on contributions, donations, and petition signatures.
  */
 
-export enum UserRankId {
-    OBSERVADOR = 'observador',
-    ATIVO = 'ativo',
-    ENGAJADO = 'engajado',
-    SOLIDARIO = 'solidario',
-    MOBILIZADOR = 'mobilizador',
-    GUARDIAO = 'guardiao'
-}
+export const UserRankId = {
+    OBSERVADOR: 'observador',
+    ATIVO: 'ativo',
+    ENGAJADO: 'engajado',
+    SOLIDARIO: 'solidario',
+    MOBILIZADOR: 'mobilizador',
+    GUARDIAO: 'guardiao'
+} as const;
+
+export type UserRankId = typeof UserRankId[keyof typeof UserRankId];
 
 export interface UserRank {
     id: UserRankId;

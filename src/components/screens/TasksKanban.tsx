@@ -15,6 +15,7 @@ import {
 import { Button } from '../ui/button';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
 import { Card, CardContent } from '../ui/card';
+import { ReportDialog } from '../common/ReportDialog';
 
 const CITY_NAMES: { [key: string]: string } = {
     'maua': 'Mauá',
@@ -82,6 +83,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, tasks, color }) => (
 const TasksKanban: React.FC = () => {
     const { cityId } = useParams<{ cityId: string }>();
     const [sidebarOpen, setSidebarOpen] = useState(false);
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
     const { logout } = useAuth();
     const navigate = useNavigate();
 
@@ -149,12 +151,14 @@ const TasksKanban: React.FC = () => {
                                 </Button>
                                 <Button
                                     variant="ghost"
-                                    className="justify-start opacity-50 cursor-not-allowed"
-                                    disabled
+                                    className="justify-start hover:bg-orange-50 hover:text-orange-600"
+                                    onClick={() => {
+                                        setSidebarOpen(false);
+                                        setReportDialogOpen(true);
+                                    }}
                                 >
                                     <BarChart3 className="mr-2 h-4 w-4" />
                                     Relatórios
-                                    <span className="ml-auto text-xs bg-gray-100 px-2 py-0.5 rounded">Em breve</span>
                                 </Button>
                                 <Button
                                     variant="ghost"
@@ -214,6 +218,12 @@ const TasksKanban: React.FC = () => {
                     color="bg-gray-600"
                 />
             </div>
+            <ReportDialog
+                open={reportDialogOpen}
+                onOpenChange={setReportDialogOpen}
+                cityId={cityId}
+                cityName={cityName}
+            />
         </div>
     );
 };
