@@ -13,6 +13,7 @@ import CitySelector from './components/screens/CitySelector';
 import CityDashboard from './components/screens/CityDashboard';
 import TasksKanban from './components/screens/TasksKanban';
 import DepartmentsCRM from './components/screens/DepartmentsCRM';
+import MarketingScreen from './components/screens/MarketingScreen';
 import { Toaster } from 'sonner';
 
 // Wrapper for protected routes
@@ -59,6 +60,7 @@ function App() {
                         <Route path="cities" element={<AdminCities />} />
                         <Route path="moderation" element={<AdminModeration />} />
                         <Route path="alerts" element={<AdminAlerts />} />
+                        <Route path="marketing" element={<MarketingScreen />} />
                     </Route>
 
                     {/* City Selection */}

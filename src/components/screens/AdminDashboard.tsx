@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../firebaseConfig';
-import { collection, onSnapshot, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import {
     BarChart,
     Bar,
@@ -14,33 +14,27 @@ import {
     PieChart,
     Pie,
     Cell,
-    LineChart,
-    Line,
     Legend
 } from 'recharts';
 import {
-    Users,
-    FileText,
     CheckCircle,
     AlertTriangle,
+    FileText,
     Menu,
     LayoutDashboard,
     Users as UsersIcon,
     BarChart3,
-    Settings,
-    LogOut,
-    ArrowLeft,
     Share2,
-    ThumbsUp,
-    MapPin,
+    LogOut,
     Building2,
     Calendar as CalendarIcon,
     Filter,
-    Bell
+    Bell,
+    TrendingUp
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
+import { Sheet, SheetContent, SheetTrigger } from '../ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
@@ -226,6 +220,9 @@ const AdminDashboard: React.FC = () => {
                             <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/alerts'); setSidebarOpen(false); }}>
                                 <Bell className="mr-2 h-4 w-4" /> Alertas
                             </Button>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/marketing'); setSidebarOpen(false); }}>
+                                <TrendingUp className="mr-2 h-4 w-4" /> Marketing
+                            </Button>
                         </nav>
                         <div className="absolute bottom-4 left-4 right-4">
                             <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/20" onClick={handleLogout}>
@@ -277,6 +274,13 @@ const AdminDashboard: React.FC = () => {
                         onClick={() => navigate('/admin/alerts')}
                     >
                         <Bell className="mr-2 h-4 w-4" /> Alertas
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('marketing') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('marketing') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/marketing')}
+                    >
+                        <TrendingUp className="mr-2 h-4 w-4" /> Marketing
                     </Button>
                 </nav>
                 <div className="p-4 border-t border-slate-800">
@@ -438,7 +442,7 @@ const AdminDashboard: React.FC = () => {
                                                 paddingAngle={5}
                                                 dataKey="value"
                                             >
-                                                {chartData.statusOverview.map((entry, index) => (
+                                                {chartData.statusOverview.map((_, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
