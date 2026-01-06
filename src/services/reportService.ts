@@ -13,7 +13,7 @@ export interface ReportData {
     address?: string;
     city?: string;
     state?: string;
-    createdAt: any;
+    createdAt: { toDate: () => Date } | Date | string | number;
     userId: string;
     imageUrl?: string;
     tags?: string[];
@@ -34,9 +34,10 @@ export const reportService = {
     /**
      * Formata a data para exibição
      */
-    formatDate(date: any): string {
+    formatDate(date: { toDate: () => Date } | Date | string | number): string {
         if (!date) return 'N/A';
-        const d = date.toDate ? date.toDate() : new Date(date);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d = (date as any).toDate ? (date as any).toDate() : new Date(date as string | number | Date);
         return format(d, "dd/MM/yyyy HH:mm", { locale: ptBR });
     },
 
@@ -118,6 +119,7 @@ export const reportService = {
         });
 
         // Add Footer
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const pageCount = (doc as any).internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
             doc.setPage(i);

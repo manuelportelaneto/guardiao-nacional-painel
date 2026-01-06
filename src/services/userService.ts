@@ -1,5 +1,5 @@
 import { db } from '../firebaseConfig';
-import { doc, updateDoc, deleteDoc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export interface UserManagement {
     id: string;

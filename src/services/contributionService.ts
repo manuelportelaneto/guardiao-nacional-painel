@@ -19,7 +19,7 @@ export const contributionService = {
         endDate?: Date
     }): Promise<ReportData[]> {
         const contributionsRef = collection(db, 'contributions');
-        let q = query(
+        const q = query(
             contributionsRef,
             where('cityId', '==', cityId),
             orderBy('createdAt', 'desc')
@@ -46,13 +46,15 @@ export const contributionService = {
             }
             if (filters.startDate) {
                 data = data.filter(item => {
-                    const d = item.createdAt?.toDate ? item.createdAt.toDate() : new Date(item.createdAt);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const d = (item.createdAt as any)?.toDate ? (item.createdAt as any).toDate() : new Date(item.createdAt as string | number | Date);
                     return d >= filters.startDate!;
                 });
             }
             if (filters.endDate) {
                 data = data.filter(item => {
-                    const d = item.createdAt?.toDate ? item.createdAt.toDate() : new Date(item.createdAt);
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    const d = (item.createdAt as any)?.toDate ? (item.createdAt as any).toDate() : new Date(item.createdAt as string | number | Date);
                     return d <= filters.endDate!;
                 });
             }
