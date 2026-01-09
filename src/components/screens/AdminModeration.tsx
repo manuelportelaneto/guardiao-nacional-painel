@@ -81,6 +81,7 @@ interface Contribution {
     rejectionReason?: string;
     deletionReason?: string;
     authorName?: string;
+    riskLevel?: number; // 1-5
 }
 
 interface ReportWithContribution extends Report {
@@ -384,30 +385,46 @@ const AdminModeration: React.FC = () => {
     };
 
     // Render Helpers
-    const renderRiskBadges = (analysis: Contribution['aiAnalysis']) => {
-        if (!analysis || !Array.isArray(analysis) || analysis.length === 0) return null;
+    const renderRiskBadges = (item: Contribution) => {
+        const analysis = item.aiAnalysis;
+        const riskLevel = item.riskLevel;
 
-        const risks: { className: string, probability: number }[] = [];
-        analysis.forEach(img => {
-            if (img.predictions) {
-                // Show all non-neutral if unsafe, or just useful tags
-                risks.push(...img.predictions.filter(p => p.className !== 'Neutral' && p.className !== 'Drawing' && p.probability > 0.01));
-            }
-        });
+        const elements = [];
 
-        if (risks.length === 0) {
-            // If nothing significant but marked unsafe
-            if (analysis.some(a => !a.isSafe)) return <Badge variant="destructive" className="text-[10px]">Risco IA (Sem detalhe)</Badge>;
-            return null;
+        // Risk Level Badge
+        if (riskLevel && riskLevel > 1) {
+            let color = "bg-gray-100 text-gray-800";
+            if (riskLevel === 2) color = "bg-yellow-100 text-yellow-800";
+            if (riskLevel === 3) color = "bg-orange-100 text-orange-800";
+            if (riskLevel >= 4) color = "bg-red-100 text-red-800";
+
+            elements.push(
+                <Badge key="risk" variant="outline" className={`${color} border-none`}>
+                    Risco Nível {riskLevel}
+                </Badge>
+            );
         }
+
+        if (analysis && Array.isArray(analysis)) {
+            analysis.forEach((img, idx) => {
+                if (img.predictions) {
+                    const unsafe = img.predictions.filter(p => p.className !== 'Neutral' && p.className !== 'Drawing' && p.probability > 0.01);
+                    unsafe.forEach((risk, rIdx) => {
+                        elements.push(
+                            <Badge key={`ai-${idx}-${rIdx}`} variant={risk.probability > 0.5 ? "destructive" : "secondary"} className="text-[10px]">
+                                IA: {risk.className} {Math.round(risk.probability * 100)}%
+                            </Badge>
+                        );
+                    });
+                }
+            });
+        }
+
+        if (elements.length === 0) return null;
 
         return (
             <div className="flex flex-wrap gap-1 mt-1">
-                {risks.slice(0, 3).map((risk, idx) => (
-                    <Badge key={idx} variant={risk.probability > 0.5 ? "destructive" : "secondary"} className="text-[10px]">
-                        {risk.className} {Math.round(risk.probability * 100)}%
-                    </Badge>
-                ))}
+                {elements.slice(0, 4)}
             </div>
         );
     };
@@ -489,7 +506,7 @@ const AdminModeration: React.FC = () => {
                                     <CardContent className="space-y-2">
                                         {item.imageUrl && <img src={item.imageUrl} className="w-full h-40 object-cover rounded" alt="Content" />}
                                         <h4 className="font-semibold text-sm line-clamp-1">{item.title}</h4>
-                                        {renderRiskBadges(item.aiAnalysis)}
+                                        {renderRiskBadges(item)}
                                         <div className="text-xs text-gray-500">Autor: {getDisplayUser(item.userId, (item as any).authorName)}</div>
 
                                         {tab === 'queue' && (
@@ -572,6 +589,7 @@ const AdminModeration: React.FC = () => {
                                         {/* Added User ID Complete */}
                                         <p>User ID: {selectedContribution.userId}</p>
                                         <p>Status: {selectedContribution.status}</p>
+                                        <p className="font-bold text-yellow-400">Risco Calculado: Nível {selectedContribution.riskLevel || 'N/A'}</p>
                                         {selectedContribution.rejectionReason && <p className="text-red-400">Motivo Rejeição: {selectedContribution.rejectionReason}</p>}
                                         {selectedContribution.deletionReason && <p className="text-red-400">Motivo Exclusão: {selectedContribution.deletionReason}</p>}
                                         <p>IP: {selectedContribution.ipAddress || 'Unknown'}</p>
