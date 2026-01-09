@@ -41,6 +41,9 @@ O **Guardião Nacional Painel** é uma aplicação web administrativa que permit
   - Fluxos claros para "Remover Conteúdo" (Punição) vs "Ignorar Denúncia" (Manter aprovado)
   - Filtros avançados por localização e categoria
   - Visualização detalhada de denúncias com ID do reporter e conteúdo original completo
+  - **Visualização de Risco por IA** ✨ NEW
+    - Badges coloridos indicando nível de risco (1-5)
+    - Detalhe percentual de probabilidade da IA
   - Auditoria com ID completo do usuário e metadados de IA
 
 - **Sistema de Alertas e Engajamento** ✨ NEW
