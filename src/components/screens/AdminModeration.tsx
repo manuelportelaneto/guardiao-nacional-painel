@@ -12,7 +12,9 @@ import {
     setDoc,
     Timestamp,
     orderBy,
-    limit
+    limit,
+    addDoc,
+    increment // Import increment
 } from 'firebase/firestore';
 import {
     ArrowLeft,
@@ -22,7 +24,8 @@ import {
     RefreshCw,
     Settings,
     Search,
-    Filter
+    Filter,
+    Star // Import Star
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Switch } from '../ui/switch';
@@ -104,14 +107,15 @@ const AdminModeration: React.FC = () => {
 
     // Reply State
     const [replyDialog, setReplyDialog] = useState<{ open: boolean; contribution: Contribution | null }>({ open: false, contribution: null });
-    const [autoPublish, setAutoPublish] = useState(false);
+    // autoPublish removed
     const [replyText, setReplyText] = useState('');
     const [useDefaultReply, setUseDefaultReply] = useState(false);
     const defaultReplyText = "Agradecemos sua contribuição! Ela é muito importante para a melhoria da nossa cidade. Encaminharemos para o setor responsável.";
 
-    const [collapsedFilters, setCollapsedFilters] = useState(false); // Default open or closed? "ocupar menos espaço" -> maybe default closed or just more compact. Let's toggle.
-    const [settingsOpen, setSettingsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('reports');
+    // Rating State
+    const [approvalRating, setApprovalRating] = useState(5); // Default 5 stars
+    const [collapsedFilters, setCollapsedFilters] = useState(true); // Default collapsed as per request
 
     // Helper: Mask User Data
     const getDisplayUser = (id: string, name?: string) => {
@@ -149,10 +153,9 @@ const AdminModeration: React.FC = () => {
             try {
                 // Settings
                 const settingsRef = doc(db, 'settings', 'moderation');
-                const unsubscribeSettings = onSnapshot(settingsRef, (doc) => {
-                    if (doc.exists()) {
-                        setAutoPublish(doc.data().autoPublish || false);
-                    }
+                // Removed autoPublish listener from here
+                const unsubscribeSettings = onSnapshot(settingsRef, (_doc) => {
+                    // Logic moved to SystemControls
                 });
 
                 // Reports
@@ -313,17 +316,64 @@ const AdminModeration: React.FC = () => {
 
         try {
             if (action === 'approve_contrib') {
-                await updateDoc(doc(db, 'contributions', contrib.id), { status: 'Aprovado' });
-                toast.success("Aprovado!");
+                // Approve with Rating
+                await updateDoc(doc(db, 'contributions', contrib.id), {
+                    status: 'Aprovado',
+                    rating: approvalRating, // Save Admin Rating
+                    approvedAt: Timestamp.now()
+                });
+
+                // Notify User (Alert)
+                if (contrib.userId) {
+                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                        title: 'Contribuição Aprovada! 🎉',
+                        message: `Sua contribuição "${contrib.title}" foi aprovada e já está no mapa!`,
+                        type: 'success',
+                        link: '/history', // Link to history
+                        read: false,
+                        createdAt: Timestamp.now()
+                    });
+
+                    // Update Gamification (Ratings Received)
+                    // We increment the ratingsReceived counter if it exists, or set it.
+                    // Also increment approved count maybe?
+                    // For now, satisfy "Aguardar Avaliações" mission which checks 'ratingsReceived'
+                    const userRef = doc(db, 'users', contrib.userId);
+                    // Increment ratingsReceived safely
+                    await setDoc(userRef, {
+                        interactions: {
+                            ratingsReceived: increment(1)
+                        }
+                    }, { merge: true });
+                }
+
+                toast.success("Aprovado com sucesso!");
+
             } else if (action === 'reject_contrib' || action === 'reject_approved') {
+                const reason = rejectionReason || 'Sem motivo especificado';
                 await updateDoc(doc(db, 'contributions', contrib.id), {
                     status: 'Rejeitado',
-                    rejectionReason: rejectionReason || 'Sem motivo especificado'
+                    rejectionReason: reason,
+                    rejectedAt: Timestamp.now()
                 });
+
+                // Notify User (Alert) - Rejected
+                if (contrib.userId) {
+                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                        title: 'Contribuição Recusada',
+                        message: `Sua contribuição "${contrib.title}" não pôde ser aceita. Motivo: ${reason}`,
+                        type: 'error',
+                        link: '/history', // Link to history (Filtered by Rejected ideally, but history root is fine)
+                        read: false,
+                        createdAt: Timestamp.now()
+                    });
+                }
+
                 toast.success("Rejeitado com motivo.");
             }
             setConfirmDialog({ open: false, action: null, report: null, contribution: null });
             setRejectionReason('');
+            setApprovalRating(5); // Reset
         } catch (err) {
             console.error(err);
             toast.error("Erro na ação.");
@@ -431,14 +481,14 @@ const AdminModeration: React.FC = () => {
     if (error) return <div>Error: {error}</div>; // Simple error fallback
 
     return (
-        <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
+        <div className="p-6 space-y-6 bg-gray-50 min-h-screen pt-16 md:pt-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}><ArrowLeft className="h-5 w-5" /></Button>
                     <div><h1 className="text-2xl font-bold">Moderação</h1><p className="text-sm text-gray-500">Gestão de Conteúdo</p></div>
                 </div>
+                {/* Settings removed (moved to System Controls) */}
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}><Settings className="h-4 w-4 mr-2" /> Configurar</Button>
                     <Button variant="outline" size="sm" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /></Button>
                 </div>
             </div>
@@ -491,7 +541,7 @@ const AdminModeration: React.FC = () => {
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-5 max-w-4xl">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-2">
                     <TabsTrigger value="reports">Denúncias ({reports.length})</TabsTrigger>
                     <TabsTrigger value="queue">Fila IA ({moderationQueue.length})</TabsTrigger>
                     <TabsTrigger value="approved">Aprovados ({approvedList.length})</TabsTrigger>
@@ -516,9 +566,9 @@ const AdminModeration: React.FC = () => {
                                         <div className="text-xs text-gray-500">Autor: {getDisplayUser(item.userId, (item as any).authorName)}</div>
 
                                         {tab === 'queue' && (
-                                            <div className="flex gap-2 mt-2">
-                                                <Button size="sm" variant="destructive" className="flex-1" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'reject_contrib', contribution: item, report: null }); }}>Rejeitar</Button>
-                                                <Button size="sm" className="flex-1" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'approve_contrib', contribution: item, report: null }); }}>Aprovar</Button>
+                                            <div className="flex gap-2 mt-2 flex-wrap"> {/* Added flex-wrap */}
+                                                <Button size="sm" variant="destructive" className="flex-1 min-w-[80px]" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'reject_contrib', contribution: item, report: null }); }}>Rejeitar</Button>
+                                                <Button size="sm" className="flex-1 min-w-[80px]" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'approve_contrib', contribution: item, report: null }); }}>Aprovar</Button>
                                             </div>
                                         )}
                                         {tab === 'approved' && (
@@ -570,19 +620,7 @@ const AdminModeration: React.FC = () => {
 
             </Tabs>
 
-            {/* Settings Dialog */}
-            <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
-                <DialogContent>
-                    <DialogHeader><DialogTitle>Configurações</DialogTitle></DialogHeader>
-                    <div className="flex items-center space-x-2 py-4">
-                        <Switch id="auto-publish" checked={autoPublish} onCheckedChange={async () => {
-                            await setDoc(doc(db, 'settings', 'moderation'), { autoPublish: !autoPublish }, { merge: true });
-                            setAutoPublish(!autoPublish);
-                        }} />
-                        <Label htmlFor="auto-publish">Auto-Publicação</Label>
-                    </div>
-                </DialogContent>
-            </Dialog>
+            {/* Settings Dialog Removed */}
 
             {/* Details Dialog (Unified for Queue & Approved) */}
             <Dialog open={!!selectedContribution} onOpenChange={() => setSelectedContribution(null)}>
@@ -709,6 +747,28 @@ const AdminModeration: React.FC = () => {
                             {confirmDialog.action === 'approve_remove_content' ? 'Remover conteúdo e notificar usuário?' : `Ação: ${confirmDialog.action === 'reject' ? 'Ignorar Denúncia' : confirmDialog.action}`}
                         </DialogDescription>
                     </DialogHeader>
+
+                    {confirmDialog.action === 'approve_contrib' && (
+                        <div className="py-4 space-y-4">
+                            <div className="space-y-2">
+                                <Label>Avaliação do Relato (Qualidade)</Label>
+                                <div className="flex items-center gap-2">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                        <button
+                                            key={star}
+                                            onClick={() => setApprovalRating(star)}
+                                            className={`p-1 transition-colors ${approvalRating >= star ? 'text-yellow-400' : 'text-gray-300'}`}
+                                            type="button"
+                                        >
+                                            <Star className="w-8 h-8 fill-current" />
+                                        </button>
+                                    ))}
+                                    <span className="text-sm font-bold ml-2 text-gray-700">{approvalRating}/5</span>
+                                </div>
+                                <p className="text-xs text-gray-500">Essa nota conta para a reputação do usuário.</p>
+                            </div>
+                        </div>
+                    )}
 
                     {/* Reason Input for Rejection - ONLY if Action is one that REQUIRES reason */}
                     {['reject_contrib', 'reject_approved', 'approve_remove_content'].includes(confirmDialog.action || '') && (

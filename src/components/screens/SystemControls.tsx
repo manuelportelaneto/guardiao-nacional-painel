@@ -11,12 +11,14 @@ interface SystemSettings {
     showAds: boolean;
     maintenanceMode: boolean;
     enableGamification: boolean;
+    autoPublish: boolean;
 }
 
 const DEFAULT_SETTINGS: SystemSettings = {
     showAds: false,
     maintenanceMode: false,
-    enableGamification: true
+    enableGamification: true,
+    autoPublish: false
 };
 
 const SystemControls: React.FC = () => {
@@ -146,8 +148,34 @@ const SystemControls: React.FC = () => {
                         </div>
                     </CardContent>
                 </Card>
+
+
+                {/* AI & Moderation */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">IA & Moderação</CardTitle>
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center space-x-4 mt-4">
+                            <Switch
+                                id="autoPublish"
+                                checked={settings.autoPublish}
+                                onCheckedChange={() => handleToggle('autoPublish')}
+                            />
+                            <div className="flex-1 space-y-1">
+                                <Label htmlFor="autoPublish" className="text-sm font-medium leading-none">
+                                    Auto-Publicação
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Aprova automaticamente contribuições de baixo risco.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
-        </div>
+        </div >
     );
 };
 
