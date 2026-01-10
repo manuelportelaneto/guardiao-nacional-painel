@@ -42,15 +42,7 @@ import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface Contribution {
-    id: string;
-    city?: string;
-    status: string;
-    likes?: number;
-    shares?: number;
-    createdAt?: any;
-    category?: string;
-}
+import type { Contribution } from '../../types/contribution';
 
 const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, description?: string, color: string }> = ({ title, value, icon, description, color }) => (
     <Card>
@@ -82,14 +74,17 @@ const AdminDashboard: React.FC = () => {
         newContribsToday: 0,
         sharesTotal: 0,
         positiveContribs: 0,
-        negativeContribs: 0
+        negativeContribs: 0,
+        averageRating: 0,
+        totalEvaluations: 0
     });
 
     const [chartData, setChartData] = useState<{
         cityRanking: any[];
         likesRanking: any[];
         statusOverview: any[];
-    }>({ cityRanking: [], likesRanking: [], statusOverview: [] });
+        ratingByCategory: any[];
+    }>({ cityRanking: [], likesRanking: [], statusOverview: [], ratingByCategory: [] });
 
     const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
     const [regionFilter, setRegionFilter] = useState('all');
@@ -123,6 +118,24 @@ const AdminDashboard: React.FC = () => {
             // Likes (Assuming we track likes on doc)
             const likesToday = contribs.reduce((acc, c) => acc + (c.likes || 0), 0);
 
+            // Calculate Average Ratings
+            const ratedContributions = contribs.filter(c => c.rating && c.rating > 0);
+            const totalRatingSum = ratedContributions.reduce((acc, c) => acc + (c.rating || 0), 0);
+            const averageRating = ratedContributions.length > 0 ? (totalRatingSum / ratedContributions.length).toFixed(1) : "0.0";
+
+            // Ratings by Category
+            const ratingByCategoryMap: Record<string, { sum: number, count: number }> = {};
+            ratedContributions.forEach(c => {
+                const cat = c.category || 'Outros';
+                if (!ratingByCategoryMap[cat]) ratingByCategoryMap[cat] = { sum: 0, count: 0 };
+                ratingByCategoryMap[cat].sum += (c.rating || 0);
+                ratingByCategoryMap[cat].count += 1;
+            });
+            const ratingByCategory = Object.entries(ratingByCategoryMap).map(([name, data]) => ({
+                name,
+                value: parseFloat((data.sum / data.count).toFixed(1))
+            }));
+
             setStats(prev => ({
                 ...prev,
                 totalContributions: total,
@@ -132,7 +145,9 @@ const AdminDashboard: React.FC = () => {
                 positiveContribs: positive,
                 negativeContribs: negative,
                 newContribsToday: newToday,
-                likesToday: likesToday
+                likesToday: likesToday,
+                averageRating: parseFloat(averageRating as string),
+                totalEvaluations: ratedContributions.length
             }));
 
             // Prepare Chart Data
@@ -171,7 +186,8 @@ const AdminDashboard: React.FC = () => {
             setChartData({
                 cityRanking,
                 likesRanking,
-                statusOverview
+                statusOverview,
+                ratingByCategory
             });
         });
 
@@ -481,6 +497,36 @@ const AdminDashboard: React.FC = () => {
                                     </ResponsiveContainer>
                                 </CardContent>
                             </Card>
+
+                            {/* Avaliação Média por Categoria */}
+                            <Card className="md:col-span-1">
+                                <CardHeader>
+                                    <CardTitle>Média de Avaliação por Categoria</CardTitle>
+                                </CardHeader>
+                                <CardContent className="h-[250px]">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={chartData.ratingByCategory}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                            <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                                            <YAxis domain={[0, 5]} />
+                                            <Tooltip />
+                                            <Bar dataKey="value" fill="#ffc658" radius={[4, 4, 0, 0]} name="Nota Média" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+
+                            {/* Card Global Stats for Rating */}
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <StatCard
+                                    title="Média Nacional de Avaliação"
+                                    value={stats.averageRating.toString()}
+                                    icon={<UsersIcon className="h-4 w-4 text-yellow-600" />}
+                                    description={`${stats.totalEvaluations} avaliações computadas`}
+                                    color="bg-yellow-100"
+                                />
+                                {/* Add more detailed breakdown if needed, simpler for now */}
+                            </div>
                         </div>
                     </div>
                 ) : (

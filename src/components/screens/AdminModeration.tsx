@@ -21,7 +21,8 @@ import {
     Loader2,
     RefreshCw,
     Settings,
-    Search
+    Search,
+    Filter
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Switch } from '../ui/switch';
@@ -60,26 +61,9 @@ interface Report {
     status: 'pending' | 'approved' | 'rejected';
 }
 
-interface Contribution {
-    id: string;
-    title?: string;
-    description?: string;
-    category?: string;
-    imageUrl?: string;
-    userId: string;
-    city?: string;
-    state?: string;
-    createdAt?: Timestamp;
-    isReported?: boolean;
-    status: string; // 'Em Análise', 'Aprovado', 'Rejeitado'
-    aiAnalysis?: { isSafe: boolean; predictions?: { className: string; probability: number }[] }[];
-    ipAddress?: string;
-    imagesMetadata?: any[];
-    rejectionReason?: string;
-    deletionReason?: string;
-    authorName?: string;
-    riskLevel?: number; // 1-5
-}
+import type { Contribution } from '../../types/contribution';
+
+// Local Contribution interface removed in favor of shared type
 
 interface ReportWithContribution extends Report {
     contribution?: Contribution;
@@ -118,7 +102,14 @@ const AdminModeration: React.FC = () => {
         contribution?: Contribution | null;
     }>({ open: false, action: null, report: null });
 
+    // Reply State
+    const [replyDialog, setReplyDialog] = useState<{ open: boolean; contribution: Contribution | null }>({ open: false, contribution: null });
     const [autoPublish, setAutoPublish] = useState(false);
+    const [replyText, setReplyText] = useState('');
+    const [useDefaultReply, setUseDefaultReply] = useState(false);
+    const defaultReplyText = "Agradecemos sua contribuição! Ela é muito importante para a melhoria da nossa cidade. Encaminharemos para o setor responsável.";
+
+    const [collapsedFilters, setCollapsedFilters] = useState(false); // Default open or closed? "ocupar menos espaço" -> maybe default closed or just more compact. Let's toggle.
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [activeTab, setActiveTab] = useState('reports');
 
@@ -305,7 +296,6 @@ const AdminModeration: React.FC = () => {
                 toast.info("Funcionalidade de banimento em breve.");
             }
 
-            setConfirmDialog({ open: false, action: null, report: null });
             setRejectionReason('');
         } catch (err) {
             console.error(err);
@@ -337,6 +327,29 @@ const AdminModeration: React.FC = () => {
         } catch (err) {
             console.error(err);
             toast.error("Erro na ação.");
+        } finally {
+            setActionLoading(false);
+        }
+    };
+
+    const handleReplyAction = async () => {
+        if (!replyDialog.contribution) return;
+        setActionLoading(true);
+        try {
+            await updateDoc(doc(db, 'contributions', replyDialog.contribution.id), {
+                reply: replyText,
+                replyDate: Timestamp.now(),
+                // Optionally update status to 'Resolvido' or just keep it? Usually a reply implies some action.
+                // Keeping status as is, or maybe user wants to mark valid?
+                // Request says "responder (adicionando um texto)". Doesn't specify status change.
+            });
+            toast.success("Resposta enviada com sucesso!");
+            setReplyDialog({ open: false, contribution: null });
+            setReplyText('');
+            setUseDefaultReply(false);
+        } catch (error) {
+            console.error(error);
+            toast.error("Erro ao enviar resposta.");
         } finally {
             setActionLoading(false);
         }
@@ -430,26 +443,39 @@ const AdminModeration: React.FC = () => {
                 </div>
             </div>
 
-            {/* Filters */}
+            {/* Filters - Flexible/Collapsible */}
             <div className="space-y-4">
-                <div className="flex flex-col md:flex-row gap-4 md:items-center bg-white p-4 rounded-lg shadow-sm">
-                    <div className="relative flex-1 w-full md:max-w-sm">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-                        <Input placeholder="Buscar..." className="pl-9 w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                <div className="bg-white p-4 rounded-lg shadow-sm">
+                    <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setCollapsedFilters(!collapsedFilters)}>
+                        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                            <Filter className="w-4 h-4" /> Filtros e Busca
+                        </h3>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                            {collapsedFilters ? <Settings className="h-4 w-4 rotate-45" /> : <Settings className="h-4 w-4" />}
+                        </Button>
                     </div>
-                    <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                        <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas</SelectItem>
-                            <SelectItem value="infrastructure">Infraestrutura</SelectItem>
-                            <SelectItem value="security">Segurança</SelectItem>
-                            <SelectItem value="transport">Transporte</SelectItem>
-                            <SelectItem value="environment">Meio Ambiente</SelectItem>
-                            <SelectItem value="services">Serviços</SelectItem>
-                            <SelectItem value="leisure">Lazer</SelectItem>
-                            <SelectItem value="health">Saúde</SelectItem>
-                        </SelectContent>
-                    </Select>
+
+                    {!collapsedFilters && (
+                        <div className="flex flex-col md:flex-row gap-4 md:items-center animate-in slide-in-from-top-1">
+                            <div className="relative flex-1 w-full md:max-w-sm">
+                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                                <Input placeholder="Buscar..." className="pl-9 w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                            </div>
+                            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                                <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Todas</SelectItem>
+                                    <SelectItem value="infrastructure">Infraestrutura</SelectItem>
+                                    <SelectItem value="security">Segurança</SelectItem>
+                                    <SelectItem value="transport">Transporte</SelectItem>
+                                    <SelectItem value="environment">Meio Ambiente</SelectItem>
+                                    <SelectItem value="services">Serviços</SelectItem>
+                                    <SelectItem value="leisure">Lazer</SelectItem>
+                                    <SelectItem value="health">Saúde</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
                 </div>
 
                 {/* Standard Location Filter - Visible mostly for lists, but can filter Queue/Approved */}
@@ -498,6 +524,12 @@ const AdminModeration: React.FC = () => {
                                         {tab === 'approved' && (
                                             <Button size="sm" variant="outline" className="w-full mt-2 text-red-500" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'reject_approved', contribution: item, report: null }); }}>
                                                 <Ban className="h-3 w-3 mr-1" /> Rejeitar
+                                            </Button>
+                                        )}
+                                        {/* Reply Button for all tabs except Trash probably */}
+                                        {tab !== 'trash' && (
+                                            <Button size="sm" variant="outline" className="w-full mt-2" onClick={e => { e.stopPropagation(); setReplyDialog({ open: true, contribution: item }); }}>
+                                                Responder
                                             </Button>
                                         )}
                                         {tab === 'rejected' && item.rejectionReason && (
@@ -627,6 +659,46 @@ const AdminModeration: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
+            {/* Reply Dialog */}
+            <Dialog open={replyDialog.open} onOpenChange={(open) => !open && setReplyDialog({ open: false, contribution: null })}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Responder Contribuição</DialogTitle>
+                        <DialogDescription>
+                            Envie uma resposta ao cidadão sobre esta contribuição.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="flex items-center space-x-2">
+                            <Switch id="default-reply" checked={useDefaultReply} onCheckedChange={(checked) => {
+                                setUseDefaultReply(checked);
+                                if (checked) setReplyText(defaultReplyText);
+                                else setReplyText('');
+                            }} />
+                            <Label htmlFor="default-reply">Usar resposta padrão</Label>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Texto da Resposta</Label>
+                            <textarea
+                                className="w-full min-h-[100px] p-2 border rounded-md"
+                                value={replyText}
+                                onChange={(e) => {
+                                    setReplyText(e.target.value);
+                                    if (useDefaultReply && e.target.value !== defaultReplyText) setUseDefaultReply(false);
+                                }}
+                                placeholder="Digite sua resposta aqui..."
+                            />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setReplyDialog({ open: false, contribution: null })}>Cancelar</Button>
+                        <Button onClick={handleReplyAction} disabled={!replyText.trim() || actionLoading}>
+                            {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar Resposta'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
 
             {/* CONFIRM DIALOG WITH REASON */}
             <Dialog open={confirmDialog.open} onOpenChange={o => !o && setConfirmDialog({ ...confirmDialog, open: false })}>
@@ -678,7 +750,7 @@ const AdminModeration: React.FC = () => {
                 </DialogContent>
             </Dialog>
 
-        </div>
+        </div >
     );
 };
 
