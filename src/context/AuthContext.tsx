@@ -1,64 +1,77 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { type User, onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseConfig';
+import type { UserData } from '../types/user';
 
 /**
  * @interface AuthContextType
- * @property {User | null} currentUser - The currently authenticated user from Firebase, or null if no user is logged in.
- * @property {boolean} loading - A boolean flag that is true while the authentication state is being determined, and false otherwise.
- * @property {() => Promise<void>} logout - Function to logout the current user.
+ * @property {User | null} currentUser - The currently authenticated user from Firebase Authentication.
+ * @property {UserData | null} userData - Extended user data from Firestore (role, assignments, etc.).
+ * @property {boolean} loading - True while auth state or user data is loading.
+ * @property {() => Promise<void>} logout - Function to logout.
  */
 interface AuthContextType {
   currentUser: User | null;
+  userData: UserData | null;
   loading: boolean;
   logout: () => Promise<void>;
 }
 
-/**
- * React Context for Firebase Authentication.
- * Provides `currentUser` and `loading` state to its children.
- */
 const AuthContext = createContext<AuthContextType>({
   currentUser: null,
+  userData: null,
   loading: true,
   logout: async () => { },
 });
 
-/**
- * A component that provides the authentication context to its children.
- * It listens for changes in the Firebase authentication state and updates the context accordingly.
- * @param {object} props - The component props.
- * @param {ReactNode} props.children - The child components to be rendered within the provider.
- */
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+
+      if (user) {
+        try {
+          // Fetch user role and additional data from Firestore
+          const userDocRef = doc(db, 'users', user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists()) {
+            setUserData(userDoc.data() as UserData);
+          } else {
+            // Basic fallback if no extra data exists
+            setUserData({ uid: user.uid, email: user.email, role: 'citizen' });
+          }
+        } catch (error) {
+          console.error("Error fetching user data:", error);
+          setUserData(null);
+        }
+      } else {
+        setUserData(null);
+      }
+
       setLoading(false);
     });
 
-    // Cleanup the subscription when the component unmounts
     return unsubscribe;
   }, []);
 
   const logout = async () => {
     await signOut(auth);
+    setUserData(null);
   };
 
   return (
-    <AuthContext.Provider value={{ currentUser, loading, logout }}>
+    <AuthContext.Provider value={{ currentUser, userData, loading, logout }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-/**
- * A custom hook to easily access the authentication context.
- * @returns {AuthContextType} The authentication context, containing the `currentUser` and `loading` state.
- */
 export const useAuth = () => {
   return useContext(AuthContext);
 };

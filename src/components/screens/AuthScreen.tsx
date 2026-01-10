@@ -208,7 +208,7 @@ const AuthScreen: React.FC = () => {
         emailVerified: user.emailVerified,
         termsAcceptedAt: Timestamp.now(),
         privacyAcceptedAt: Timestamp.now(),
-        consentAcceptedAt: Timestamp.now(),
+        dataConsentAcceptedAt: Timestamp.now(),
         termsVersion: '2.0',
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),

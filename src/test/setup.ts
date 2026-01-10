@@ -12,14 +12,17 @@ vi.mock('../firebaseConfig', () => ({
     app: {},
     auth: {
         currentUser: null,
-        onAuthStateChanged: vi.fn((callback) => {
-            callback(null);
-            return vi.fn(); // unsubscribe
+        onAuthStateChanged: vi.fn((_auth, callback) => {
+            // Mock implementation that immediately calls callback with null (logged out) or a mock user
+            // For now, simpler to just simulate callback
+            // callback(null); // Doing nothing by default to let tests control it via mock properties if needed
+            return () => { }; // unsubscribe
         }),
         signInWithEmailAndPassword: vi.fn(),
-        signInWithPopup: vi.fn(),
-        signOut: vi.fn(),
         createUserWithEmailAndPassword: vi.fn(),
+        signOut: vi.fn(),
+        GoogleAuthProvider: vi.fn(),
+        signInWithPopup: vi.fn(),
     },
     db: {
         collection: vi.fn(),
@@ -39,9 +42,8 @@ vi.mock('firebase/auth', () => ({
     GoogleAuthProvider: vi.fn(),
     signOut: vi.fn(),
     createUserWithEmailAndPassword: vi.fn(),
-    onAuthStateChanged: vi.fn((auth, callback) => {
-        callback(null);
-        return vi.fn();
+    onAuthStateChanged: vi.fn(() => {
+        return vi.fn(); // unsubscribe
     }),
 }));
 
@@ -58,7 +60,11 @@ vi.mock('firebase/firestore', () => ({
     query: vi.fn(),
     where: vi.fn(),
     orderBy: vi.fn(),
-    onSnapshot: vi.fn((ref, callback) => {
+    onAuthStateChanged: vi.fn(() => {
+        // callback(null);
+        return vi.fn(); // unsubscribe
+    }),
+    onSnapshot: vi.fn((_ref, callback) => {
         callback({ docs: [] });
         return vi.fn();
     }),

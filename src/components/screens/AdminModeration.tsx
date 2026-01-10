@@ -12,18 +12,15 @@ import {
     setDoc,
     Timestamp,
     orderBy,
-    limit,
-    deleteDoc
+    limit
 } from 'firebase/firestore';
 import {
     ArrowLeft,
-    Flag,
     Ban,
     User,
     Loader2,
     RefreshCw,
     Settings,
-    Shield,
     Search
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -106,7 +103,7 @@ const AdminModeration: React.FC = () => {
     const [locationFilter, setLocationFilter] = useState<LocationFilterState>({});
 
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [error] = useState<string | null>(null);
 
     // Selection
     const [selectedReport, setSelectedReport] = useState<ReportWithContribution | null>(null);
@@ -250,24 +247,7 @@ const AdminModeration: React.FC = () => {
 
 
     // Actions
-    const handleToggleAutoPublish = async () => {
-        setLoading(true);
-        try {
-            await setDoc(doc(db, 'settings', 'moderation'), {
-                autoPublish: !autoPublish,
-                updatedAt: Timestamp.now(),
-                updatedBy: 'admin' // In real app, use auth uid
-            }, { merge: true });
 
-            setAutoPublish(!autoPublish);
-            toast.success(`Publicação Automática ${!autoPublish ? 'Ativada' : 'Desativada'}`);
-        } catch (error) {
-            console.error(error);
-            toast.error("Erro ao atualizar configurações.");
-        } finally {
-            setLoading(false);
-        }
-    };
 
     const handleReportAction = async (action: 'approve' | 'reject' | 'ban' | 'approve_remove_content') => {
         if (!confirmDialog.report) return;

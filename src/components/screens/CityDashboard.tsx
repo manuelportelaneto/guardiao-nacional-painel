@@ -260,8 +260,8 @@ const CityDashboard: React.FC = () => {
             <ReportDialog
                 open={reportDialogOpen}
                 onOpenChange={setReportDialogOpen}
-                cityId={cityId}
-                cityName={cityName}
+                cityId={cityId || ''}
+                cityName={cityName || ''}
             />
         </div>
     );

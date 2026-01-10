@@ -59,7 +59,7 @@ const RoleHub: React.FC = () => {
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
                     <p className="text-gray-600">
-                        Este painel é exclusivo para administradores e gestores públicos.
+                        Este painel é exclusivo para administradores, prefeitos e servidores públicos.
                         Seu usuário <strong>({currentUser?.email})</strong> não possui as permissões necessárias.
                     </p>
                     <button

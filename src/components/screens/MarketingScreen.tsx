@@ -6,14 +6,11 @@ import {
     Target,
     MousePointer2,
     Eye,
-    BarChart,
     Plus,
     Calendar,
     ArrowUpRight
 } from 'lucide-react';
 import {
-    BarChart as ReBarChart,
-    Bar,
     XAxis,
     YAxis,
     CartesianGrid,
