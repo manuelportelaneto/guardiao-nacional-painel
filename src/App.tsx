@@ -5,25 +5,17 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthScreen from './components/screens/AuthScreen';
 import RoleHub from './components/screens/RoleHub';
 import SystemControls from './components/screens/SystemControls';
-
-// ... (in Routes)
-
-{/* Admin Section */ }
-<Route path="/admin" element={
-    <PrivateRoute>
-        <AdminDashboard />
-    </PrivateRoute>
-}>
-    <Route index element={<Navigate to="dashboard" replace />} />
-    <Route path="dashboard" element={<Navigate to="/admin" replace />} /> {/* Redirecting since Dashboard is the main view for now, or we can move the main view to a wrapper */}
-    <Route path="users" element={<AdminUsers />} />
-    <Route path="cities" element={<AdminCities />} />
-    <Route path="moderation" element={<AdminModeration />} />
-    <Route path="alerts" element={<AdminAlerts />} />
-    <Route path="marketing" element={<MarketingScreen />} />
-    <Route path="settings" element={<SystemControls />} />
-</Route>
 import { Toaster } from 'sonner';
+import AdminDashboard from './components/screens/AdminDashboard';
+import AdminUsers from './components/screens/AdminUsers';
+import AdminCities from './components/screens/AdminCities';
+import AdminModeration from './components/screens/AdminModeration';
+import AdminAlerts from './components/screens/AdminAlerts';
+import MarketingScreen from './components/screens/MarketingScreen';
+import CitySelector from './components/screens/CitySelector';
+import CityDashboard from './components/screens/CityDashboard';
+import TasksKanban from './components/screens/TasksKanban';
+import DepartmentsCRM from './components/screens/DepartmentsCRM';
 
 // Wrapper for protected routes
 const PrivateRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
