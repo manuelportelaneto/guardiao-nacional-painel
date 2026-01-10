@@ -53,7 +53,13 @@ O **Guardião Nacional Painel** é uma aplicação web administrativa que permit
   - Targeting baseado em residência ou última localização
   - Histórico de envios com métricas
 
-- **Sistema de Painéis Municipais**
+  - Histórico de envios com métricas
+
+- **Controle e Manutenção (System Controls)** ✨ NEW
+  - **Feature Flags em Tempo Real**: Ative/desative funcionalidades sem deploy
+  - **Controle de Anúncios**: Switch global para ligar/desligar publicidade
+  - **Modo Manutenção**: Bloqueio de acesso para usuários comuns
+  - **Gamificação**: Pausa global do sistema de XP
   - Seleção automática ou manual de município
   - Dashboard específico por cidade
   - Kanban de tarefas (ocorrências)

@@ -30,7 +30,8 @@ import {
     Calendar as CalendarIcon,
     Filter,
     Bell,
-    TrendingUp
+    TrendingUp,
+    Settings
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -223,6 +224,9 @@ const AdminDashboard: React.FC = () => {
                             <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/marketing'); setSidebarOpen(false); }}>
                                 <TrendingUp className="mr-2 h-4 w-4" /> Marketing
                             </Button>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/settings'); setSidebarOpen(false); }}>
+                                <Settings className="mr-2 h-4 w-4" /> Configurações
+                            </Button>
                         </nav>
                         <div className="absolute bottom-4 left-4 right-4">
                             <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/20" onClick={handleLogout}>
@@ -281,6 +285,13 @@ const AdminDashboard: React.FC = () => {
                         onClick={() => navigate('/admin/marketing')}
                     >
                         <TrendingUp className="mr-2 h-4 w-4" /> Marketing
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('settings') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('settings') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/settings')}
+                    >
+                        <Settings className="mr-2 h-4 w-4" /> Configurações
                     </Button>
                 </nav>
                 <div className="p-4 border-t border-slate-800">
