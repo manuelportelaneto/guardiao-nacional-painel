@@ -155,7 +155,7 @@ VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
 npm run dev
 ```
 
-Acesse: `http://localhost:5173`
+Acesse: `http://localhost:5173` ou `https://guardiao-painel-72130.web.app` (Produção)
 
 ### 5. Build para produção
 
@@ -185,8 +185,10 @@ users/{userId}:
   - cities: ['maua', 'santo-andre', ...] // Municípios vinculados
 ```
 
-- **super_admin / admin**: Acesso ao Painel Geral
-- **city_admin**: Acesso a Painéis Municipais específicos
+- **admin / super_admin / presidente**: Acesso total ao Painel Geral
+- **governador**: Acesso a dados estaduais
+- **prefeito** (antigo city_admin): Acesso ao dashboard municipal
+- **servidor**: Acesso restrito a CRM e Tarefas
 - **user**: Sem acesso ao painel
 
 ## 🗺️ Municípios Disponíveis
