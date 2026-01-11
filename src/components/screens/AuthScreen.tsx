@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signInWithPhoneNumber, signOut } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signOut } from 'firebase/auth';
 import type { ConfirmationResult } from 'firebase/auth';
 import { doc, setDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebaseConfig';
@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Shield, ExternalLink, Phone, Mail, CheckCircle2 } from 'lucide-react';
+import { Shield, ExternalLink, Mail, CheckCircle2 } from 'lucide-react';
 import { Separator } from '../ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 // InputMask removed due to React 19 incompatibility - using simple input instead
@@ -29,7 +29,7 @@ const AuthScreen: React.FC = () => {
   const [verificationCode, setVerificationCode] = useState('');
   const [showCodeModal, setShowCodeModal] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-  const [isVerifyingPhone, setIsVerifyingPhone] = useState(false);
+
   const [passwordStrength, setPasswordStrength] = useState(0);
   const [termsError, setTermsError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
@@ -386,41 +386,7 @@ const AuthScreen: React.FC = () => {
     };
   }, [isLogin, loginMethod]);
 
-  const handlePhoneLogin = async () => {
-    if (!phoneNumber || phoneNumber.replace(/\D/g, '').length < 13) {
-      toast.error('Por favor, insira um número de telefone válido.');
-      return;
-    }
 
-    setIsVerifyingPhone(true);
-
-    try {
-      const formattedPhone = `+${phoneNumber.replace(/\D/g, '')}`;
-
-      if (!recaptchaVerifierRef.current) {
-        throw new Error('reCAPTCHA não inicializado');
-      }
-
-      const confirmationResult = await signInWithPhoneNumber(
-        auth,
-        formattedPhone,
-        recaptchaVerifierRef.current
-      );
-
-      confirmationResultRef.current = confirmationResult;
-      setShowCodeModal(true);
-      toast.success('Código SMS enviado!');
-    } catch (error: unknown) {
-      console.error('Error sending SMS:', error);
-      if (error instanceof Error) {
-        toast.error('Erro ao enviar SMS: ' + error.message);
-      } else {
-        toast.error('Erro ao enviar SMS. Tente novamente.');
-      }
-    } finally {
-      setIsVerifyingPhone(false);
-    }
-  };
 
   const handleVerifyCode = async () => {
     if (!verificationCode || verificationCode.length !== 6) {
@@ -529,228 +495,178 @@ const AuthScreen: React.FC = () => {
             </span>
           </div>
 
-          {/* Login Method Toggle (only on login screen) */}
-          {isLogin && (
-            <div className="flex gap-2 mb-6">
-              <Button
-                type="button"
-                variant={loginMethod === 'email' ? 'default' : 'outline'}
-                className="flex-1 h-10"
-                onClick={() => setLoginMethod('email')}
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                Email
-              </Button>
-              <Button
-                type="button"
-                variant={loginMethod === 'phone' ? 'default' : 'outline'}
-                className="flex-1 h-10"
-                onClick={() => setLoginMethod('phone')}
-              >
-                <Phone className="w-4 h-4 mr-2" />
-                Telefone
-              </Button>
+          {/* Email/Password Form */}
+          <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-4">
+            {!isLogin && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="firstName">Nome</Label>
+                  <Input
+                    id="firstName"
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="lastName">Sobrenome</Label>
+                  <Input
+                    id="lastName"
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    required
+                  />
+                </div>
+              </>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
             </div>
-          )}
-
-          {/* Phone Login Form */}
-          {isLogin && loginMethod === 'phone' ? (
-            <div className="space-y-4">
+            {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="phoneNumber">Telefone</Label>
+                <Label htmlFor="phoneRegister">Telefone (Opcional)</Label>
                 <Input
-                  id="phoneNumber"
+                  id="phoneRegister"
                   type="tel"
                   value={phoneNumber}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhoneNumber(e.target.value)}
                   placeholder="+55 11 99999-9999"
                 />
+                <p className="text-xs text-gray-500">
+                  Adicione seu telefone agora ou depois no perfil
+                </p>
               </div>
-
-              <div id="recaptcha-container-login"></div>
-
-              <Button
-                type="button"
-                onClick={handlePhoneLogin}
-                disabled={isVerifyingPhone}
-                className="w-full h-12 bg-primary hover:bg-primary/90"
-              >
-                {isVerifyingPhone ? 'Enviando...' : 'Enviar Código SMS'}
-              </Button>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className={passwordError && !isLogin ? 'border-red-500 ring-1 ring-red-500' : ''}
+                required
+              />
             </div>
-          ) : (
-            /* Email/Password Form */
-            <form onSubmit={isLogin ? handleLogin : handleRegister} className="space-y-4">
-              {!isLogin && (
-                <>
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">Nome</Label>
-                    <Input
-                      id="firstName"
-                      type="text"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Sobrenome</Label>
-                    <Input
-                      id="lastName"
-                      type="text"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      required
-                    />
-                  </div>
-                </>
-              )}
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
+            {isLogin && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPasswordModal(true)}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Esqueceu sua senha?
+                </button>
               </div>
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="phoneRegister">Telefone (Opcional)</Label>
-                  <Input
-                    id="phoneRegister"
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhoneNumber(e.target.value)}
-                    placeholder="+55 11 99999-9999"
-                  />
-                  <p className="text-xs text-gray-500">
-                    Adicione seu telefone agora ou depois no perfil
-                  </p>
+            )}
+            {!isLogin && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Força da senha:</span>
+                  <span className={`font-medium ${passwordStrength <= 2 ? 'text-red-500' :
+                    passwordStrength === 3 ? 'text-yellow-600' : 'text-green-600'
+                    }`}>
+                    {getStrengthLabel(passwordStrength)}
+                  </span>
                 </div>
-              )}
+                <div className="flex gap-1 h-1.5">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <div
+                      key={level}
+                      className={`flex-1 rounded-full transition-colors duration-300 ${level <= passwordStrength ? getStrengthColor(passwordStrength) : 'bg-gray-200'
+                        }`}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Use 8+ caracteres, letras maiúsculas, números e símbolos.
+                </p>
+                {passwordError && (
+                  <p className="text-xs text-red-500 mt-1">
+                    A senha não atende aos requisitos mínimos de segurança.
+                  </p>
+                )}
+              </div>
+            )}
+            {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="confirmPassword">Confirmar Senha</Label>
                 <Input
-                  id="password"
+                  id="confirmPassword"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className={passwordError && !isLogin ? 'border-red-500 ring-1 ring-red-500' : ''}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                 />
               </div>
-              {isLogin && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowForgotPasswordModal(true)}
-                    className="text-sm text-primary hover:underline"
-                  >
-                    Esqueceu sua senha?
-                  </button>
-                </div>
-              )}
-              {!isLogin && (
-                <div className="space-y-1">
-                  <div className="flex justify-between text-xs text-gray-500 mb-1">
-                    <span>Força da senha:</span>
-                    <span className={`font-medium ${passwordStrength <= 2 ? 'text-red-500' :
-                      passwordStrength === 3 ? 'text-yellow-600' : 'text-green-600'
-                      }`}>
-                      {getStrengthLabel(passwordStrength)}
-                    </span>
-                  </div>
-                  <div className="flex gap-1 h-1.5">
-                    {[1, 2, 3, 4, 5].map((level) => (
-                      <div
-                        key={level}
-                        className={`flex-1 rounded-full transition-colors duration-300 ${level <= passwordStrength ? getStrengthColor(passwordStrength) : 'bg-gray-200'
-                          }`}
-                      />
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Use 8+ caracteres, letras maiúsculas, números e símbolos.
-                  </p>
-                  {passwordError && (
-                    <p className="text-xs text-red-500 mt-1">
-                      A senha não atende aos requisitos mínimos de segurança.
-                    </p>
-                  )}
-                </div>
-              )}
-              {!isLogin && (
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
+            )}
+            {!isLogin && (
+              <>
+                <div className="flex items-start space-x-2 py-2">
+                  <input
+                    type="checkbox"
+                    id="acceptTerms"
+                    checked={acceptedTerms}
+                    onChange={(e) => {
+                      setAcceptedTerms(e.target.checked);
+                      if (e.target.checked) setTermsError(false);
+                    }}
+                    className={`mt-1 h-4 w-4 rounded border-gray-300 ${termsError ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                   />
+                  <label htmlFor="acceptTerms" className="text-sm text-gray-600 leading-tight">
+                    Aceito os{' '}
+                    <a
+                      href="https://guardiao-nacional.web.app/legal.html#termos"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center"
+                    >
+                      Termos de Uso
+                      <ExternalLink className="w-3 h-3 ml-0.5" />
+                    </a>
+                    ,{' '}
+                    <a
+                      href="https://guardiao-nacional.web.app/legal.html#privacidade"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center"
+                    >
+                      Política
+                      <ExternalLink className="w-3 h-3 ml-0.5" />
+                    </a>
+                    {' '}e o{' '}
+                    <a
+                      href="https://guardiao-nacional.web.app/legal.html#consentimento"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline inline-flex items-center"
+                    >
+                      Consentimento de Dados
+                      <ExternalLink className="w-3 h-3 ml-0.5" />
+                    </a>
+                  </label>
                 </div>
-              )}
-              {!isLogin && (
-                <>
-                  <div className="flex items-start space-x-2 py-2">
-                    <input
-                      type="checkbox"
-                      id="acceptTerms"
-                      checked={acceptedTerms}
-                      onChange={(e) => {
-                        setAcceptedTerms(e.target.checked);
-                        if (e.target.checked) setTermsError(false);
-                      }}
-                      className={`mt-1 h-4 w-4 rounded border-gray-300 ${termsError ? 'border-red-500 ring-1 ring-red-500' : ''}`}
-                    />
-                    <label htmlFor="acceptTerms" className="text-sm text-gray-600 leading-tight">
-                      Aceito os{' '}
-                      <a
-                        href="https://guardiao-nacional.web.app/legal.html#termos"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center"
-                      >
-                        Termos de Uso
-                        <ExternalLink className="w-3 h-3 ml-0.5" />
-                      </a>
-                      ,{' '}
-                      <a
-                        href="https://guardiao-nacional.web.app/legal.html#privacidade"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center"
-                      >
-                        Política
-                        <ExternalLink className="w-3 h-3 ml-0.5" />
-                      </a>
-                      {' '}e o{' '}
-                      <a
-                        href="https://guardiao-nacional.web.app/legal.html#consentimento"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-primary hover:underline inline-flex items-center"
-                      >
-                        Consentimento de Dados
-                        <ExternalLink className="w-3 h-3 ml-0.5" />
-                      </a>
-                    </label>
-                  </div>
-                  {termsError && (
-                    <p className="text-xs text-red-500 mt-1 ml-6">
-                      É obrigatório aceitar os termos para continuar.
-                    </p>
-                  )}
-                </>
-              )}
-              <Button type="submit" className="w-full h-12 bg-primary hover:bg-primary/90">
-                {isLogin ? 'Entrar' : 'Cadastrar'}
-              </Button>
-            </form>
-          )}
+                {termsError && (
+                  <p className="text-xs text-red-500 mt-1 ml-6">
+                    É obrigatório aceitar os termos para continuar.
+                  </p>
+                )}
+              </>
+            )}
+            <Button type="submit" className="w-full h-12 bg-primary hover:bg-primary/90">
+              {isLogin ? 'Entrar' : 'Cadastrar'}
+            </Button>
+          </form>
+
 
           <div className="mt-6 text-center">
             <p className="text-gray-600">
