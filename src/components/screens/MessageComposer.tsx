@@ -61,6 +61,12 @@ const MessageComposer: React.FC = () => {
             const estimatedReach = isTargetAll ? 15420 : Math.floor(Math.random() * 2000) + 50;
 
             const messageData = {
+                // Root-level fields for App NotificationsScreen compatibility
+                title,
+                body,
+                segment: isTargetAll ? 'all' : 'targeted',
+
+                // Detailed structure for admin panel and future features
                 content: {
                     title,
                     body,

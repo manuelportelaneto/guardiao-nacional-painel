@@ -32,7 +32,8 @@ import {
     Bell,
     Settings,
     MessageSquare,
-    ShieldAlert
+    ShieldAlert,
+    Map as MapIcon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -235,6 +236,9 @@ const AdminDashboard: React.FC = () => {
                             <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/moderation'); setSidebarOpen(false); }}>
                                 <AlertTriangle className="mr-2 h-4 w-4" /> Moderação
                             </Button>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/intelligence'); setSidebarOpen(false); }}>
+                                <MapIcon className="mr-2 h-4 w-4" /> Inteligência
+                            </Button>
                             <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/alerts'); setSidebarOpen(false); }}>
                                 <Bell className="mr-2 h-4 w-4" /> Alertas
                             </Button>
@@ -291,6 +295,13 @@ const AdminDashboard: React.FC = () => {
                         onClick={() => navigate('/admin/moderation')}
                     >
                         <AlertTriangle className="mr-2 h-4 w-4" /> Moderação
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('intelligence') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('intelligence') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/intelligence')}
+                    >
+                        <MapIcon className="mr-2 h-4 w-4" /> Inteligência
                     </Button>
 
                     <Button

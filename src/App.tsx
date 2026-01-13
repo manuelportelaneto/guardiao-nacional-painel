@@ -16,6 +16,7 @@ import TasksKanban from './components/screens/TasksKanban';
 import DepartmentsCRM from './components/screens/DepartmentsCRM';
 import AdminCommunication from './components/screens/AdminCommunication';
 import AdminLogs from './components/screens/AdminLogs';
+import IntelligenceMap from './components/screens/IntelligenceMap';
 import type { UserRole } from './types/user';
 
 // Wrapper for protected routes
@@ -93,6 +94,7 @@ function App() {
                         <Route path="communication" element={<AdminCommunication />} />
                         <Route path="settings" element={<SystemControls />} />
                         <Route path="logs" element={<AdminLogs />} />
+                        <Route path="intelligence" element={<IntelligenceMap />} />
                     </Route>
 
                     {/* City Selection */}
