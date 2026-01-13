@@ -72,7 +72,8 @@ const AdminUsers: React.FC = () => {
             const usersData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data(),
-                displayName: doc.data().displayName || `${doc.data().firstName || ''} ${doc.data().lastName || ''}`.trim() || 'Usuário sem Nome'
+                displayName: doc.data().displayName || `${doc.data().firstName || ''} ${doc.data().lastName || ''}`.trim() || 'Usuário sem Nome',
+                phoneNumber: doc.data().phone || doc.data().phoneNumber || null
             })) as UserManagement[];
 
             if (isLoadMore) {
@@ -215,7 +216,13 @@ const AdminUsers: React.FC = () => {
                 const docRef = doc(db, 'users', term);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
-                    setUsers([{ id: docSnap.id, ...docSnap.data() } as UserManagement]);
+                    const data = docSnap.data();
+                    setUsers([{
+                        id: docSnap.id,
+                        ...data,
+                        displayName: data.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Usuário sem Nome',
+                        phoneNumber: data.phone || data.phoneNumber || null
+                    } as UserManagement]);
                 } else {
                     setUsers([]);
                 }
@@ -237,10 +244,15 @@ const AdminUsers: React.FC = () => {
             // Disable pagination for search mode for simplicity
             setHasMore(false);
 
-            const usersData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as UserManagement[];
+            const usersData = querySnapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data,
+                    displayName: data.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Usuário sem Nome',
+                    phoneNumber: data.phone || data.phoneNumber || null
+                };
+            }) as UserManagement[];
             setUsers(usersData);
         } catch (error) {
             console.error("Search error:", error);
