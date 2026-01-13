@@ -340,4 +340,19 @@ Este projeto é privado e de propriedade da Procuradoria Cidadã.
 - [Procuradoria Cidadã Mobile](https://github.com/manuelportelaneto/procuradoria-cidada)
 - [Procuradoria Cidadã Website](https://github.com/manuelportelaneto/procuradoria-cidada-website)
 - [Documentação Firebase](https://firebase.google.com/docs)
-- [Tailwind CSS v4](https://tailwindcss.com/docs)
+
+## 🔄 Últimas Atualizações (Jan 2026) - Versão 2.1.0
+### Phase 3: Final Polish & UX
+- **Refinamento de Perfil e Usuários**:
+    - Modal integrado para detalhes de contribuição no histórico do usuário.
+    - Extrato detalhado de pontos de gamificação (fonte dos pontos).
+    - Busca de usuários por ID exato.
+- **Sistema de Auditoria**:
+    - Logs detalhados de todas as ações administrativas (Ban, Role Change, Configurações).
+    - Visualização protegida na nova aba "Logs do Sistema".
+- **Comunicação e Engajamento**:
+    - Módulo de "Mensageria" para envio de broadcasts e notificações segmentadas.
+    - Histórico de mensagens enviadas.
+- **System Controls**:
+    - Centralização de configurações globais (Feature Flags, Manutenção).
+    - Controle de análise de IA e Gamificação.
