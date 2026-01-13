@@ -474,7 +474,7 @@ const AdminDashboard: React.FC = () => {
                                                 paddingAngle={5}
                                                 dataKey="value"
                                             >
-                                                {chartData.statusOverview.map((entry, index) => (
+                                                {chartData.statusOverview.map((_, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>

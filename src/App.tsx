@@ -32,7 +32,7 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, allowedRoles }) =
     if (!currentUser) return <Navigate to="/" />;
 
     // Block citizens (users without authorized role)
-    if (userData && !['admin', 'presidente', 'governador', 'prefeito', 'servidor'].includes(userData.role)) {
+    if (userData && !['super_admin', 'admin', 'city_admin', 'presidente', 'governador', 'prefeito', 'servidor'].includes(userData.role)) {
         return (
             <div className="h-screen flex flex-col items-center justify-center gap-4">
                 <h1 className="text-xl font-bold text-red-600">Acesso Restrito</h1>
@@ -80,7 +80,7 @@ function App() {
 
                     {/* Admin Section - Only Admins & Presidente */}
                     <Route path="/admin" element={
-                        <PrivateRoute allowedRoles={['admin', 'presidente']}>
+                        <PrivateRoute allowedRoles={['super_admin', 'admin', 'presidente']}>
                             <AdminDashboard />
                         </PrivateRoute>
                     }>

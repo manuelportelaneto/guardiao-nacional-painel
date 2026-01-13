@@ -38,7 +38,6 @@ const AdminCities: React.FC = () => {
     const [breadcrumb, setBreadcrumb] = useState<GeoLevel[]>([{ type: 'country', name: 'Brasil' }]);
 
     // Data Stats
-    const [activeStates, setActiveStates] = useState<string[]>([]);
     const [activeCities, setActiveCities] = useState<string[]>([]);
 
     // City Level Data

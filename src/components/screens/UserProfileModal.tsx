@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { ScrollArea } from '../ui/scroll-area';
 import {
     User, Mail, Phone, Calendar, Shield, MapPin,
-    Trophy, Star, History, FileText, CheckCircle2, XCircle, AlertTriangle
+    Trophy, Star, History
 } from 'lucide-react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
@@ -86,32 +85,48 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, open, onClose
     };
 
     // Calculate mock points based on contributions for now (Gamification Tab)
+    // Calculate Active XP matching the App logic (gamification.ts)
+    // Rules: Post = 10, Like = 1, Share = 5
+    // Window: 90 days rolling
     const calculatePoints = () => {
         let points = 0;
         const history: { action: string, points: number, date: string }[] = [];
 
-        // Base points for registration
-        points += 100;
-        history.push({ action: 'Cadastro Realizado', points: 100, date: formatDate(user.createdAt) });
+        const now = new Date();
+        const cutoffDate = new Date();
+        cutoffDate.setDate(now.getDate() - 90);
 
-        // Points per contribution
         contributions.forEach(c => {
-            const pts = c.status === 'Resolvido' ? 50 : 20;
-            points += pts;
-            history.push({
-                action: `Contribuição: ${c.category}`,
-                points: pts,
-                date: formatDate(c.createdAt)
-            });
+            // Parse date
+            const cDate = c.createdAt?.toDate ? c.createdAt.toDate() : new Date(c.createdAt);
+
+            // Only count active contributions (last 90 days) for Level Progress
+            if (cDate >= cutoffDate) {
+                // Contribution Points
+                const pointsPerContrib = 10;
+                points += pointsPerContrib;
+                history.push({
+                    action: `Contribuição (Ativa): ${c.category}`,
+                    points: pointsPerContrib,
+                    date: formatDate(c.createdAt)
+                });
+
+                // Like Points
+                if (c.likes && c.likes > 0) {
+                    const pointsPerLike = 1;
+                    const totalLikePoints = c.likes * pointsPerLike;
+                    points += totalLikePoints;
+                    history.push({
+                        action: `Curtidas Recebidas (${c.likes})`,
+                        points: totalLikePoints,
+                        date: formatDate(c.createdAt)
+                    });
+                }
+            }
         });
 
-        // Points for badges
-        if (user.badges) {
-            user.badges.forEach(b => {
-                points += 150;
-                history.push({ action: `Conquista: ${b}`, points: 150, date: '2024' });
-            });
-        }
+        // Sort history by date desc - DISABLED (Using pre-sorted order or index for now)
+        // history.sort((a, b) => 0);
 
         return { total: points, history };
     };

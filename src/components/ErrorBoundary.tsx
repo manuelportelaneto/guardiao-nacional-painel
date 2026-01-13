@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { loggingService } from '../services/loggingService';
 import { Button } from './ui/button';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
@@ -25,9 +25,11 @@ class ErrorBoundary extends Component<Props, State> {
     public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
         console.error("Uncaught error:", error, errorInfo);
 
-        loggingService.logError(error, {
-            componentStack: errorInfo.componentStack,
-            source: 'ErrorBoundary'
+        loggingService.logError({
+            message: error.message,
+            stack: errorInfo.componentStack || error.stack,
+            code: 'CRITICAL_UI_ERROR',
+            path: 'ErrorBoundary'
         });
     }
 

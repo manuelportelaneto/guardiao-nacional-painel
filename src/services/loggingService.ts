@@ -48,7 +48,7 @@ class LoggingService {
      * @param context Additional context (userId, path)
      */
     async logError(errorData: Partial<ErrorLog> & { message: string }) {
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.MODE === 'development') {
             console.warn('[Dev] Error Log skipped:', errorData);
             return;
         }

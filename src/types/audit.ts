@@ -19,4 +19,5 @@ export type AuditAction =
     | 'CONTRIBUTION_APPROVE'
     | 'CONTRIBUTION_REJECT'
     | 'SETTINGS_UPDATE'
-    | 'LOGIN_SUCCESS';
+    | 'LOGIN_SUCCESS'
+    | 'USER_ROLE_CHANGE';

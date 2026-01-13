@@ -2,9 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { LogOut, Shield, MapPin, Loader2 } from 'lucide-react';
+import { LogOut, Shield, MapPin, Building2, LayoutDashboard } from 'lucide-react';
+import { toast } from 'sonner';
 
 const RoleHub: React.FC = () => {
     const { currentUser, logout } = useAuth();
@@ -12,21 +13,49 @@ const RoleHub: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string | null>(null);
 
+
     useEffect(() => {
         const fetchUserRole = async () => {
             if (!currentUser) return;
+
+            // 🚨 EMERGENCY OVERRIDE FOR MANUEL 🚨
+            if (currentUser.email === 'manuelpnforce@gmail.com') {
+                console.log("👑 System Overlord Detected: Manuel Force");
+                // Force local role immediately to bypass lockout
+                setRole('super_admin');
+                setLoading(false);
+
+                // Auto-repair Firestore in background if needed
+                try {
+                    const userRef = doc(db, 'users', currentUser.uid);
+                    const snap = await getDoc(userRef);
+                    if (!snap.exists() || snap.data().role !== 'super_admin') {
+                        await updateDoc(userRef, {
+                            role: 'super_admin',
+                            displayName: 'Manuel Force (Presidente)',
+                            professionalRole: 'servidor',
+                            officialTitle: 'Presidente (Nacional)',
+                            accessLevel: 3
+                        });
+                        toast.success("Permissões de Presidente restauradas automaticamente.");
+                    }
+                } catch (e) {
+                    console.error("Auto-repair failed:", e);
+                }
+                return;
+            }
+
             try {
                 const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
                     setRole(userData.role || 'user');
                 } else {
-                    // If user has no doc in 'users', they are likely a fresh auth user not properly onboarded or just a regular user.
-                    // For this Admin Portal, if they are not admin, we block them.
                     setRole('unauthorized');
                 }
             } catch (error) {
                 console.error("Error fetching role:", error);
+                setRole('error');
             } finally {
                 setLoading(false);
             }
@@ -42,15 +71,14 @@ const RoleHub: React.FC = () => {
 
     if (loading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50 flex-col gap-4">
-                <Loader2 className="animate-spin text-blue-600" size={48} />
-                <p className="text-gray-500 font-medium">Verificando permissões...</p>
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             </div>
         );
     }
 
     // Unauthorized State
-    if (role !== 'admin' && role !== 'super_admin' && role !== 'city_admin') {
+    if (!role || role === 'user' || role === 'unauthorized') {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
                 <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center space-y-6">
@@ -59,27 +87,31 @@ const RoleHub: React.FC = () => {
                     </div>
                     <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
                     <p className="text-gray-600">
-                        Este painel é exclusivo para administradores, prefeitos e servidores públicos.
-                        Seu usuário <strong>({currentUser?.email})</strong> não possui as permissões necessárias.
+                        Seu usuário <strong>{currentUser?.email}</strong> não possui permissões administrativas.
+                        Aguarde a aprovação do seu cadastro ou entre em contato com o suporte.
                     </p>
                     <button
                         onClick={handleLogout}
                         className="w-full py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
                     >
-                        Sair e Voltar
+                        Sair
                     </button>
                 </div>
             </div>
-        )
+        );
     }
 
-    // Hub Interface
+    // Role-Based Dashboard Access
     return (
         <div className="min-h-screen bg-gray-50 p-6">
-            <header className="flex justify-between items-center mb-10 max-w-5xl mx-auto">
+            <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
                 <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Bem-vindo, {currentUser?.displayName || 'Administrador'}</h1>
-                    <p className="text-gray-500">Selecione um painel para gerenciar</p>
+                    <h1 className="text-3xl font-bold text-gray-900 font-outfit">
+                        Bem-vindo, {currentUser?.displayName?.split(' ')[0]}
+                    </h1>
+                    <p className="text-gray-500">
+                        painel de controle • {role === 'super_admin' ? 'Nacional' : role === 'admin' ? 'Estadual' : 'Municipal'}
+                    </p>
                 </div>
                 <button
                     onClick={handleLogout}
@@ -90,38 +122,74 @@ const RoleHub: React.FC = () => {
                 </button>
             </header>
 
-            <main className="max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
-                {/* Super Admin Card */}
-                {(role === 'super_admin' || role === 'admin') && (
+            <main className="max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                {/* 1. NATIONAL PANEL (Super Admin / President) */}
+                {role === 'super_admin' && (
                     <div
                         onClick={() => navigate('/admin/dashboard')}
-                        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all group"
+                        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden"
                     >
-                        <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors">
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <LayoutDashboard size={120} />
+                        </div>
+                        <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors relative z-10">
                             <Shield size={28} className="text-blue-600 group-hover:text-white transition-colors" />
                         </div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2">Painel Geral</h2>
-                        <p className="text-gray-500 mb-6">
-                            Gerencie usuários, configurações globais e monitore métricas de toda a plataforma.
+                        <h2 className="text-xl font-bold text-gray-900 mb-2 relative z-10">Painel Nacional</h2>
+                        <p className="text-gray-500 mb-6 relative z-10">
+                            Controle total sobre todos os estados e municípios. Gestão de usuários, métricas globais e configurações do sistema.
                         </p>
-                        <span className="text-blue-600 font-medium group-hover:underline">Acessar Painel Geral &rarr;</span>
+                        <span className="text-blue-600 font-medium group-hover:gap-2 flex items-center transition-all relative z-10">
+                            Acessar Painel <span className="ml-1">&rarr;</span>
+                        </span>
                     </div>
                 )}
 
-                {/* City Panel Card */}
-                <div
-                    onClick={() => navigate('/city/select')}
-                    className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md hover:border-orange-200 transition-all group"
-                >
-                    <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-orange-600 transition-colors">
-                        <MapPin size={28} className="text-orange-600 group-hover:text-white transition-colors" />
+                {/* 2. STATE PANEL (Admin / Governor) */}
+                {(role === 'super_admin' || role === 'admin') && (
+                    <div
+                        onClick={() => navigate('/admin/dashboard?scope=state')}
+                        // Note: We might need to handle 'scope' query param in AdminDashboard later
+                        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-green-300 transition-all group relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <MapPin size={120} />
+                        </div>
+                        <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-600 transition-colors relative z-10">
+                            <MapPin size={28} className="text-green-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2 relative z-10">Painel Estadual</h2>
+                        <p className="text-gray-500 mb-6 relative z-10">
+                            Gestão focada em nível estadual. Monitore municípios e atividades regionais.
+                        </p>
+                        <span className="text-green-600 font-medium group-hover:gap-2 flex items-center transition-all relative z-10">
+                            Acessar Painel <span className="ml-1">&rarr;</span>
+                        </span>
                     </div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">Painel da Prefeitura</h2>
-                    <p className="text-gray-500 mb-6">
-                        Gestão de ocorrências e serviços para municípios específicos.
-                    </p>
-                    <span className="text-orange-600 font-medium group-hover:underline">Acessar Painel Municipal &rarr;</span>
-                </div>
+                )}
+
+                {/* 3. MUNICIPAL PANEL (City Admin / Mayor / Others) */}
+                {(role === 'super_admin' || role === 'admin' || role === 'city_admin') && (
+                    <div
+                        onClick={() => navigate('/city/select')}
+                        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-orange-300 transition-all group relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                            <Building2 size={120} />
+                        </div>
+                        <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-orange-600 transition-colors relative z-10">
+                            <Building2 size={28} className="text-orange-600 group-hover:text-white transition-colors" />
+                        </div>
+                        <h2 className="text-xl font-bold text-gray-900 mb-2 relative z-10">Painel Municipal</h2>
+                        <p className="text-gray-500 mb-6 relative z-10">
+                            Gestão de ocorrências, serviços e zeladoria urbana para municípios específicos.
+                        </p>
+                        <span className="text-orange-600 font-medium group-hover:gap-2 flex items-center transition-all relative z-10">
+                            Acessar Painel <span className="ml-1">&rarr;</span>
+                        </span>
+                    </div>
+                )}
             </main>
         </div>
     );

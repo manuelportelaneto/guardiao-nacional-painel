@@ -72,6 +72,11 @@ interface ReportWithContribution extends Report {
     contributorEmail?: string;
 }
 
+interface LocationFilterState {
+    state?: string;
+    city?: string;
+}
+
 const AdminModeration: React.FC = () => {
     const navigate = useNavigate();
     const { currentUser } = useAuth();

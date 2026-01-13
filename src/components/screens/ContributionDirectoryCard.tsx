@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { MapPin, Calendar, Star, Eye } from 'lucide-react';
+import { MapPin, Calendar, Eye } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Link } from 'react-router-dom';
 
