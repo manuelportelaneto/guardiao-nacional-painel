@@ -1,8 +1,7 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, RecaptchaVerifier, signOut } from 'firebase/auth';
-import type { ConfirmationResult } from 'firebase/auth';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendEmailVerification, sendPasswordResetEmail, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 import { doc, setDoc, Timestamp, getDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebaseConfig';
 import { toast } from 'sonner';
@@ -19,15 +18,14 @@ import { useAuth } from '../../context/AuthContext';
 const AuthScreen: React.FC = () => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
-  const [loginMethod, setLoginMethod] = useState<'email' | 'phone'>('email');
+
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showCodeModal, setShowCodeModal] = useState(false);
+
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [passwordStrength, setPasswordStrength] = useState(0);
@@ -40,8 +38,7 @@ const AuthScreen: React.FC = () => {
   const [showEmailNotVerifiedModal, setShowEmailNotVerifiedModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
 
-  const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationResultRef = useRef<ConfirmationResult | null>(null);
+
 
 
   const { currentUser } = useAuth(); // Import useAuth if not already imported or available
@@ -340,106 +337,24 @@ const AuthScreen: React.FC = () => {
 
   const toggleMode = () => {
     setIsLogin(!isLogin);
-    // Reset form fields when toggling
     setFirstName('');
     setLastName('');
     setEmail('');
     setPassword('');
     setConfirmPassword('');
     setPhoneNumber('');
-    setVerificationCode('');
-    setVerificationCode('');
     setAcceptedTerms(false);
     setTermsError(false);
     setPasswordError(false);
-    setLoginMethod('email');
   };
 
-  // Initialize reCAPTCHA for phone auth
-  useEffect(() => {
-    if (isLogin && loginMethod === 'phone' && !recaptchaVerifierRef.current) {
-      const container = document.getElementById('recaptcha-container-login');
-      if (container) {
-        try {
-          recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container-login', {
-            'size': 'normal',
-            'callback': () => {
-              console.log('reCAPTCHA solved');
-            }
-          });
-          recaptchaVerifierRef.current.render();
-        } catch (e) {
-          console.error('reCAPTCHA init error', e);
-        }
-      }
-    }
-
-    return () => {
-      if (recaptchaVerifierRef.current) {
-        try {
-          recaptchaVerifierRef.current.clear();
-        } catch (e) {
-          console.error('Error clearing reCAPTCHA', e);
-        }
-        recaptchaVerifierRef.current = null;
-      }
-    };
-  }, [isLogin, loginMethod]);
 
 
 
-  const handleVerifyCode = async () => {
-    if (!verificationCode || verificationCode.length !== 6) {
-      toast.error('Por favor, insira o código de 6 dígitos.');
-      return;
-    }
 
-    if (!confirmationResultRef.current) {
-      toast.error('Erro: confirmação não encontrada.');
-      return;
-    }
 
-    try {
-      const result = await confirmationResultRef.current.confirm(verificationCode);
-      const user = result.user;
 
-      // Check if user document exists
-      const userDocRef = doc(db, 'users', user.uid);
-      const userDoc = await getDoc(userDocRef);
 
-      // If new user, create document
-      if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-          uid: user.uid,
-          phone: user.phoneNumber,
-          provider: 'phone',
-          phoneVerified: true,
-          termsAcceptedAt: Timestamp.now(),
-          privacyAcceptedAt: Timestamp.now(),
-          consentAcceptedAt: Timestamp.now(),
-          termsVersion: '2.0',
-          createdAt: Timestamp.now(),
-          updatedAt: Timestamp.now(),
-        });
-
-        await setDoc(doc(db, 'demographics', user.uid), {
-          userId: user.uid,
-          updatedAt: Timestamp.now(),
-        });
-      }
-
-      toast.success('Login realizado com sucesso!');
-      setShowCodeModal(false);
-      navigate('/hub');
-    } catch (error: unknown) {
-      console.error('Error verifying code:', error);
-      if (error instanceof Error) {
-        toast.error('Código inválido. Tente novamente.');
-      } else {
-        toast.error('Erro ao verificar código.');
-      }
-    }
-  };
 
   return (
     <div className="h-screen bg-background flex flex-col">
@@ -531,21 +446,7 @@ const AuthScreen: React.FC = () => {
                 required
               />
             </div>
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="phoneRegister">Telefone (Opcional)</Label>
-                <Input
-                  id="phoneRegister"
-                  type="tel"
-                  value={phoneNumber}
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPhoneNumber(e.target.value)}
-                  placeholder="+55 11 99999-9999"
-                />
-                <p className="text-xs text-gray-500">
-                  Adicione seu telefone agora ou depois no perfil
-                </p>
-              </div>
-            )}
+
             <div className="space-y-2">
               <Label htmlFor="password">Senha</Label>
               <Input
@@ -684,48 +585,7 @@ const AuthScreen: React.FC = () => {
 
 
 
-      {/* SMS Code Verification Modal */}
-      <Dialog open={showCodeModal} onOpenChange={setShowCodeModal}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Verificação de Telefone</DialogTitle>
-            <DialogDescription>
-              Digite o código de 6 dígitos enviado para o seu telefone.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-gray-600">
-              Digite o código de 6 dígitos enviado para o seu telefone
-            </p>
-            <div className="space-y-2">
-              <Label htmlFor="verificationCode">Código SMS</Label>
-              <Input
-                id="verificationCode"
-                type="text"
-                maxLength={6}
-                placeholder="000000"
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                className="text-center text-2xl tracking-widest"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCodeModal(false);
-                setVerificationCode('');
-              }}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleVerifyCode} disabled={verificationCode.length !== 6}>
-              Verificar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
 
       {/* Forgot Password Modal */}
       <Dialog open={showForgotPasswordModal} onOpenChange={setShowForgotPasswordModal}>

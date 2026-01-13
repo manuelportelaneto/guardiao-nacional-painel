@@ -14,6 +14,9 @@ interface SystemSettings {
     autoPublish: boolean;
 }
 
+import { loggingService } from '../../services/loggingService';
+import { useAuth } from '../../context/AuthContext';
+
 const DEFAULT_SETTINGS: SystemSettings = {
     showAds: false,
     maintenanceMode: false,
@@ -22,12 +25,13 @@ const DEFAULT_SETTINGS: SystemSettings = {
 };
 
 const SystemControls: React.FC = () => {
+    const { currentUser } = useAuth();
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // ... (same as before)
         const settingsRef = doc(db, 'settings', 'global');
-
         const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
             if (docSnap.exists()) {
                 setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() } as SystemSettings);
@@ -40,7 +44,6 @@ const SystemControls: React.FC = () => {
             toast.error("Erro ao carregar configurações.");
             setLoading(false);
         });
-
         return () => unsubscribe();
     }, []);
 
@@ -54,6 +57,14 @@ const SystemControls: React.FC = () => {
             const settingsRef = doc(db, 'settings', 'global');
             await setDoc(settingsRef, { [key]: newValue }, { merge: true });
             toast.success(`Configuração "${key}" atualizada!`);
+
+            if (currentUser) {
+                loggingService.logAudit('SETTINGS_UPDATE', currentUser.uid, key, {
+                    oldValue: !newValue,
+                    newValue: newValue
+                });
+            }
+
         } catch (error) {
             console.error("Error updating setting:", error);
             toast.error("Erro ao salvar alteração.");

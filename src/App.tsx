@@ -9,12 +9,13 @@ import AdminDashboard from './components/screens/AdminDashboard';
 import AdminUsers from './components/screens/AdminUsers';
 import AdminCities from './components/screens/AdminCities';
 import AdminModeration from './components/screens/AdminModeration';
-import AdminAlerts from './components/screens/AdminAlerts';
-import MarketingScreen from './components/screens/MarketingScreen';
+
 import CitySelector from './components/screens/CitySelector';
 import CityDashboard from './components/screens/CityDashboard';
 import TasksKanban from './components/screens/TasksKanban';
 import DepartmentsCRM from './components/screens/DepartmentsCRM';
+import AdminCommunication from './components/screens/AdminCommunication';
+import AdminLogs from './components/screens/AdminLogs';
 import type { UserRole } from './types/user';
 
 // Wrapper for protected routes
@@ -88,9 +89,10 @@ function App() {
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="cities" element={<AdminCities />} />
                         <Route path="moderation" element={<AdminModeration />} />
-                        <Route path="alerts" element={<AdminAlerts />} />
-                        <Route path="marketing" element={<MarketingScreen />} />
+
+                        <Route path="communication" element={<AdminCommunication />} />
                         <Route path="settings" element={<SystemControls />} />
+                        <Route path="logs" element={<AdminLogs />} />
                     </Route>
 
                     {/* City Selection */}

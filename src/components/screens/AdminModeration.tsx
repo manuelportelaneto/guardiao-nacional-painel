@@ -18,13 +18,9 @@ import {
 } from 'firebase/firestore';
 import {
     ArrowLeft,
-    Ban,
     User,
     Loader2,
     RefreshCw,
-    Settings,
-    Search,
-    Filter,
     Star // Import Star
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
@@ -33,7 +29,6 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import { Input } from '../ui/input';
 import {
     Select,
     SelectContent,
@@ -51,9 +46,12 @@ import {
 } from '../ui/dialog';
 import { toast } from 'sonner';
 import { notificationService } from '../../services/notificationService';
+import { loggingService } from '../../services/loggingService';
+import { useAuth } from '../../context/AuthContext';
 
-import { StandardLocationFilter } from '../common/StandardLocationFilter';
-import type { LocationFilterState } from '../common/StandardLocationFilter';
+import { ModerationCard } from './moderation/ModerationCard';
+import { ModerationFilters } from './moderation/ModerationFilters';
+import { ModerationDetails } from './moderation/ModerationDetails';
 
 interface Report {
     id: string;
@@ -76,7 +74,14 @@ interface ReportWithContribution extends Report {
 
 const AdminModeration: React.FC = () => {
     const navigate = useNavigate();
+    const { currentUser } = useAuth();
     const [reports, setReports] = useState<ReportWithContribution[]>([]);
+
+    // ... (rest of state)
+
+    // ... (inside handleReportAction)
+
+    // ...
 
     // Lists
     const [moderationQueue, setModerationQueue] = useState<Contribution[]>([]);
@@ -283,6 +288,8 @@ const AdminModeration: React.FC = () => {
                 await updateDoc(doc(db, 'reports', report.id), { status: 'approved' });
                 toast.success("Conteúdo removido e usuário notificado.");
 
+                if (currentUser) loggingService.logAudit('CONTRIBUTION_REJECT', currentUser.uid, report.contributionId, { reason: rejectionReason, source: 'report' });
+
             } else if (action === 'approve') {
                 // Legacy / Direct Delete (Keep as fallback or for other contexts)
                 if (report.contributionId) {
@@ -290,6 +297,8 @@ const AdminModeration: React.FC = () => {
                 }
                 await updateDoc(doc(db, 'reports', report.id), { status: 'approved' });
                 toast.success("Conteúdo movido para Lixo.");
+
+                if (currentUser) loggingService.logAudit('CONTRIBUTION_REJECT', currentUser.uid, report.contributionId, { reason: 'Lixo', source: 'report_trash' });
 
             } else if (action === 'reject') {
                 await updateDoc(doc(db, 'reports', report.id), { status: 'rejected' });
@@ -348,6 +357,7 @@ const AdminModeration: React.FC = () => {
                 }
 
                 toast.success("Aprovado com sucesso!");
+                if (currentUser) loggingService.logAudit('CONTRIBUTION_APPROVE', currentUser.uid, contrib.id, { rating: approvalRating });
 
             } else if (action === 'reject_contrib' || action === 'reject_approved') {
                 const reason = rejectionReason || 'Sem motivo especificado';
@@ -370,6 +380,7 @@ const AdminModeration: React.FC = () => {
                 }
 
                 toast.success("Rejeitado com motivo.");
+                if (currentUser) loggingService.logAudit('CONTRIBUTION_REJECT', currentUser.uid, contrib.id, { reason });
             }
             setConfirmDialog({ open: false, action: null, report: null, contribution: null });
             setRejectionReason('');
@@ -428,49 +439,7 @@ const AdminModeration: React.FC = () => {
     };
 
     // Render Helpers
-    const renderRiskBadges = (item: Contribution) => {
-        const analysis = item.aiAnalysis;
-        const riskLevel = item.riskLevel;
 
-        const elements = [];
-
-        // Risk Level Badge
-        if (riskLevel && riskLevel > 1) {
-            let color = "bg-gray-100 text-gray-800";
-            if (riskLevel === 2) color = "bg-yellow-100 text-yellow-800";
-            if (riskLevel === 3) color = "bg-orange-100 text-orange-800";
-            if (riskLevel >= 4) color = "bg-red-100 text-red-800";
-
-            elements.push(
-                <Badge key="risk" variant="outline" className={`${color} border-none`}>
-                    Risco Nível {riskLevel}
-                </Badge>
-            );
-        }
-
-        if (analysis && Array.isArray(analysis)) {
-            analysis.forEach((img, idx) => {
-                if (img.predictions) {
-                    const unsafe = img.predictions.filter(p => p.className !== 'Neutral' && p.className !== 'Drawing' && p.probability > 0.01);
-                    unsafe.forEach((risk, rIdx) => {
-                        elements.push(
-                            <Badge key={`ai-${idx}-${rIdx}`} variant={risk.probability > 0.5 ? "destructive" : "secondary"} className="text-[10px]">
-                                IA: {risk.className} {Math.round(risk.probability * 100)}%
-                            </Badge>
-                        );
-                    });
-                }
-            });
-        }
-
-        if (elements.length === 0) return null;
-
-        return (
-            <div className="flex flex-wrap gap-1 mt-1">
-                {elements.slice(0, 4)}
-            </div>
-        );
-    };
 
 
     if (loading && !reports.length && !moderationQueue.length && !approvedList.length && !rejectedList.length && !trashList.length) {
@@ -493,52 +462,18 @@ const AdminModeration: React.FC = () => {
                 </div>
             </div>
 
-            {/* Filters - Flexible/Collapsible */}
-            <div className="space-y-4">
-                <div className="bg-white p-4 rounded-lg shadow-sm">
-                    <div className="flex justify-between items-center mb-2 cursor-pointer" onClick={() => setCollapsedFilters(!collapsedFilters)}>
-                        <h3 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                            <Filter className="w-4 h-4" /> Filtros e Busca
-                        </h3>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                            {collapsedFilters ? <Settings className="h-4 w-4 rotate-45" /> : <Settings className="h-4 w-4" />}
-                        </Button>
-                    </div>
-
-                    {!collapsedFilters && (
-                        <div className="flex flex-col md:flex-row gap-4 md:items-center animate-in slide-in-from-top-1">
-                            <div className="relative flex-1 w-full md:max-w-sm">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
-                                <Input placeholder="Buscar..." className="pl-9 w-full" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                            </div>
-                            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                                <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Categoria" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas</SelectItem>
-                                    <SelectItem value="infrastructure">Infraestrutura</SelectItem>
-                                    <SelectItem value="security">Segurança</SelectItem>
-                                    <SelectItem value="transport">Transporte</SelectItem>
-                                    <SelectItem value="environment">Meio Ambiente</SelectItem>
-                                    <SelectItem value="services">Serviços</SelectItem>
-                                    <SelectItem value="leisure">Lazer</SelectItem>
-                                    <SelectItem value="health">Saúde</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    )}
-                </div>
-
-                {/* Standard Location Filter - Visible mostly for lists, but can filter Queue/Approved */}
-                {(activeTab === 'approved' || activeTab === 'queue') && (
-                    <div className="bg-white p-4 rounded-lg shadow-sm w-fit">
-                        <Label className="text-xs text-gray-400 mb-2 block">Filtrar por Localização</Label>
-                        <StandardLocationFilter
-                            value={locationFilter}
-                            onChange={setLocationFilter}
-                        />
-                    </div>
-                )}
-            </div>
+            {/* Filters */}
+            <ModerationFilters
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                categoryFilter={categoryFilter}
+                setCategoryFilter={setCategoryFilter}
+                locationFilter={locationFilter}
+                setLocationFilter={setLocationFilter}
+                collapsed={collapsedFilters}
+                setCollapsed={setCollapsedFilters}
+                activeTab={activeTab}
+            />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-2">
@@ -554,42 +489,14 @@ const AdminModeration: React.FC = () => {
                     <TabsContent key={tab} value={tab} className="mt-6">
                         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                             {filterList(tab === 'queue' ? moderationQueue : tab === 'approved' ? approvedList : tab === 'rejected' ? rejectedList : trashList).map((item) => (
-                                <Card key={item.id} onClick={() => setSelectedContribution(item)} className="cursor-pointer hover:shadow-md">
-                                    <CardHeader className="pb-2 flex flex-row justify-between space-y-0">
-                                        <Badge variant="outline">{item.category}</Badge>
-                                        <span className="text-xs text-gray-400">{formatDate(item.createdAt)}</span>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        {item.imageUrl && <img src={item.imageUrl} className="w-full h-40 object-cover rounded" alt="Content" />}
-                                        <h4 className="font-semibold text-sm line-clamp-1">{item.title}</h4>
-                                        {renderRiskBadges(item)}
-                                        <div className="text-xs text-gray-500">Autor: {getDisplayUser(item.userId, (item as any).authorName)}</div>
-
-                                        {tab === 'queue' && (
-                                            <div className="flex gap-2 mt-2 flex-wrap"> {/* Added flex-wrap */}
-                                                <Button size="sm" variant="destructive" className="flex-1 min-w-[80px]" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'reject_contrib', contribution: item, report: null }); }}>Rejeitar</Button>
-                                                <Button size="sm" className="flex-1 min-w-[80px]" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'approve_contrib', contribution: item, report: null }); }}>Aprovar</Button>
-                                            </div>
-                                        )}
-                                        {tab === 'approved' && (
-                                            <Button size="sm" variant="outline" className="w-full mt-2 text-red-500" onClick={e => { e.stopPropagation(); setConfirmDialog({ open: true, action: 'reject_approved', contribution: item, report: null }); }}>
-                                                <Ban className="h-3 w-3 mr-1" /> Rejeitar
-                                            </Button>
-                                        )}
-                                        {/* Reply Button for all tabs except Trash probably */}
-                                        {tab !== 'trash' && (
-                                            <Button size="sm" variant="outline" className="w-full mt-2" onClick={e => { e.stopPropagation(); setReplyDialog({ open: true, contribution: item }); }}>
-                                                Responder
-                                            </Button>
-                                        )}
-                                        {tab === 'rejected' && item.rejectionReason && (
-                                            <Badge variant="secondary" className="bg-red-100 text-red-800 mt-2">Motivo: {item.rejectionReason}</Badge>
-                                        )}
-                                        {tab === 'trash' && item.deletionReason && (
-                                            <Badge variant="secondary" className="bg-red-100 text-red-800 mt-2">Motivo: {item.deletionReason}</Badge>
-                                        )}
-                                    </CardContent>
-                                </Card>
+                                <ModerationCard
+                                    key={item.id}
+                                    item={item}
+                                    tab={tab}
+                                    onClick={(i) => setSelectedContribution(i)}
+                                    onAction={(action, i) => setConfirmDialog({ open: true, action: action as any, contribution: i, report: null })}
+                                    onReply={(i) => setReplyDialog({ open: true, contribution: i })}
+                                />
                             ))}
                             {filterList(tab === 'queue' ? moderationQueue : tab === 'approved' ? approvedList : tab === 'rejected' ? rejectedList : trashList).length === 0 && (
                                 <div className="col-span-3 text-center py-12 text-gray-500 border border-dashed rounded">Lista vazia.</div>
@@ -623,40 +530,10 @@ const AdminModeration: React.FC = () => {
             {/* Settings Dialog Removed */}
 
             {/* Details Dialog (Unified for Queue & Approved) */}
-            <Dialog open={!!selectedContribution} onOpenChange={() => setSelectedContribution(null)}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>Detalhes</DialogTitle></DialogHeader>
-                    {selectedContribution && (
-                        <div className="space-y-4">
-                            {selectedContribution.imageUrl && <img src={selectedContribution.imageUrl} className="w-full h-80 object-cover rounded" alt="Full" />}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div><Label className="text-gray-500">Título</Label><p className="font-medium">{selectedContribution.title}</p></div>
-                                <div><Label className="text-gray-500">Autor</Label><p>{getDisplayUser(selectedContribution.userId, (selectedContribution as any).authorName)}</p></div>
-                                <div className="col-span-2"><Label className="text-gray-500">Descrição</Label><p className="text-sm bg-gray-50 p-2 rounded">{selectedContribution.description}</p></div>
-                                <div className="col-span-2 border-t pt-2"><Label className="text-gray-500">IA & Auditoria</Label>
-                                    <div className="bg-slate-900 text-green-400 p-2 rounded font-mono text-xs overflow-auto">
-                                        <p>ID: {selectedContribution.id}</p>
-                                        {/* Added User ID Complete */}
-                                        <p>User ID: {selectedContribution.userId}</p>
-                                        <p>Status: {selectedContribution.status}</p>
-                                        <p className="font-bold text-yellow-400">Risco Calculado: Nível {selectedContribution.riskLevel || 'N/A'}</p>
-                                        {selectedContribution.rejectionReason && <p className="text-red-400">Motivo Rejeição: {selectedContribution.rejectionReason}</p>}
-                                        {selectedContribution.deletionReason && <p className="text-red-400">Motivo Exclusão: {selectedContribution.deletionReason}</p>}
-                                        <p>IP: {selectedContribution.ipAddress || 'Unknown'}</p>
-                                        <p>Analysis: {JSON.stringify(selectedContribution.aiAnalysis, null, 2)}</p>
-                                        {selectedContribution.imagesMetadata && (
-                                            <p>Metadata: {JSON.stringify(selectedContribution.imagesMetadata, null, 2)}</p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                    <DialogFooter>
-                        <Button className="w-full" onClick={() => setSelectedContribution(null)}>Fechar</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <ModerationDetails
+                contribution={selectedContribution}
+                onClose={() => setSelectedContribution(null)}
+            />
 
             {/* Report Details Dialog */}
             <Dialog open={!!selectedReport} onOpenChange={() => setSelectedReport(null)}>

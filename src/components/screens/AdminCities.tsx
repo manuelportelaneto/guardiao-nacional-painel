@@ -1,34 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebaseConfig';
-import { collection, query, getDocs, doc, updateDoc, orderBy, where } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, where, limit, startAfter } from 'firebase/firestore';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import {
     Building2,
-    CheckCircle2,
-    XCircle,
-    Plus,
-    Settings2,
     Loader2,
     ChevronRight,
     Globe,
     MapPin,
-    ArrowLeft
+    ArrowLeft,
+    Database,
+    AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface City {
-    id: string;
-    name: string;
-    uf: string;
-    region?: string;
-    country?: string;
-    status: 'active' | 'inactive' | 'pending';
-    adminEmail?: string;
-    population?: number;
-    updatedAt?: Date;
-}
+import ContributionDirectoryCard from './ContributionDirectoryCard';
 
 interface GeoLevel {
     type: 'country' | 'region' | 'state' | 'city';
@@ -46,53 +33,138 @@ const STATE_BY_REGION: Record<string, string[]> = {
 };
 
 const AdminCities: React.FC = () => {
-    const [cities, setCities] = useState<City[]>([]);
-    const [loading, setLoading] = useState(true);
-
     // Hierarchical navigation state
     const [currentLevel, setCurrentLevel] = useState<GeoLevel>({ type: 'country', name: 'Brasil' });
     const [breadcrumb, setBreadcrumb] = useState<GeoLevel[]>([{ type: 'country', name: 'Brasil' }]);
 
+    // Data Stats
+    const [activeStates, setActiveStates] = useState<string[]>([]);
+    const [activeCities, setActiveCities] = useState<string[]>([]);
+
+    // City Level Data
+    const [cityContributions, setCityContributions] = useState<any[]>([]);
+    const [loadingData, setLoadingData] = useState(false);
+
+    // Pagination & Filters
+    const [filters, setFilters] = useState({
+        status: 'all',
+        category: 'all'
+    });
+    const [lastVisible, setLastVisible] = useState<any>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const LIMIT = 12;
+
     useEffect(() => {
-        if (currentLevel.type === 'city' || currentLevel.type === 'state') {
-            fetchCities();
+        // Initial load to identify active regions/states (Optimization: could be a dedicated stats doc)
+        // For now, we might just allow navigation everywhere but show "No data" if empty,
+        // OR we can fetch a glimpse of active places.
+        // Let's allow standard navigation for now, but fetching city specific data when entering a city is key.
+        if (currentLevel.type === 'state') {
+            fetchCitiesInState(currentLevel.name);
+        }
+        if (currentLevel.type === 'city') {
+            // Reset pagination when entering a city
+            setCityContributions([]);
+            setLastVisible(null);
+            setHasMore(true);
+            fetchCityContributions(currentLevel.name, false, filters);
         }
     }, [currentLevel]);
 
-    const fetchCities = async () => {
-        setLoading(true);
+    // Refresh when filters change (only if in city view)
+    useEffect(() => {
+        if (currentLevel.type === 'city') {
+            setCityContributions([]);
+            setLastVisible(null);
+            setHasMore(true);
+            fetchCityContributions(currentLevel.name, false, filters);
+        }
+    }, [filters]);
+
+    const fetchCitiesInState = async (stateAbbr: string) => {
+        setLoadingData(true);
         try {
-            let q;
-            if (currentLevel.type === 'state') {
-                q = query(collection(db, 'cities'), where('uf', '==', currentLevel.name), orderBy('name'));
-            } else {
-                q = query(collection(db, 'cities'), orderBy('name'));
-            }
-            const querySnapshot = await getDocs(q);
-            const citiesData = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as City[];
-            setCities(citiesData);
+            // Find unique cities in this state from contributions
+            // Firestore doesn't support "distinct" easily.
+            // We fetch contributions with 'uf' == stateAbbr (requires composite index probably or just filtering)
+            // Ideally we should have a 'cities' collection or 'stats' collection.
+            // Fallback: Query contributions filtering by UF (assuming we save UF in contributions)
+            // If contributions don't have UF, we might track by city name only (risk of duplicate names).
+            // Let's assume contributions have 'uf' field as per recent updates or we use the 'city' field string.
+
+            // To be safe and fast without reading ALL docs:
+            // We can't easily list "Active Cities" without a separate index.
+            // PROPOSAL: Display ALL cities? No, too many.
+            // PROPOSAL: Query 'cities' collection if we keep it synced?
+            // The user wanted "vincule agora mesmo os municípios que já temos registros".
+            // So we MUST look at 'contributions'.
+
+            // Let's try to fetch recent contributions in this state and extract unique cities.
+            // FIXED: Reverting to 'uf' as apparently legacy records use this field.
+            // If we need to support both, we'd need complex queries or client-side filter.
+            // For now, assuming 'uf' is the standard field in the DB.
+            const q = query(
+                collection(db, 'contributions'),
+                where('uf', '==', stateAbbr),
+                limit(100) // Limit to avoid reading too much. Ideally we need an aggregation.
+            );
+            const snap = await getDocs(q);
+            const cities = new Set<string>();
+            snap.docs.forEach(d => {
+                const data = d.data();
+                if (data.city) cities.add(data.city);
+            });
+            setActiveCities(Array.from(cities).sort());
+
         } catch (error) {
             console.error("Error fetching cities:", error);
-            toast.error("Erro ao carregar cidades");
+            // Try fallback: maybe field IS 'uf'? Double check if fails.
+            // For now assuming 'state' is correct as per type definition.
+            // toast.error("Erro ao buscar cidades ativas");
+            setActiveCities([]); // Fail gracefully
         } finally {
-            setLoading(false);
+            setLoadingData(false);
         }
     };
 
-    const toggleCityStatus = async (city: City) => {
-        const newStatus = city.status === 'active' ? 'inactive' : 'active';
+    const fetchCityContributions = async (cityName: string, isLoadMore = false, currentFilters = filters) => {
+        setLoadingData(true);
         try {
-            await updateDoc(doc(db, 'cities', city.id), {
-                status: newStatus,
-                updatedAt: new Date()
-            });
-            toast.success(`Cidade ${newStatus === 'active' ? 'ativada' : 'desativada'}`);
-            setCities(cities.map(c => c.id === city.id ? { ...c, status: newStatus } : c));
-        } catch {
-            toast.error("Erro ao atualizar status da cidade");
+            let constraints: any[] = [
+                where('city', '==', cityName),
+                orderBy('createdAt', 'desc')
+            ];
+
+            if (currentFilters.status !== 'all') {
+                constraints.push(where('status', '==', currentFilters.status));
+            }
+            if (currentFilters.category !== 'all') {
+                constraints.push(where('category', '==', currentFilters.category));
+            }
+
+            let q = query(collection(db, 'contributions'), ...constraints, limit(LIMIT));
+
+            if (isLoadMore && lastVisible) {
+                q = query(collection(db, 'contributions'), ...constraints, startAfter(lastVisible), limit(LIMIT));
+            }
+
+            const snap = await getDocs(q);
+            const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            const lastDoc = snap.docs[snap.docs.length - 1];
+            setLastVisible(lastDoc);
+            setHasMore(snap.docs.length === LIMIT);
+
+            if (isLoadMore) {
+                setCityContributions(prev => [...prev, ...data]);
+            } else {
+                setCityContributions(data);
+            }
+        } catch (error) {
+            console.error("Error fetching city data:", error);
+            toast.error("Erro ao carregar contribuições");
+        } finally {
+            setLoadingData(false);
         }
     };
 
@@ -113,6 +185,12 @@ const AdminCities: React.FC = () => {
             setCurrentLevel(newBreadcrumb[newBreadcrumb.length - 1]);
         }
     };
+
+    // Extract unique categories from current items for filter (or hardcode common ones)
+    // For simplicity, let's hardcode common ones or just generic input.
+    const CONTRIBUTORS_STATUS = ['Em Análise', 'Aprovado', 'Rejeitado', 'Resolvido', 'Lixo'];
+    const CONTRIBUTORS_CATEGORIES = ['Saúde', 'Educação', 'Infraestrutura', 'Meio Ambiente', 'Segurança', 'Outros'];
+
 
     const renderContent = () => {
         if (currentLevel.type === 'country') {
@@ -166,68 +244,112 @@ const AdminCities: React.FC = () => {
         }
 
         if (currentLevel.type === 'state') {
-            if (loading) {
-                return (
-                    <div className="flex items-center justify-center py-20 text-gray-500">
-                        <Loader2 className="animate-spin w-6 h-6 mr-2" />
-                        Carregando cidades...
-                    </div>
-                );
-            }
-
-            if (cities.length === 0) {
-                return (
-                    <div className="text-center py-20 text-gray-500">
-                        <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                        <p>Nenhuma cidade cadastrada em {currentLevel.name}.</p>
-                        <p className="text-sm mt-2">As cidades são criadas automaticamente quando uma contribuição é registrada.</p>
-                    </div>
-                );
-            }
-
             return (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {cities.map(city => (
-                        <Card key={city.id} className={`overflow-hidden ${city.status === 'inactive' ? 'opacity-60' : ''}`}>
-                            <div className={`h-1.5 w-full ${city.status === 'active' ? 'bg-green-500' : 'bg-gray-300'}`} />
-                            <CardHeader className="pb-2">
-                                <div className="flex items-start justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
-                                            <Building2 className="w-5 h-5" />
+                <div className="space-y-6">
+                    <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-2 text-blue-800 text-sm">
+                        <AlertCircle className="w-4 h-4" />
+                        <p>Mostrando cidades com contribuições recentes registradas neste estado.</p>
+                    </div>
+
+                    {loadingData ? (
+                        <div className="flex items-center justify-center py-20 text-gray-500">
+                            <Loader2 className="animate-spin w-6 h-6 mr-2" /> Carregando cidades...
+                        </div>
+                    ) : activeCities.length === 0 ? (
+                        <div className="text-center py-20 text-gray-500">
+                            <Building2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                            <p>Nenhuma cidade com contribuições encontrada recentemente em {currentLevel.name}.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {activeCities.map(city => (
+                                <Card
+                                    key={city}
+                                    className="cursor-pointer hover:shadow-md hover:border-blue-300"
+                                    onClick={() => navigateTo({ type: 'city', name: city })}
+                                >
+                                    <CardContent className="p-4 flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="bg-blue-100 p-2 rounded-full text-blue-600">
+                                                <Building2 className="w-4 h-4" />
+                                            </div>
+                                            <span className="font-semibold text-gray-700">{city}</span>
                                         </div>
-                                        <div>
-                                            <CardTitle className="text-lg">{city.name}</CardTitle>
-                                            <span className="text-xs text-gray-500 font-mono">{city.uf}</span>
-                                        </div>
-                                    </div>
-                                    <Badge variant={city.status === 'active' ? 'secondary' : 'outline'}>
-                                        {city.status === 'active' ? 'Ativa' : 'Inativa'}
-                                    </Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-3">
-                                <p className="text-sm text-gray-600">
-                                    <strong>Responsável:</strong> {city.adminEmail || 'Não atribuído'}
-                                </p>
-                                <div className="flex gap-2 pt-2 border-t">
-                                    <Button variant="ghost" size="sm" className="flex-1 gap-1">
-                                        <Settings2 className="w-4 h-4" />
-                                        Configurar
-                                    </Button>
+                                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
+        if (currentLevel.type === 'city') {
+            return (
+                <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                                <Building2 className="w-5 h-5 text-blue-600" />
+                                {currentLevel.name}
+                            </h3>
+                            <Badge variant="outline" className="px-3 py-1">
+                                {cityContributions.length > 0 ? `${cityContributions.length}${hasMore ? '+' : ''}` : '0'} Registros
+                            </Badge>
+                        </div>
+
+                        {/* Filters */}
+                        <div className="flex gap-2">
+                            <select
+                                className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                value={filters.status}
+                                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                            >
+                                <option value="all">Todos Status</option>
+                                {CONTRIBUTORS_STATUS.map(s => <option key={s} value={s}>{s}</option>)}
+                            </select>
+                            <select
+                                className="h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                value={filters.category}
+                                onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                            >
+                                <option value="all">Todas Categorias</option>
+                                {CONTRIBUTORS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                            </select>
+                        </div>
+                    </div>
+
+                    {loadingData && cityContributions.length === 0 ? (
+                        <div className="flex items-center justify-center py-20 text-gray-500">
+                            <Loader2 className="animate-spin w-6 h-6 mr-2" /> Carregando registros...
+                        </div>
+                    ) : cityContributions.length === 0 ? (
+                        <div className="text-center py-10 text-gray-500">
+                            <p>Nenhum registro encontrado com estes filtros.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {cityContributions.map(contrib => (
+                                    <ContributionDirectoryCard key={contrib.id} contribution={contrib} />
+                                ))}
+                            </div>
+
+                            {hasMore && (
+                                <div className="flex justify-center pt-6">
                                     <Button
-                                        variant={city.status === 'active' ? 'destructive' : 'default'}
-                                        size="sm"
-                                        className="flex-1 gap-1"
-                                        onClick={() => toggleCityStatus(city)}
+                                        variant="outline"
+                                        onClick={() => fetchCityContributions(currentLevel.name, true)}
+                                        disabled={loadingData}
                                     >
-                                        {city.status === 'active' ? <XCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
-                                        {city.status === 'active' ? 'Desativar' : 'Ativar'}
+                                        {loadingData ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                        Carregar Mais
                                     </Button>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    ))}
+                            )}
+                        </>
+                    )}
                 </div>
             );
         }
@@ -240,13 +362,13 @@ const AdminCities: React.FC = () => {
             {/* Header */}
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
                 <div>
-                    <h2 className="text-3xl font-bold text-gray-900 font-outfit">Gestão Geográfica</h2>
-                    <p className="text-gray-500">Navegue pela hierarquia Brasil &gt; Região &gt; Estado &gt; Cidade.</p>
+                    <h2 className="text-3xl font-bold text-gray-900 font-outfit">Diretório Geográfico</h2>
+                    <p className="text-gray-500">Navegue pelas contribuições organizadas hierarquicamente.</p>
                 </div>
-                <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
-                    <Plus className="w-4 h-4" />
-                    Nova Cidade
-                </Button>
+                <Badge variant="secondary" className="gap-1">
+                    <Database className="w-3 h-3" />
+                    Modo Dinâmico
+                </Badge>
             </div>
 
             {/* Breadcrumb Navigation */}

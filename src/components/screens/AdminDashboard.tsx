@@ -30,8 +30,9 @@ import {
     Calendar as CalendarIcon,
     Filter,
     Bell,
-    TrendingUp,
-    Settings
+    Settings,
+    MessageSquare,
+    ShieldAlert
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -237,8 +238,11 @@ const AdminDashboard: React.FC = () => {
                             <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/alerts'); setSidebarOpen(false); }}>
                                 <Bell className="mr-2 h-4 w-4" /> Alertas
                             </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/marketing'); setSidebarOpen(false); }}>
-                                <TrendingUp className="mr-2 h-4 w-4" /> Marketing
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/communication'); setSidebarOpen(false); }}>
+                                <MessageSquare className="mr-2 h-4 w-4" /> Comunicação
+                            </Button>
+                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/logs'); setSidebarOpen(false); }}>
+                                <ShieldAlert className="mr-2 h-4 w-4" /> Logs do Sistema
                             </Button>
                             <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/settings'); setSidebarOpen(false); }}>
                                 <Settings className="mr-2 h-4 w-4" /> Configurações
@@ -288,19 +292,20 @@ const AdminDashboard: React.FC = () => {
                     >
                         <AlertTriangle className="mr-2 h-4 w-4" /> Moderação
                     </Button>
+
                     <Button
-                        variant={location.pathname.includes('alerts') ? "secondary" : "ghost"}
-                        className={`w-full justify-start ${!location.pathname.includes('alerts') && 'text-white hover:text-white hover:bg-slate-800'}`}
-                        onClick={() => navigate('/admin/alerts')}
+                        variant={location.pathname.includes('communication') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('communication') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/communication')}
                     >
-                        <Bell className="mr-2 h-4 w-4" /> Alertas
+                        <MessageSquare className="mr-2 h-4 w-4" /> Comunicação
                     </Button>
                     <Button
-                        variant={location.pathname.includes('marketing') ? "secondary" : "ghost"}
-                        className={`w-full justify-start ${!location.pathname.includes('marketing') && 'text-white hover:text-white hover:bg-slate-800'}`}
-                        onClick={() => navigate('/admin/marketing')}
+                        variant={location.pathname.includes('logs') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('logs') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/logs')}
                     >
-                        <TrendingUp className="mr-2 h-4 w-4" /> Marketing
+                        <ShieldAlert className="mr-2 h-4 w-4" /> Logs do Sistema
                     </Button>
                     <Button
                         variant={location.pathname.includes('settings') ? "secondary" : "ghost"}
@@ -457,7 +462,7 @@ const AdminDashboard: React.FC = () => {
                                 <CardHeader>
                                     <CardTitle>Status das Contribuições</CardTitle>
                                 </CardHeader>
-                                <CardContent className="h-[300px]">
+                                <CardContent className="h-[250px] w-full min-w-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <PieChart>
                                             <Pie
@@ -469,7 +474,7 @@ const AdminDashboard: React.FC = () => {
                                                 paddingAngle={5}
                                                 dataKey="value"
                                             >
-                                                {chartData.statusOverview.map((_, index) => (
+                                                {chartData.statusOverview.map((entry, index) => (
                                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
@@ -485,7 +490,7 @@ const AdminDashboard: React.FC = () => {
                                 <CardHeader>
                                     <CardTitle>Engajamento por Cidade (Curtidas Totais)</CardTitle>
                                 </CardHeader>
-                                <CardContent className="h-[250px]">
+                                <CardContent className="h-[250px] w-full min-w-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={chartData.likesRanking}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />
@@ -503,7 +508,7 @@ const AdminDashboard: React.FC = () => {
                                 <CardHeader>
                                     <CardTitle>Média de Avaliação por Categoria</CardTitle>
                                 </CardHeader>
-                                <CardContent className="h-[250px]">
+                                <CardContent className="h-[250px] w-full min-w-0">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <BarChart data={chartData.ratingByCategory}>
                                             <CartesianGrid strokeDasharray="3 3" vertical={false} />

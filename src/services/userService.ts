@@ -12,6 +12,11 @@ export interface UserManagement {
     isDonor?: boolean;
     status: 'active' | 'blocked';
     badges?: string[];
+    // Extended profile fields
+    photoURL?: string;
+    phoneNumber?: string;
+    createdAt?: any; // Firestore Timestamp
+    lastLoginAt?: any; // Firestore Timestamp
 }
 
 /**
@@ -23,6 +28,7 @@ export const promoteUser = async (userId: string, data: Partial<UserManagement>)
         ...data,
         updatedAt: serverTimestamp()
     });
+    return data.role; // Return new role for UI update
 };
 
 /**

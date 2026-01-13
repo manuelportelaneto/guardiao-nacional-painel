@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebaseConfig';
-import { collection, query, getDocs, orderBy, limit, where } from 'firebase/firestore';
+import { collection, query, getDocs, orderBy, limit, where, startAfter, doc, getDoc } from 'firebase/firestore';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
@@ -21,50 +21,181 @@ import { toast } from 'sonner';
 import { toggleUserBlock, promoteUser, removeUser } from '../../services/userService';
 import type { UserManagement } from '../../services/userService';
 import { USER_RANKS } from '../../types/userRanks';
+import { loggingService } from '../../services/loggingService';
+import { useAuth } from '../../context/AuthContext';
+import UserProfileModal from './UserProfileModal';
 
 const AdminUsers: React.FC = () => {
+    const { currentUser } = useAuth();
     const [users, setUsers] = useState<UserManagement[]>([]);
     const [loading, setLoading] = useState(true);
-    const [searchType, setSearchType] = useState<'email' | 'name' | 'cpf'>('email');
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const [searchType, setSearchType] = useState<'email' | 'name' | 'cpf' | 'id'>('email');
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Pagination State
+    const [lastVisible, setLastVisible] = useState<any>(null);
+    const [hasMore, setHasMore] = useState(true);
+    const USERS_PER_PAGE = 20;
+
+    // Modal State
+    const [selectedUser, setSelectedUser] = useState<UserManagement | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+
+    const handleUserClick = (user: UserManagement) => {
+        setSelectedUser(user);
+        setIsModalOpen(true);
+    };
 
     useEffect(() => {
         fetchUsers();
     }, []);
 
-    const fetchUsers = async () => {
-        setLoading(true);
+    const fetchUsers = async (isLoadMore = false) => {
+        if (isLoadMore) setIsLoadingMore(true);
+        else setLoading(true);
         try {
-            const q = query(collection(db, 'users'), orderBy('email'), limit(50));
+            let q = query(collection(db, 'users'), orderBy('email'), limit(USERS_PER_PAGE));
+
+            if (isLoadMore && lastVisible) {
+                q = query(collection(db, 'users'), orderBy('email'), startAfter(lastVisible), limit(USERS_PER_PAGE));
+            }
+
             const querySnapshot = await getDocs(q);
+
+            const lastVisibleDoc = querySnapshot.docs[querySnapshot.docs.length - 1];
+            setLastVisible(lastVisibleDoc);
+            setHasMore(querySnapshot.docs.length === USERS_PER_PAGE);
+
             const usersData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             })) as UserManagement[];
-            setUsers(usersData);
+
+            if (isLoadMore) {
+                setUsers(prev => [...prev, ...usersData]);
+            } else {
+                setUsers(usersData);
+            }
         } catch (error) {
             console.error("Error fetching users:", error);
             toast.error("Erro ao carregar usuários");
         } finally {
-            setLoading(false);
+            if (isLoadMore) setIsLoadingMore(false);
+            else setLoading(false);
         }
     };
 
+    const handleToggleBlock = async (user: UserManagement) => {
+        try {
+            const newStatus = await toggleUserBlock(user.id, user.status);
+            toast.success(`Usuário ${newStatus === 'active' ? 'desbloqueado' : 'bloqueado'}.`);
+
+            // Audit Log
+            if (currentUser) {
+                loggingService.logAudit(
+                    newStatus === 'blocked' ? 'USER_BAN' : 'USER_UNBAN',
+                    currentUser.uid,
+                    user.id,
+                    {
+                        targetEmail: user.email,
+                        reason: 'Manual action by admin'
+                    }
+                );
+            }
+
+            // Optimistic update
+            setUsers(users.map(u => u.id === user.id ? { ...u, status: newStatus as any } : u));
+        } catch (error) {
+            console.error("Error toggling block:", error);
+            toast.error("Erro ao alterar status do usuário.");
+        }
+    };
+
+    const handlePromote = async (targetUser: UserManagement, newRole: string) => {
+        try {
+            await promoteUser(targetUser.id, { role: newRole as any });
+            setUsers(users.map(u => u.id === targetUser.id ? { ...u, role: newRole as any } : u));
+            toast.success(`Role alterada para ${newRole}`);
+
+            // Audit Log
+            if (currentUser) {
+                loggingService.logAudit(
+                    'USER_ROLE_CHANGE',
+                    currentUser.uid,
+                    targetUser.id,
+                    { newRole, oldRole: targetUser.role }
+                );
+            }
+
+        } catch (error) {
+            console.error("Error promoting user:", error);
+            toast.error('Erro ao promover usuário');
+        }
+    };
+
+    const handleRemove = async (userId: string) => {
+        if (!confirm('Tem certeza? Essa ação não pode ser desfeita.')) return;
+        try {
+            await removeUser(userId);
+            toast.success("Usuário removido.");
+
+            // Audit Log
+            if (currentUser) {
+                loggingService.logAudit(
+                    'USER_BAN',
+                    currentUser.uid,
+                    userId,
+                    { action: 'DELETE_USER_PERMANENT' }
+                );
+            }
+
+            setUsers(users.filter(u => u.id !== userId));
+        } catch {
+            toast.error('Erro ao remover usuário');
+        }
+    };
     const handleSearch = async () => {
         if (!searchTerm.trim()) {
-            fetchUsers();
+            setLastVisible(null);
+            fetchUsers(false); // Reset to initial list
             return;
         }
         setLoading(true);
         try {
+            // Search logic
+            let q;
+            const term = searchTerm.trim();
+
+            if (searchType === 'id') {
+                // ID exact match
+                // We can use documentId() logic or just fetch the doc directly for best performance/accuracy
+                // But for simplicity in list view, let's just fetch it and wrap in array
+                const docRef = doc(db, 'users', term);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setUsers([{ id: docSnap.id, ...docSnap.data() } as UserManagement]);
+                } else {
+                    setUsers([]);
+                }
+                setHasMore(false);
+                setLoading(false);
+                return;
+            }
+
             const field = searchType === 'cpf' ? 'cpf' : searchType === 'name' ? 'displayName' : 'email';
-            const q = query(
+            q = query(
                 collection(db, 'users'),
-                where(field, '>=', searchTerm),
-                where(field, '<=', searchTerm + '\uf8ff'),
+                where(field, '>=', term),
+                where(field, '<=', term + '\uf8ff'),
                 limit(50)
             );
+
             const querySnapshot = await getDocs(q);
+
+            // Disable pagination for search mode for simplicity
+            setHasMore(false);
+
             const usersData = querySnapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
@@ -75,37 +206,6 @@ const AdminUsers: React.FC = () => {
             toast.error("Erro na busca");
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handleToggleBlock = async (user: UserManagement) => {
-        try {
-            const newStatus = await toggleUserBlock(user.id, user.status);
-            setUsers(users.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
-            toast.success(newStatus === 'blocked' ? 'Usuário bloqueado' : 'Usuário reativado');
-        } catch {
-            toast.error('Erro ao alterar status');
-        }
-    };
-
-    const handleRemove = async (userId: string) => {
-        if (!confirm('Tem certeza que deseja remover este usuário?')) return;
-        try {
-            await removeUser(userId);
-            setUsers(users.filter(u => u.id !== userId));
-            toast.success('Usuário removido');
-        } catch {
-            toast.error('Erro ao remover usuário');
-        }
-    };
-
-    const handlePromote = async (user: UserManagement, role: UserManagement['role']) => {
-        try {
-            await promoteUser(user.id, { role });
-            setUsers(users.map(u => u.id === user.id ? { ...u, role } : u));
-            toast.success(`Role alterada para ${role}`);
-        } catch {
-            toast.error('Erro ao promover usuário');
         }
     };
 
@@ -125,7 +225,7 @@ const AdminUsers: React.FC = () => {
             {/* Advanced Search Bar */}
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4">
                 <div className="flex flex-wrap gap-2">
-                    {(['email', 'name', 'cpf'] as const).map((type) => (
+                    {(['email', 'name', 'cpf', 'id'] as const).map((type) => (
                         <Button
                             key={type}
                             variant={searchType === type ? 'default' : 'outline'}
@@ -133,7 +233,7 @@ const AdminUsers: React.FC = () => {
                             onClick={() => setSearchType(type)}
                             className="capitalize"
                         >
-                            {type}
+                            {type === 'id' ? 'ID' : type}
                         </Button>
                     ))}
                 </div>
@@ -141,116 +241,155 @@ const AdminUsers: React.FC = () => {
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <Input
-                            placeholder={`Buscar por ${searchType === 'cpf' ? 'CPF' : searchType === 'name' ? 'nome' : 'e-mail'}...`}
+                            placeholder={`Buscar por ${searchType === 'cpf' ? 'CPF' :
+                                searchType === 'name' ? 'nome' :
+                                    searchType === 'id' ? 'ID exato' : 'e-mail'}...`}
                             className="pl-10 h-11"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
                     </div>
-                    <Button onClick={handleSearch} className="h-11 px-8">
+                    <Button onClick={handleSearch} className="h-11 px-4 md:px-8 touch-manipulation">
                         Buscar
                     </Button>
                 </div>
             </div>
 
             {/* Users Grid */}
-            {loading ? (
-                <div className="text-center py-20 text-gray-500">Carregando usuários...</div>
-            ) : users.length === 0 ? (
-                <div className="text-center py-20 text-gray-500">Nenhum usuário encontrado.</div>
-            ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {users.map((user) => (
-                        <Card key={user.id} className={`overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow bg-white ${user.status === 'blocked' ? 'opacity-75 grayscale' : ''}`}>
-                            <div className={`h-2 w-full ${user.role === 'super_admin' ? 'bg-red-500' :
-                                user.role === 'admin' ? 'bg-orange-500' :
-                                    user.role === 'city_admin' ? 'bg-blue-500' : 'bg-green-500'
-                                }`} />
-                            <CardHeader className="pb-2">
-                                <div className="flex justify-between items-start">
-                                    <div className="flex flex-col">
-                                        <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                            {user.displayName ? user.displayName.split(' ')[0] : 'Usuário'}
-                                        </CardTitle>
-                                        <span className="text-xs font-mono text-gray-500 mt-0.5">ID: {user.id.substring(0, 8)}...</span>
+            {
+                loading ? (
+                    <div className="text-center py-20 text-gray-500">Carregando usuários...</div>
+                ) : users.length === 0 ? (
+                    <div className="text-center py-20 text-gray-500">Nenhum usuário encontrado.</div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {users.map((user) => (
+                            <Card
+                                key={user.id}
+                                className={`overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow bg-white cursor-pointer ${user.status === 'blocked' ? 'opacity-75 grayscale' : ''}`}
+                                onClick={() => handleUserClick(user)}
+                            >
+                                <div className={`h-2 w-full ${user.role === 'super_admin' ? 'bg-red-500' :
+                                    user.role === 'admin' ? 'bg-orange-500' :
+                                        user.role === 'city_admin' ? 'bg-blue-500' : 'bg-green-500'
+                                    }`} />
+                                <CardHeader className="pb-2">
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex flex-col">
+                                            <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+                                                {user.displayName || (user as any).name || user.email.split('@')[0]}
+                                            </CardTitle>
+                                            <span className="text-xs font-mono text-gray-500 mt-0.5">ID: {user.id.substring(0, 8)}...</span>
+                                        </div>
+                                        <Badge variant={user.role === 'super_admin' ? 'destructive' : user.role === 'city_admin' ? 'secondary' : 'outline'}>
+                                            {user.role}
+                                        </Badge>
                                     </div>
-                                    <Badge variant={user.role === 'super_admin' ? 'destructive' : user.role === 'city_admin' ? 'secondary' : 'outline'}>
-                                        {user.role}
-                                    </Badge>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex flex-wrap gap-1.5">
-                                    {/* Professional Roles */}
-                                    {user.professionalRole && (
-                                        <Badge variant="default" className="bg-slate-700 gap-1">
-                                            {user.professionalRole === 'servidor' && <ShieldCheck className="w-3 h-3" />}
-                                            {user.professionalRole === 'empresa' && <Building2 className="w-3 h-3" />}
-                                            {user.professionalRole === 'cidadao' && <Briefcase className="w-3 h-3" />}
-                                            {user.professionalRole} {user.accessLevel && `Lvl ${user.accessLevel}`}
-                                        </Badge>
-                                    )}
-
-                                    {/* Donor Tag */}
-                                    {user.isDonor && (
-                                        <Badge variant="outline" className="text-pink-600 border-pink-200 bg-pink-50 gap-1">
-                                            <Heart className="w-3 h-3 fill-pink-600" /> Doador
-                                        </Badge>
-                                    )}
-
-                                    {/* Gamification Badges */}
-                                    {user.badges?.map(badgeId => {
-                                        const rank = USER_RANKS.find(r => r.id === badgeId);
-                                        return (
-                                            <Badge key={badgeId} variant="secondary" className="gap-1">
-                                                <span>{rank?.emoji || '🏅'}</span>
-                                                {rank?.name || badgeId}
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {/* Professional Roles */}
+                                        {user.professionalRole && (
+                                            <Badge variant="default" className="bg-slate-700 gap-1">
+                                                {user.professionalRole === 'servidor' && <ShieldCheck className="w-3 h-3" />}
+                                                {user.professionalRole === 'empresa' && <Building2 className="w-3 h-3" />}
+                                                {user.professionalRole === 'cidadao' && <Briefcase className="w-3 h-3" />}
+                                                {user.professionalRole} {user.accessLevel && `Lvl ${user.accessLevel}`}
                                             </Badge>
-                                        );
-                                    })}
-                                </div>
+                                        )}
 
-                                <div className="flex items-center gap-2 text-xs text-gray-500 border-t pt-4">
-                                    <span className="flex items-center gap-1">
-                                        <div className={`w-2 h-2 rounded-full ${user.status === 'blocked' ? 'bg-red-500' : 'bg-green-500'}`} />
-                                        {user.status === 'blocked' ? 'Bloqueado' : 'Ativo'}
-                                    </span>
-                                </div>
-                            </CardContent>
-                            <CardFooter className="bg-gray-50/50 p-4 flex gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="flex-1 gap-1"
-                                    onClick={() => handlePromote(user, user.role === 'user' ? 'city_admin' : 'user')}
-                                >
-                                    <UserCog className="w-4 h-4" />
-                                    {user.role === 'user' ? 'Promover' : 'Demover'}
-                                </Button>
-                                <Button
-                                    variant={user.status === 'blocked' ? 'default' : 'secondary'}
-                                    size="sm"
-                                    className="flex-1 gap-1"
-                                    onClick={() => handleToggleBlock(user)}
-                                >
-                                    {user.status === 'blocked' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
-                                    {user.status === 'blocked' ? 'Reativar' : 'Bloquear'}
-                                </Button>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="px-2 text-gray-400 hover:text-red-600"
-                                    onClick={() => handleRemove(user.id)}
-                                >
-                                    <UserMinus className="w-4 h-4" />
-                                </Button>
-                            </CardFooter>
-                        </Card>
-                    ))}
-                </div>
-            )}
-        </div>
+                                        {/* Donor Tag */}
+                                        {user.isDonor && (
+                                            <Badge variant="outline" className="text-pink-600 border-pink-200 bg-pink-50 gap-1">
+                                                <Heart className="w-3 h-3 fill-pink-600" /> Doador
+                                            </Badge>
+                                        )}
+
+                                        {/* Gamification Badges */}
+                                        {user.badges?.map(badgeId => {
+                                            const rank = USER_RANKS.find(r => r.id === badgeId);
+                                            return (
+                                                <Badge key={badgeId} variant="secondary" className="gap-1">
+                                                    <span>{rank?.emoji || '🏅'}</span>
+                                                    {rank?.name || badgeId}
+                                                </Badge>
+                                            );
+                                        })}
+                                    </div>
+
+                                    <div className="flex items-center gap-2 text-xs text-gray-500 border-t pt-4">
+                                        <span className="flex items-center gap-1">
+                                            <div className={`w-2 h-2 rounded-full ${user.status === 'blocked' ? 'bg-red-500' : 'bg-green-500'}`} />
+                                            {user.status === 'blocked' ? 'Bloqueado' : 'Ativo'}
+                                        </span>
+                                    </div>
+                                </CardContent>
+                                <CardFooter className="bg-gray-50/50 p-4 flex gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="flex-1 gap-1 touch-manipulation"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handlePromote(user, user.role === 'user' ? 'city_admin' : 'user');
+                                        }}
+                                    >
+                                        <UserCog className="w-4 h-4" />
+                                        {user.role === 'user' ? 'Promover' : 'Demover'}
+                                    </Button>
+                                    <Button
+                                        variant={user.status === 'blocked' ? 'default' : 'secondary'}
+                                        size="sm"
+                                        className="flex-1 gap-1 touch-manipulation"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleToggleBlock(user);
+                                        }}
+                                    >
+                                        {user.status === 'blocked' ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                                        {user.status === 'blocked' ? 'Reativar' : 'Bloquear'}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="px-2 text-gray-400 hover:text-red-600 touch-manipulation"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleRemove(user.id);
+                                        }}
+                                    >
+                                        <UserMinus className="w-4 h-4" />
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        ))}
+                    </div>
+                )
+            }
+            {/* Load More Button */}
+            {
+                !searchTerm.trim() && hasMore && !loading && !isLoadingMore && (
+                    <div className="flex justify-center pt-6 pb-12">
+                        <Button variant="outline" onClick={() => fetchUsers(true)} className="w-full max-w-xs">
+                            Carregar Mais Usuários
+                        </Button>
+                    </div>
+                )
+            }
+
+            {
+                isLoadingMore && (
+                    <div className="flex justify-center p-4"><div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div></div>
+                )
+            }
+
+            <UserProfileModal
+                user={selectedUser}
+                open={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+            />
+        </div >
     );
 };
 
