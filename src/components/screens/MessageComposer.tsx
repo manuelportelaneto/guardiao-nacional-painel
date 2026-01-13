@@ -9,7 +9,7 @@ import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Checkbox } from '../ui/checkbox';
 import { toast } from 'sonner';
-import { Send, Target, Smartphone, Mail, Bell, MessageSquare } from 'lucide-react';
+import { Send, Target, Smartphone, Mail, Bell, MessageSquare, Users } from 'lucide-react';
 import { StandardLocationFilter } from '../common/StandardLocationFilter';
 import type { LocationFilterState } from '../common/StandardLocationFilter';
 
@@ -32,6 +32,7 @@ const MessageComposer: React.FC = () => {
     // Targeting State
     const [isTargetAll, setIsTargetAll] = useState(true);
     const [locationFilter, setLocationFilter] = useState<LocationFilterState>({});
+    const [targetUserIds, setTargetUserIds] = useState(''); // Comma-separated user IDs
     const [targetAudience, setTargetAudience] = useState({
         minAge: '',
         maxAge: '',
@@ -76,7 +77,8 @@ const MessageComposer: React.FC = () => {
                 filters: {
                     isTargetAll,
                     location: locationFilter,
-                    demographics: targetAudience
+                    demographics: targetAudience,
+                    targetUserIds: targetUserIds ? targetUserIds.split(',').map(id => id.trim()).filter(Boolean) : []
                 },
                 status: 'queued',
                 stats: {
@@ -100,6 +102,7 @@ const MessageComposer: React.FC = () => {
             setImageUrl('');
             setIsTargetAll(true);
             setLocationFilter({});
+            setTargetUserIds('');
         } catch (error) {
             console.error(error);
             toast.error('Erro ao enviar mensagem');
@@ -209,6 +212,19 @@ const MessageComposer: React.FC = () => {
                                     value={locationFilter}
                                     onChange={setLocationFilter}
                                 />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold uppercase text-gray-500 flex items-center gap-1">
+                                    <Users className="w-3 h-3" /> IDs de Usuários Específicos
+                                </Label>
+                                <Textarea
+                                    placeholder="Cole os IDs separados por vírgula. Ex: abc123, xyz789, user456"
+                                    value={targetUserIds}
+                                    onChange={(e) => setTargetUserIds(e.target.value)}
+                                    className="min-h-[60px] text-xs font-mono"
+                                />
+                                <p className="text-xs text-gray-400">Deixe em branco para usar filtros de localização/perfil.</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
