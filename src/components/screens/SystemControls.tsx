@@ -1,17 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { doc, setDoc, onSnapshot } from 'firebase/firestore';
+import { doc, setDoc, onSnapshot, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
+import { Button } from '../ui/button';
 import { toast } from 'sonner';
-import { Settings, Shield, Zap } from 'lucide-react';
+import { Settings, Shield, Zap, Database, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Progress } from '../ui/progress';
 
 interface SystemSettings {
     showAds: boolean;
     maintenanceMode: boolean;
     enableGamification: boolean;
     autoPublish: boolean;
+}
+
+interface BackupStatus {
+    lastBackup: string | null;
+    storageUsedGB: number;
+    storagePercent: number;
+    isApproachingLimit: boolean;
+    backupCount: number;
 }
 
 import { loggingService } from '../../services/loggingService';
@@ -28,9 +38,10 @@ const SystemControls: React.FC = () => {
     const { currentUser } = useAuth();
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
     const [loading, setLoading] = useState(true);
+    const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
+    const [loadingBackup, setLoadingBackup] = useState(false);
 
     useEffect(() => {
-        // ... (same as before)
         const settingsRef = doc(db, 'settings', 'global');
         const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
             if (docSnap.exists()) {
@@ -44,8 +55,45 @@ const SystemControls: React.FC = () => {
             toast.error("Erro ao carregar configurações.");
             setLoading(false);
         });
+
+        // Fetch last backup info from audit_logs
+        fetchBackupStatus();
+
         return () => unsubscribe();
     }, []);
+
+    const fetchBackupStatus = async () => {
+        setLoadingBackup(true);
+        try {
+            const q = query(
+                collection(db, 'audit_logs'),
+                orderBy('timestamp', 'desc'),
+                limit(50)
+            );
+            const snapshot = await getDocs(q);
+
+            const backupLogs = snapshot.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter((log: any) => log.action === 'firestore_backup' || log.action === 'manual_backup');
+
+            const lastBackup = backupLogs[0] as any;
+            const storageAlert = snapshot.docs
+                .map(d => d.data())
+                .find((log: any) => log.action === 'storage_alert');
+
+            setBackupStatus({
+                lastBackup: lastBackup?.details?.timestamp || null,
+                storageUsedGB: parseFloat(storageAlert?.details?.currentUsageGB) || 0,
+                storagePercent: parseFloat(storageAlert?.details?.percentUsed) || 0,
+                isApproachingLimit: !!storageAlert,
+                backupCount: backupLogs.length
+            });
+        } catch (error) {
+            console.warn('Could not fetch backup status:', error);
+        } finally {
+            setLoadingBackup(false);
+        }
+    };
 
     const handleToggle = async (key: keyof SystemSettings) => {
         const newValue = !settings[key];
@@ -103,7 +151,7 @@ const SystemControls: React.FC = () => {
                                     Exibir Anúncios
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Ativa ou desativa banners de publicidade em todo o aplicativo.
+                                    Ativa banners e interstitials no app.
                                 </p>
                             </div>
                         </div>
@@ -128,7 +176,7 @@ const SystemControls: React.FC = () => {
                                     Modo Manutenção
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Bloqueia o acesso ao aplicativo para usuários comuns.
+                                    Bloqueia acesso ao app para usuários.
                                 </p>
                             </div>
                         </div>
@@ -153,18 +201,17 @@ const SystemControls: React.FC = () => {
                                     Sistema de XP
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
-                                    Habilita ou desabilita o ganho de XP e níveis.
+                                    Ativa badges, níveis e missões.
                                 </p>
                             </div>
                         </div>
                     </CardContent>
                 </Card>
 
-
-                {/* AI & Moderation */}
+                {/* Auto-Publish */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">IA & Moderação</CardTitle>
+                        <CardTitle className="text-sm font-medium">Moderação</CardTitle>
                         <Shield className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
@@ -185,8 +232,76 @@ const SystemControls: React.FC = () => {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Backup Status Card */}
+                <Card className="md:col-span-2">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Database className="h-4 w-4" />
+                            Backups do Firestore
+                        </CardTitle>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={fetchBackupStatus}
+                            disabled={loadingBackup}
+                        >
+                            <RefreshCw className={`h-4 w-4 ${loadingBackup ? 'animate-spin' : ''}`} />
+                        </Button>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {backupStatus ? (
+                            <>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Último backup:</span>
+                                    <span className="font-medium">
+                                        {backupStatus.lastBackup || 'Nenhum registro'}
+                                    </span>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">Armazenamento:</span>
+                                        <span className={`font-medium ${backupStatus.isApproachingLimit ? 'text-orange-500' : 'text-green-500'}`}>
+                                            {backupStatus.storageUsedGB.toFixed(2)} GB / 5 GB
+                                        </span>
+                                    </div>
+                                    <Progress
+                                        value={backupStatus.storagePercent}
+                                        className={backupStatus.isApproachingLimit ? 'bg-orange-100' : ''}
+                                    />
+                                </div>
+
+                                {backupStatus.isApproachingLimit && (
+                                    <div className="flex items-center gap-2 text-orange-600 text-xs bg-orange-50 p-2 rounded">
+                                        <AlertTriangle className="w-4 h-4" />
+                                        <span>Armazenamento próximo do limite! Considere limpar backups antigos.</span>
+                                    </div>
+                                )}
+
+                                {!backupStatus.isApproachingLimit && backupStatus.lastBackup && (
+                                    <div className="flex items-center gap-2 text-green-600 text-xs bg-green-50 p-2 rounded">
+                                        <CheckCircle className="w-4 h-4" />
+                                        <span>Backups automáticos funcionando normalmente.</span>
+                                    </div>
+                                )}
+
+                                <p className="text-xs text-muted-foreground">
+                                    Backups automáticos diários às 03:00 (Brasília). Retenção: 30 dias.
+                                </p>
+                            </>
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                <p>⚠️ Sistema de backup ainda não configurado.</p>
+                                <p className="text-xs mt-2">
+                                    Requer deploy da Cloud Function e configuração do bucket no Google Cloud Console.
+                                </p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
             </div>
-        </div >
+        </div>
     );
 };
 
