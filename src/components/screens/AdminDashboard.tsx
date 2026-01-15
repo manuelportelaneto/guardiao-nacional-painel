@@ -477,7 +477,7 @@ const AdminDashboard: React.FC = () => {
                                     <CardTitle>Ranking de Ocorrências (Cidade)</CardTitle>
                                 </CardHeader>
                                 <CardContent className="h-[300px]">
-                                    <ResponsiveContainer width="100%" height="100%">
+                                    <ResponsiveContainer width="100%" height="100%" minWidth={0}>
                                         <BarChart data={chartData.cityRanking} layout="vertical" margin={{ left: 20 }}>
                                             <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                                             <XAxis type="number" />

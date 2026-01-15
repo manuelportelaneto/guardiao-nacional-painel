@@ -226,7 +226,7 @@ const CityDashboard: React.FC = () => {
                         <CardTitle>Entrada de Ocorrências</CardTitle>
                     </CardHeader>
                     <CardContent className="pl-2">
-                        <ResponsiveContainer width="100%" height={300}>
+                        <ResponsiveContainer width="100%" height={300} minWidth={0}>
                             <BarChart data={data}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                                 <XAxis dataKey="name" fontSize={12} tickLine={false} axisLine={false} />
