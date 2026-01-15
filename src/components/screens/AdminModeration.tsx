@@ -27,13 +27,7 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "../ui/select"
+// Select imports removed as they are unused
 import {
     Dialog,
     DialogContent,

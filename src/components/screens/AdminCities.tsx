@@ -120,7 +120,7 @@ const AdminCities: React.FC = () => {
         }
     };
 
-    const fetchCities = async (regionId: string, stateId: string) => {
+    const fetchCities = async (_regionId: string, stateId: string) => {
         setLoadingData(true);
         try {
             // Fetch cities with contributions

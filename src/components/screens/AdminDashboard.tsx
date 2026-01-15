@@ -68,8 +68,8 @@ const AdminDashboard: React.FC = () => {
     const location = useLocation();
 
     const isPresidente = userData?.role === 'presidente';
-    const panelTitle = isPresidente ? 'Painel Nacional' : 'Painel SysAdmin';
-    const panelSubtitle = isPresidente ? 'Presidência da República' : 'Administração do Sistema';
+    const panelTitle = isPresidente ? 'Guardião Nacional' : 'Guardião Painel';
+    const panelSubtitle = isPresidente ? 'Visão Presidencial' : 'Administração do Sistema';
 
     const [stats, setStats] = useState({
         users: 0,

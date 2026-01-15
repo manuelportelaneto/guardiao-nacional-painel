@@ -374,10 +374,10 @@ const AuthScreen: React.FC = () => {
       {/* Form Container */}
       <div className="flex-1 px-6">
         <div className="max-w-sm mx-auto">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold mb-2 text-primary">
-              {isLogin ? 'Entrar' : 'Criar Conta'}
-            </h2>
+          <div className="text-center">
+            <h1 className="text-2xl font-bold tracking-tight text-blue-900">
+              Guardião Nacional
+            </h1>
             <p className="text-gray-600">
               {isLogin
                 ? 'Acesse sua conta para continuar'
