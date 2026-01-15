@@ -17,6 +17,7 @@ import DepartmentsCRM from './components/screens/DepartmentsCRM';
 import AdminCommunication from './components/screens/AdminCommunication';
 import AdminLogs from './components/screens/AdminLogs';
 import IntelligenceMap from './components/screens/IntelligenceMap';
+import AdminIntegrations from './components/screens/AdminIntegrations';
 import type { UserRole } from './types/user';
 
 // Wrapper for protected routes
@@ -95,6 +96,7 @@ function App() {
                         <Route path="settings" element={<SystemControls />} />
                         <Route path="logs" element={<AdminLogs />} />
                         <Route path="intelligence" element={<IntelligenceMap />} />
+                        <Route path="integrations" element={<AdminIntegrations />} />
                     </Route>
 
                     {/* City Selection */}

@@ -92,8 +92,8 @@ const IntelligenceMap: React.FC = () => {
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                    <h1 className="text-3xl font-bold tracking-tight text-gray-900 dark:text-white">Inteligência Territorial</h1>
-                    <p className="text-gray-500 dark:text-gray-400">Mapas de calor e análise geoespacial de ocorrências.</p>
+                    <h1 className="text-3xl font-bold tracking-tight">Inteligência Territorial</h1>
+                    <p className="text-muted-foreground mr-12">Mapas de calor e análise geoespacial de ocorrências.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={loadData} disabled={loading}>
@@ -151,7 +151,7 @@ const IntelligenceMap: React.FC = () => {
                 </CardContent>
             </Card>
 
-            <Card className="h-[600px] overflow-hidden border-gray-200 dark:border-slate-800">
+            <Card className="h-[600px] overflow-hidden border-gray-200 dark:border-slate-800 relative z-0">
                 <MapContainer center={[-14.2350, -51.9253]} zoom={4} style={{ height: '100%', width: '100%' }}>
                     <TileLayer
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

@@ -59,5 +59,42 @@ export const notificationService = {
             subject: 'Aviso: Conteúdo Removido - Guardião Nacional',
             html
         });
+    },
+
+    /**
+     * Sends an email to a user when their contribution is approved
+     */
+    async sendContentApprovedEmail(to: string, userName: string, contributionTitle: string) {
+        const firstName = userName?.split(' ')[0] || 'Cidadão';
+
+        const html = `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                <h2 style="color: #10B981;">Contribuição Aprovada! 🎉</h2>
+                <p>Olá <strong>${firstName}</strong>,</p>
+                <p>Temos ótimas notícias! Sua contribuição "<strong>${contributionTitle}</strong>" foi aprovada e já está disponível para toda a comunidade.</p>
+                
+                <div style="background-color: #ECFDF5; padding: 15px; border-radius: 8px; border-left: 4px solid #10B981; margin: 20px 0;">
+                    <p style="margin: 0; font-size: 16px; color: #047857;">
+                        ✅ Sua participação faz a diferença!
+                    </p>
+                    <p style="margin: 10px 0 0; font-size: 14px; color: #065F46;">
+                        Continue contribuindo para melhorar a nossa cidade.
+                    </p>
+                </div>
+                
+                <p>Agradecemos por ser um Guardião ativo e ajudar a fiscalizar o que acontece na sua comunidade.</p>
+                
+                <p style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+                    Equipe Guardião Nacional<br>
+                    <em>Juntos por cidades melhores</em>
+                </p>
+            </div>
+        `;
+
+        return this.sendEmail({
+            to: [to],
+            subject: '✅ Contribuição Aprovada - Guardião Nacional',
+            html
+        });
     }
 };

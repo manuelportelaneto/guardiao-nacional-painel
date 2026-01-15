@@ -26,22 +26,19 @@ export const intelligenceService = {
             // Apply filters
             if (filters.status && filters.status !== 'all') {
                 q = query(q, where('status', '==', filters.status));
+                // Equality filter doesn't force specific orderBy first, so we can order by date directly if we want
+                q = query(q, orderBy('createdAt', 'desc'));
             } else {
                 // By default, exclude rejected items unless specified
-                q = query(q, where('status', '!=', 'rejected'));
+                // Inequality filter (status != rejected) REQUIRES orderBy('status') to be the first orderBy
+                q = query(q, where('status', '!=', 'rejected'), orderBy('status'), orderBy('createdAt', 'desc'));
             }
 
             if (filters.category && filters.category !== 'all') {
                 q = query(q, where('category', '==', filters.category));
             }
 
-            // Date filtering requires a composite index if mixed with other equality filters
-            // For now, we will fetch most recent 500 and filter in memory if needed for simplicity
-            // or assume we are just showing the "current state"
-            // If startDate is massive, we might need composite indexes.
-            // Let's rely on 'createdAt' ordering.
-
-            q = query(q, orderBy('createdAt', 'desc'), limit(1000));
+            q = query(q, limit(1000));
 
             const snapshot = await getDocs(q);
 

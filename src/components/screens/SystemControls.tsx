@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { doc, setDoc, onSnapshot, collection, query, orderBy, limit, getDocs } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
+import { CLOUD_FUNCTIONS } from '../../config';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { Settings, Shield, Zap, Database, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../../firebaseConfig';
 import { Progress } from '../ui/progress';
 
 interface SystemSettings {
@@ -14,6 +17,10 @@ interface SystemSettings {
     maintenanceMode: boolean;
     enableGamification: boolean;
     autoPublish: boolean;
+    enableAiImageAnalysis: boolean;
+    enableAiTextAnalysis: boolean;
+    notifyOnApproval: boolean;
+    notifyOnRejection: boolean;
 }
 
 interface BackupStatus {
@@ -31,7 +38,11 @@ const DEFAULT_SETTINGS: SystemSettings = {
     showAds: false,
     maintenanceMode: false,
     enableGamification: true,
-    autoPublish: false
+    autoPublish: false,
+    enableAiImageAnalysis: true,
+    enableAiTextAnalysis: true,
+    notifyOnApproval: true,
+    notifyOnRejection: true
 };
 
 const SystemControls: React.FC = () => {
@@ -208,6 +219,47 @@ const SystemControls: React.FC = () => {
                     </CardContent>
                 </Card>
 
+                {/* Messaging Campaigns */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Campanhas</CardTitle>
+                        <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center space-x-4 mt-4">
+                            <Switch
+                                id="notifyOnApproval"
+                                checked={settings.notifyOnApproval}
+                                onCheckedChange={() => handleToggle('notifyOnApproval')}
+                            />
+                            <div className="flex-1 space-y-1">
+                                <Label htmlFor="notifyOnApproval" className="text-sm font-medium leading-none">
+                                    Notificar Aprovação
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Envia email ao aprovar contribuição.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-4">
+                            <Switch
+                                id="notifyOnRejection"
+                                checked={settings.notifyOnRejection}
+                                onCheckedChange={() => handleToggle('notifyOnRejection')}
+                            />
+                            <div className="flex-1 space-y-1">
+                                <Label htmlFor="notifyOnRejection" className="text-sm font-medium leading-none">
+                                    Notificar Rejeição
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Envia email ao rejeitar contribuição.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Auto-Publish */}
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -233,6 +285,95 @@ const SystemControls: React.FC = () => {
                     </CardContent>
                 </Card>
 
+                {/* AI Controls */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Inteligência Artificial</CardTitle>
+                        <Zap className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex items-center space-x-4 mt-4">
+                            <Switch
+                                id="enableAiImage"
+                                checked={settings.enableAiImageAnalysis}
+                                onCheckedChange={() => handleToggle('enableAiImageAnalysis')}
+                            />
+                            <div className="flex-1 space-y-1">
+                                <Label htmlFor="enableAiImage" className="text-sm font-medium leading-none">
+                                    Análise de Imagens
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Google Cloud Vision (SafeSearch)
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center space-x-4">
+                            <Switch
+                                id="enableAiText"
+                                checked={settings.enableAiTextAnalysis}
+                                onCheckedChange={() => handleToggle('enableAiTextAnalysis')}
+                            />
+                            <div className="flex-1 space-y-1">
+                                <Label htmlFor="enableAiText" className="text-sm font-medium leading-none">
+                                    Moderação de Texto
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Google Cloud Natural Language
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="pt-2">
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="w-full"
+                                onClick={async () => {
+                                    if (!confirm('Isso irá reprocessar as contribuições "Em Análise". Continuar?')) return;
+                                    const toastId = toast.loading('Analisando contribuições...');
+                                    try {
+                                        if (!currentUser) throw new Error("Usuário não autenticado");
+
+                                        // Get ID Token for manual auth
+                                        const idToken = await currentUser.getIdToken();
+
+                                        const response = await fetch(CLOUD_FUNCTIONS.runRetroactiveAnalysis, {
+                                            method: 'POST',
+                                            headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${idToken}`
+                                            },
+                                            body: JSON.stringify({ data: { limit: 50, force: true } })
+                                        });
+
+                                        if (!response.ok) {
+                                            const errorData = await response.json().catch(() => ({}));
+                                            throw new Error(errorData.error || `HTTP ${response.status}`);
+                                        }
+
+                                        const result = await response.json();
+                                        toast.dismiss(toastId);
+                                        toast.success(result.data?.message || "Análise concluída!");
+
+                                        if (currentUser) {
+                                            loggingService.logAudit('AI_RETROACTIVE_ANALYSIS', currentUser.uid, 'multiple', {
+                                                result: result.data
+                                            });
+                                        }
+                                    } catch (e: any) {
+                                        toast.dismiss(toastId);
+                                        toast.error('Erro: ' + e.message);
+                                        console.error("AI Analysis Trigger Failed:", e);
+                                    }
+                                }}
+                            >
+                                <Zap className="mr-2 h-4 w-4" /> Forçar Análise em "Em Análise"
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Backup Status Card */}
                 <Card className="md:col-span-2">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -250,6 +391,43 @@ const SystemControls: React.FC = () => {
                         </Button>
                     </CardHeader>
                     <CardContent className="space-y-4">
+                        <Button
+                            className="w-full mb-2"
+                            variant="outline"
+                            onClick={async () => {
+                                if (!confirm('Iniciar backup manual agora?')) return;
+                                setLoadingBackup(true);
+                                try {
+                                    if (!currentUser) throw new Error('Usuário não autenticado');
+                                    const idToken = await currentUser.getIdToken();
+
+                                    const response = await fetch(CLOUD_FUNCTIONS.manualBackup, {
+                                        method: 'POST',
+                                        headers: {
+                                            'Content-Type': 'application/json',
+                                            'Authorization': `Bearer ${idToken}`
+                                        },
+                                        body: JSON.stringify({})
+                                    });
+
+                                    if (!response.ok) {
+                                        const errorData = await response.json().catch(() => ({}));
+                                        throw new Error(errorData.error || `HTTP ${response.status}`);
+                                    }
+
+                                    toast.success('Backup iniciado com sucesso!');
+                                    setTimeout(fetchBackupStatus, 5000);
+                                } catch (e: any) {
+                                    toast.error('Erro ao iniciar backup: ' + e.message);
+                                    console.error('Backup Failed:', e);
+                                } finally {
+                                    setLoadingBackup(false);
+                                }
+                            }}
+                            disabled={loadingBackup}
+                        >
+                            <Database className="mr-2 h-4 w-4" /> Fazer Backup Agora
+                        </Button>
                         {backupStatus ? (
                             <>
                                 <div className="flex items-center justify-between text-sm">

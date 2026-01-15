@@ -359,6 +359,26 @@ const AdminModeration: React.FC = () => {
                             ratingsReceived: increment(1)
                         }
                     }, { merge: true });
+
+                    // Send Email Notification (if campaign enabled)
+                    try {
+                        const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
+                        const settings = settingsDoc.data() || {};
+                        if (settings.notifyOnApproval !== false) {
+                            const userDoc = await getDoc(userRef);
+                            const userData = userDoc.data();
+                            if (userData?.email) {
+                                await notificationService.sendContentApprovedEmail(
+                                    userData.email,
+                                    userData.name || 'Cidadão',
+                                    contrib.title || 'Contribuição'
+                                );
+                            }
+                        }
+                    } catch (emailErr) {
+                        console.error('Failed to send approval email:', emailErr);
+                        // Don't fail the approval if email fails
+                    }
                 }
 
                 toast.success("Aprovado com sucesso!");
@@ -382,6 +402,28 @@ const AdminModeration: React.FC = () => {
                         read: false,
                         createdAt: Timestamp.now()
                     });
+
+                    // Send Email Notification (if campaign enabled)
+                    try {
+                        const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
+                        const settings = settingsDoc.data() || {};
+                        if (settings.notifyOnRejection !== false) {
+                            const userRef = doc(db, 'users', contrib.userId);
+                            const userDoc = await getDoc(userRef);
+                            const userData = userDoc.data();
+                            if (userData?.email) {
+                                await notificationService.sendContentRemovedEmail(
+                                    userData.email,
+                                    userData.name || 'Cidadão',
+                                    contrib.title || 'Contribuição',
+                                    reason
+                                );
+                            }
+                        }
+                    } catch (emailErr) {
+                        console.error('Failed to send rejection email:', emailErr);
+                        // Don't fail the rejection if email fails
+                    }
                 }
 
                 toast.success("Rejeitado com motivo.");

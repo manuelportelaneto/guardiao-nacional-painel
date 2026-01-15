@@ -29,11 +29,11 @@ import {
     Building2,
     Calendar as CalendarIcon,
     Filter,
-    Bell,
     Settings,
     MessageSquare,
     ShieldAlert,
     Map as MapIcon,
+    Plug,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -63,9 +63,13 @@ const StatCard: React.FC<{ title: string, value: string, icon: React.ReactNode, 
 
 const AdminDashboard: React.FC = () => {
     const [sidebarOpen, setSidebarOpen] = useState(false);
-    const { logout } = useAuth();
+    const { logout, userData } = useAuth(); // Get userData for role check
     const navigate = useNavigate();
     const location = useLocation();
+
+    const isPresidente = userData?.role === 'presidente';
+    const panelTitle = isPresidente ? 'Painel Nacional' : 'Painel SysAdmin';
+    const panelSubtitle = isPresidente ? 'Presidência da República' : 'Administração do Sistema';
 
     const [stats, setStats] = useState({
         users: 0,
@@ -105,7 +109,7 @@ const AdminDashboard: React.FC = () => {
             const cities = new Set(contribs.map(c => c.city).filter(Boolean)).size;
             const shares = contribs.reduce((acc, curr) => acc + (curr.shares || 0), 0);
 
-            // Comparisons
+            // Comparisons (updated logic for status mapping)
             const positive = contribs.filter(c => c.status === 'Aprovado' || c.status === 'Resolvido').length;
             const negative = contribs.filter(c => c.status === 'Rejeitado' || c.status === 'Lixo').length;
 
@@ -180,7 +184,10 @@ const AdminDashboard: React.FC = () => {
             // 3. Status Overview
             const statusMap: Record<string, number> = {};
             contribs.forEach(c => {
-                const status = c.status || 'Pendente';
+                let status = c.status || 'Em Análise';
+                // Normalize labels
+                if (status === 'pending' || status === 'Pendente') status = 'Em Análise';
+
                 statusMap[status] = (statusMap[status] || 0) + 1;
             });
             const statusOverview = Object.entries(statusMap).map(([name, value]) => ({ name, value }));
@@ -213,59 +220,64 @@ const AdminDashboard: React.FC = () => {
 
     return (
         <div className="flex bg-gray-50 min-h-screen">
-            {/* Sidebar Content (Shared) */}
-            <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-                <SheetTrigger asChild>
-                    <Button variant="ghost" className="md:hidden fixed top-4 left-4 z-50">
-                        <Menu />
-                    </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-64 p-0">
-                    <div className="h-full bg-slate-900 text-white p-4">
-                        <div className="text-xl font-bold mb-8">Guardião Painel</div>
-                        <nav className="space-y-2">
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/dashboard'); setSidebarOpen(false); }}>
-                                <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/users'); setSidebarOpen(false); }}>
-                                <UsersIcon className="mr-2 h-4 w-4" /> Usuários
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/cities'); setSidebarOpen(false); }}>
-                                <BarChart3 className="mr-2 h-4 w-4" /> Cidades
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/moderation'); setSidebarOpen(false); }}>
-                                <AlertTriangle className="mr-2 h-4 w-4" /> Moderação
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/intelligence'); setSidebarOpen(false); }}>
-                                <MapIcon className="mr-2 h-4 w-4" /> Inteligência
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/alerts'); setSidebarOpen(false); }}>
-                                <Bell className="mr-2 h-4 w-4" /> Alertas
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/communication'); setSidebarOpen(false); }}>
-                                <MessageSquare className="mr-2 h-4 w-4" /> Comunicação
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/logs'); setSidebarOpen(false); }}>
-                                <ShieldAlert className="mr-2 h-4 w-4" /> Logs do Sistema
-                            </Button>
-                            <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/settings'); setSidebarOpen(false); }}>
-                                <Settings className="mr-2 h-4 w-4" /> Configurações
-                            </Button>
-                        </nav>
-                        <div className="absolute bottom-4 left-4 right-4">
-                            <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/20" onClick={handleLogout}>
-                                <LogOut className="mr-2 h-4 w-4" /> Sair
-                            </Button>
+            {/* Mobile Header (Visible only on small screens) */}
+            <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-40 flex items-center px-4">
+                <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+                    <SheetTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                            <Menu className="h-6 w-6" />
+                        </Button>
+                    </SheetTrigger>
+                    <SheetContent side="left" className="w-64 p-0">
+                        <div className="h-full bg-slate-900 text-white p-4">
+                            <div className="text-xl font-bold mb-1">{panelTitle}</div>
+                            <p className="text-xs text-slate-400 mb-8">{panelSubtitle}</p>
+                            <nav className="space-y-2">
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/dashboard'); setSidebarOpen(false); }}>
+                                    <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+                                </Button>
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/users'); setSidebarOpen(false); }}>
+                                    <UsersIcon className="mr-2 h-4 w-4" /> Usuários
+                                </Button>
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/cities'); setSidebarOpen(false); }}>
+                                    <BarChart3 className="mr-2 h-4 w-4" /> Cidades
+                                </Button>
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/moderation'); setSidebarOpen(false); }}>
+                                    <AlertTriangle className="mr-2 h-4 w-4" /> Moderação
+                                </Button>
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/intelligence'); setSidebarOpen(false); }}>
+                                    <MapIcon className="mr-2 h-4 w-4" /> Inteligência
+                                </Button>
+                                {/* Removed deprecated Alertas button */}
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/communication'); setSidebarOpen(false); }}>
+                                    <MessageSquare className="mr-2 h-4 w-4" /> Comunicação & Alertas
+                                </Button>
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/logs'); setSidebarOpen(false); }}>
+                                    <ShieldAlert className="mr-2 h-4 w-4" /> Logs do Sistema
+                                </Button>
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/integrations'); setSidebarOpen(false); }}>
+                                    <Plug className="mr-2 h-4 w-4" /> Integrações
+                                </Button>
+                                <Button variant="ghost" className="w-full justify-start text-white hover:text-white hover:bg-slate-800" onClick={() => { navigate('/admin/settings'); setSidebarOpen(false); }}>
+                                    <Settings className="mr-2 h-4 w-4" /> Configurações
+                                </Button>
+                            </nav>
+                            <div className="absolute bottom-4 left-4 right-4">
+                                <Button variant="ghost" className="w-full justify-start text-red-400 hover:text-red-300 hover:bg-red-900/20" onClick={handleLogout}>
+                                    <LogOut className="mr-2 h-4 w-4" /> Sair
+                                </Button>
+                            </div>
                         </div>
-                    </div>
-                </SheetContent>
-            </Sheet>
+                    </SheetContent>
+                </Sheet>
+                <div className="ml-4 font-bold text-lg">{panelTitle}</div>
+            </div>
 
-            {/* Desktop Sidebar */}
+            {/* Desktop Sidebar (unchanged) */}
             <div className="hidden md:flex w-64 bg-slate-900 text-white flex-col fixed inset-y-0">
                 <div className="p-6">
-                    <h1 className="text-xl font-bold">Guardião Painel</h1>
-                    <p className="text-xs text-slate-400 mt-1">Administração Nacional</p>
+                    <h1 className="text-xl font-bold">{panelTitle}</h1>
+                    <p className="text-xs text-slate-400 mt-1">{panelSubtitle}</p>
                 </div>
                 <nav className="flex-1 px-4 space-y-2">
                     <Button
@@ -304,12 +316,14 @@ const AdminDashboard: React.FC = () => {
                         <MapIcon className="mr-2 h-4 w-4" /> Inteligência
                     </Button>
 
+                    {/* Removed deprecated Alertas button */}
+
                     <Button
                         variant={location.pathname.includes('communication') ? "secondary" : "ghost"}
                         className={`w-full justify-start ${!location.pathname.includes('communication') && 'text-white hover:text-white hover:bg-slate-800'}`}
                         onClick={() => navigate('/admin/communication')}
                     >
-                        <MessageSquare className="mr-2 h-4 w-4" /> Comunicação
+                        <MessageSquare className="mr-2 h-4 w-4" /> Comunicação & Alertas
                     </Button>
                     <Button
                         variant={location.pathname.includes('logs') ? "secondary" : "ghost"}
@@ -317,6 +331,13 @@ const AdminDashboard: React.FC = () => {
                         onClick={() => navigate('/admin/logs')}
                     >
                         <ShieldAlert className="mr-2 h-4 w-4" /> Logs do Sistema
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('integrations') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('integrations') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/integrations')}
+                    >
+                        <Plug className="mr-2 h-4 w-4" /> Integrações
                     </Button>
                     <Button
                         variant={location.pathname.includes('settings') ? "secondary" : "ghost"}
@@ -334,13 +355,13 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 md:ml-64 p-8">
+            <div className="flex-1 md:ml-64 p-4 md:p-8 pt-20 md:pt-8 min-h-screen">
                 {isMainDashboard ? (
                     <div className="space-y-6">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div>
-                                <h1 className="text-3xl font-bold tracking-tight">Dashboard Geral</h1>
-                                <p className="text-muted-foreground">Visão unificada de métricas e indicadores.</p>
+                                <h1 className="text-3xl font-bold tracking-tight">{isPresidente ? 'Visão Estratégica Nacional' : 'Dashboard Geral'}</h1>
+                                <p className="text-muted-foreground">{isPresidente ? 'Dados consolidados para tomada de decisão.' : 'Visão unificada de métricas e indicadores.'}</p>
                             </div>
 
                             {/* Filters Toolbar */}

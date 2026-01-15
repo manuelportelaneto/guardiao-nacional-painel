@@ -46,10 +46,14 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
         }
 
         if (analysis && Array.isArray(analysis)) {
-            // Logic simplified for card
-            const unsafeCount = analysis.reduce((acc, img) => acc + (img.predictions?.filter((p: any) => p.probability > 0.5).length || 0), 0);
-            if (unsafeCount > 0) {
-                elements.push(<Badge key="ai-risk" variant="destructive" className="text-[10px]">IA: {unsafeCount} Alert(s)</Badge>);
+            // New logic for Cloud Vision (SafeSearch) results
+            const unsafeResults = analysis.filter((res: any) => !res.isSafe);
+            if (unsafeResults.length > 0) {
+                elements.push(
+                    <Badge key="ai-risk" variant="destructive" className="bg-red-600 text-[10px]">
+                        IA: {unsafeResults.length} Alerta(s) Visual
+                    </Badge>
+                );
             }
         }
         return <div className="flex flex-wrap gap-1 mt-1">{elements}</div>;
