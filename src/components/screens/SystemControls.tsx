@@ -8,8 +8,6 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
 import { Settings, Shield, Zap, Database, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '../../firebaseConfig';
 import { Progress } from '../ui/progress';
 
 interface SystemSettings {

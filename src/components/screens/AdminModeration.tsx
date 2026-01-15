@@ -21,10 +21,8 @@ import {
     User,
     Loader2,
     RefreshCw,
-    Star // Import Star
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader } from '../ui/card';
 import { Button } from '../ui/button';
@@ -41,7 +39,6 @@ import {
     DialogContent,
     DialogHeader,
     DialogTitle,
-    DialogDescription,
     DialogFooter
 } from '../ui/dialog';
 import { toast } from 'sonner';
@@ -52,6 +49,8 @@ import { useAuth } from '../../context/AuthContext';
 import { ModerationCard } from './moderation/ModerationCard';
 import { ModerationFilters } from './moderation/ModerationFilters';
 import { ModerationDetails } from './moderation/ModerationDetails';
+import { ReplyDialog, ConfirmActionDialog } from './moderation';
+import { useModerationStore } from '../../stores/moderationStore';
 
 interface Report {
     id: string;
@@ -107,25 +106,26 @@ const AdminModeration: React.FC = () => {
     const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null);
 
     const [actionLoading, setActionLoading] = useState(false);
-    const [rejectionReason, setRejectionReason] = useState('');
-    const [confirmDialog, setConfirmDialog] = useState<{
-        open: boolean;
-        action: 'approve' | 'reject' | 'ban' | 'approve_contrib' | 'reject_contrib' | 'reject_approved' | 'approve_remove_content' | null;
-        report: ReportWithContribution | null;
-        contribution?: Contribution | null;
-    }>({ open: false, action: null, report: null });
-
-    // Reply State
-    const [replyDialog, setReplyDialog] = useState<{ open: boolean; contribution: Contribution | null }>({ open: false, contribution: null });
-    // autoPublish removed
-    const [replyText, setReplyText] = useState('');
-    const [useDefaultReply, setUseDefaultReply] = useState(false);
-    const defaultReplyText = "Agradecemos sua contribuição! Ela é muito importante para a melhoria da nossa cidade. Encaminharemos para o setor responsável.";
+    // Store State
+    const {
+        confirmDialog,
+        openConfirmDialog,
+        closeConfirmDialog,
+        replyDialog,
+        openReplyDialog,
+        closeReplyDialog,
+        approvalRating,
+        setApprovalRating,
+        rejectionReason,
+        setRejectionReason,
+        replyText,
+        setReplyText,
+        useDefaultReply,
+        setUseDefaultReply
+    } = useModerationStore();
 
     const [activeTab, setActiveTab] = useState('reports');
-    // Rating State
-    const [approvalRating, setApprovalRating] = useState(5); // Default 5 stars
-    const [collapsedFilters, setCollapsedFilters] = useState(true); // Default collapsed as per request
+    const [collapsedFilters, setCollapsedFilters] = useState(true);
 
     // Helper: Mask User Data
     const getDisplayUser = (id: string, name?: string) => {
@@ -314,6 +314,7 @@ const AdminModeration: React.FC = () => {
             }
 
             setRejectionReason('');
+            closeConfirmDialog();
         } catch (err) {
             console.error(err);
             toast.error("Erro ao processar.");
@@ -429,7 +430,8 @@ const AdminModeration: React.FC = () => {
                 toast.success("Rejeitado com motivo.");
                 if (currentUser) loggingService.logAudit('CONTRIBUTION_REJECT', currentUser.uid, contrib.id, { reason });
             }
-            setConfirmDialog({ open: false, action: null, report: null, contribution: null });
+
+            closeConfirmDialog();
             setRejectionReason('');
             setApprovalRating(5); // Reset
         } catch (err) {
@@ -437,6 +439,15 @@ const AdminModeration: React.FC = () => {
             toast.error("Erro na ação.");
         } finally {
             setActionLoading(false);
+        }
+    };
+
+    // Unified Confirm Handler
+    const handleConfirmAction = () => {
+        if (confirmDialog.action?.includes('contrib') || confirmDialog.action?.includes('approved')) {
+            handleQueueAction();
+        } else if (confirmDialog.report) {
+            handleReportAction(confirmDialog.action as any);
         }
     };
 
@@ -452,7 +463,7 @@ const AdminModeration: React.FC = () => {
                 // Request says "responder (adicionando um texto)". Doesn't specify status change.
             });
             toast.success("Resposta enviada com sucesso!");
-            setReplyDialog({ open: false, contribution: null });
+            closeReplyDialog();
             setReplyText('');
             setUseDefaultReply(false);
         } catch (error) {
@@ -541,8 +552,8 @@ const AdminModeration: React.FC = () => {
                                     item={item}
                                     tab={tab}
                                     onClick={(i) => setSelectedContribution(i)}
-                                    onAction={(action, i) => setConfirmDialog({ open: true, action: action as any, contribution: i, report: null })}
-                                    onReply={(i) => setReplyDialog({ open: true, contribution: i })}
+                                    onAction={(action, i) => openConfirmDialog(action as any, i, undefined)}
+                                    onReply={(i) => openReplyDialog(i)}
                                 />
                             ))}
                             {filterList(tab === 'queue' ? moderationQueue : tab === 'approved' ? approvedList : tab === 'rejected' ? rejectedList : trashList).length === 0 && (
@@ -615,124 +626,36 @@ const AdminModeration: React.FC = () => {
                         </div>
                     )}
                     <DialogFooter>
-                        <Button variant="destructive" onClick={() => { setConfirmDialog({ open: true, action: 'approve_remove_content', report: selectedReport }); setSelectedReport(null); }}>Remover Conteúdo</Button>
-                        <Button variant="secondary" onClick={() => { setConfirmDialog({ open: true, action: 'reject', report: selectedReport }); setSelectedReport(null); }}>Ignorar Denúncia</Button>
+                        <Button variant="destructive" onClick={() => { openConfirmDialog('approve_remove_content', undefined, selectedReport || undefined); setSelectedReport(null); }}>Remover Conteúdo</Button>
+                        <Button variant="secondary" onClick={() => { openConfirmDialog('reject', undefined, selectedReport || undefined); setSelectedReport(null); }}>Ignorar Denúncia</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Reply Dialog */}
-            <Dialog open={replyDialog.open} onOpenChange={(open) => !open && setReplyDialog({ open: false, contribution: null })}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Responder Contribuição</DialogTitle>
-                        <DialogDescription>
-                            Envie uma resposta ao cidadão sobre esta contribuição.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="flex items-center space-x-2">
-                            <Switch id="default-reply" checked={useDefaultReply} onCheckedChange={(checked) => {
-                                setUseDefaultReply(checked);
-                                if (checked) setReplyText(defaultReplyText);
-                                else setReplyText('');
-                            }} />
-                            <Label htmlFor="default-reply">Usar resposta padrão</Label>
-                        </div>
-                        <div className="space-y-2">
-                            <Label>Texto da Resposta</Label>
-                            <textarea
-                                className="w-full min-h-[100px] p-2 border rounded-md"
-                                value={replyText}
-                                onChange={(e) => {
-                                    setReplyText(e.target.value);
-                                    if (useDefaultReply && e.target.value !== defaultReplyText) setUseDefaultReply(false);
-                                }}
-                                placeholder="Digite sua resposta aqui..."
-                            />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setReplyDialog({ open: false, contribution: null })}>Cancelar</Button>
-                        <Button onClick={handleReplyAction} disabled={!replyText.trim() || actionLoading}>
-                            {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Enviar Resposta'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            {/* Extracted Dialog Components */}
+            <ReplyDialog
+                open={replyDialog.open}
+                contribution={replyDialog.contribution}
+                onClose={closeReplyDialog}
+                onSubmit={handleReplyAction}
+                replyText={replyText}
+                setReplyText={setReplyText}
+                useDefaultReply={useDefaultReply}
+                setUseDefaultReply={setUseDefaultReply}
+                isLoading={actionLoading}
+            />
 
-
-            {/* CONFIRM DIALOG WITH REASON */}
-            <Dialog open={confirmDialog.open} onOpenChange={o => !o && setConfirmDialog({ ...confirmDialog, open: false })}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Confirmar Ação</DialogTitle>
-                        <DialogDescription>
-                            {confirmDialog.action === 'approve_remove_content' ? 'Remover conteúdo e notificar usuário?' : `Ação: ${confirmDialog.action === 'reject' ? 'Ignorar Denúncia' : confirmDialog.action}`}
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    {confirmDialog.action === 'approve_contrib' && (
-                        <div className="py-4 space-y-4">
-                            <div className="space-y-2">
-                                <Label>Avaliação do Relato (Qualidade)</Label>
-                                <div className="flex items-center gap-2">
-                                    {[1, 2, 3, 4, 5].map((star) => (
-                                        <button
-                                            key={star}
-                                            onClick={() => setApprovalRating(star)}
-                                            className={`p-1 transition-colors ${approvalRating >= star ? 'text-yellow-400' : 'text-gray-300'}`}
-                                            type="button"
-                                        >
-                                            <Star className="w-8 h-8 fill-current" />
-                                        </button>
-                                    ))}
-                                    <span className="text-sm font-bold ml-2 text-gray-700">{approvalRating}/5</span>
-                                </div>
-                                <p className="text-xs text-gray-500">Essa nota conta para a reputação do usuário.</p>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Reason Input for Rejection - ONLY if Action is one that REQUIRES reason */}
-                    {['reject_contrib', 'reject_approved', 'approve_remove_content'].includes(confirmDialog.action || '') && (
-                        <div className="py-2">
-                            <Label>Motivo da Rejeição / Exclusão (Obrigatório)</Label>
-                            <Select value={rejectionReason} onValueChange={setRejectionReason}>
-                                <SelectTrigger><SelectValue placeholder="Selecione um motivo" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="policy_violation">Violação de Termos</SelectItem>
-                                    <SelectItem value="low_quality">Baixa Qualidade</SelectItem>
-                                    <SelectItem value="spam">Spam / Propaganda</SelectItem>
-                                    <SelectItem value="duplicate">Duplicata</SelectItem>
-                                    <SelectItem value="inappropriate">Conteúdo Impróprio</SelectItem>
-                                    <SelectItem value="other">Outro</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {/* Optional text input if 'other' - skipping for simplicity valid per request "selecionar um motivo" */}
-                        </div>
-                    )}
-
-                    <DialogFooter>
-                        <Button variant="ghost" onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}>Cancelar</Button>
-                        <Button variant="destructive"
-                            disabled={
-                                (['reject_contrib', 'reject_approved', 'approve_remove_content'].includes(confirmDialog.action || '') && !rejectionReason)
-                                || actionLoading
-                            }
-                            onClick={() => {
-                                // If action requires reason and none is selected, return
-                                if (['reject_contrib', 'reject_approved', 'approve_remove_content'].includes(confirmDialog.action || '') && !rejectionReason) return;
-
-                                if (confirmDialog.action?.includes('contrib') || confirmDialog.action?.includes('approved')) handleQueueAction();
-                                else if (confirmDialog.report) handleReportAction(confirmDialog.action as any);
-                            }}
-                        >
-                            {actionLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirmar'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+            <ConfirmActionDialog
+                open={confirmDialog.open}
+                action={confirmDialog.action}
+                onClose={closeConfirmDialog}
+                onConfirm={handleConfirmAction}
+                isLoading={actionLoading}
+                approvalRating={approvalRating}
+                setApprovalRating={setApprovalRating}
+                rejectionReason={rejectionReason}
+                setRejectionReason={setRejectionReason}
+            />
 
         </div >
     );

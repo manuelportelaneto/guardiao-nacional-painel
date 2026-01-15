@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../../firebaseConfig';
+import { db, auth, functions } from '../../firebaseConfig';
 import { CLOUD_FUNCTIONS } from '../../config';
+import { httpsCallable } from 'firebase/functions';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';

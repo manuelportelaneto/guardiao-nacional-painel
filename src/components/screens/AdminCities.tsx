@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebaseConfig';
-import { collection, query, getDocs, orderBy, where, limit, startAfter } from 'firebase/firestore';
+import { collection, query, getDocs, where } from 'firebase/firestore';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -15,7 +15,6 @@ import {
     AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner';
-import ContributionDirectoryCard from './ContributionDirectoryCard';
 import CityDetailsModal from '../modals/CityDetailsModal';
 
 interface GeoLevel {
@@ -43,17 +42,7 @@ const AdminCities: React.FC = () => {
     const [isCityModalOpen, setIsCityModalOpen] = useState(false);
 
     // City Level Data
-    const [cityContributions, setCityContributions] = useState<any[]>([]);
     const [loadingData, setLoadingData] = useState(false);
-
-    // Pagination & Filters
-    const [filters, setFilters] = useState({
-        status: 'all',
-        category: 'all'
-    });
-    const [lastVisible, setLastVisible] = useState<any>(null);
-    const [hasMore, setHasMore] = useState(true);
-    const LIMIT = 12;
 
     useEffect(() => {
         if (currentLevel.type === 'country') {
@@ -63,18 +52,91 @@ const AdminCities: React.FC = () => {
         } else if (currentLevel.type === 'state') {
             fetchCities(currentLevel.regionId!, currentLevel.id!);
         }
-        // The 'city' case is now handled by the modal, so no direct navigation here
     }, [currentLevel]);
 
-    // Refresh when filters change (only if in city view - managed by modal now, but keeping for compatibility if needed or removing)
-    // Actually, since we moved to Modal, we don't need this effect triggering fetchCityContributions here anymore 
-    // unless we still want the 'city' level view as a fallback. 
-    // Let's keep the 'city' level view as a "directory" view, and the modal as a detail view?
-    // User asked to "reuse modal", likely implying replacing the view. 
-    // But the previous code had a full view.
-    // Let's remove the broken useEffect for filters for now to fix the syntax.
+    // Navigation Helpers
+    const navigateTo = (level: GeoLevel) => {
+        setBreadcrumb(prev => [...prev, level]);
+        setCurrentLevel(level);
+    };
 
-    // ... code continues ...
+    const goBack = () => {
+        setBreadcrumb(prev => {
+            const newBreadcrumb = prev.slice(0, -1);
+            setCurrentLevel(newBreadcrumb[newBreadcrumb.length - 1]);
+            return newBreadcrumb;
+        });
+    };
+
+    // Data Fetching Helpers
+    const fetchRegions = async () => {
+        setLoadingData(true);
+        try {
+            // Mocking dynamic regions for now or fetch from 'regions' collection if exists
+            // Assuming simplified static regions for Brazil or fetching from DB
+            const regionsRef = collection(db, 'regions');
+            const snapshot = await getDocs(regionsRef);
+            if (!snapshot.empty) {
+                setRegions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } else {
+                // Fallback hardcoded if no DB data
+                setRegions([
+                    { id: 'norte', name: 'Norte' },
+                    { id: 'nordeste', name: 'Nordeste' },
+                    { id: 'centro-oeste', name: 'Centro-Oeste' },
+                    { id: 'sudeste', name: 'Sudeste' },
+                    { id: 'sul', name: 'Sul' }
+                ]);
+            }
+        } catch (error) {
+            console.error("Error fetching regions:", error);
+            toast.error("Erro ao carregar regiões");
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    const fetchStates = async (regionId: string) => {
+        setLoadingData(true);
+        try {
+            // Fetch states filtered by region, or just all states and filter client side if small
+            // Using public IBGE API or internal DB? Assuming internal DB structure
+            // If internal DB doesn't have structure, we might need to fallback.
+            // Let's assume 'states' collection exists
+            const q = query(collection(db, 'states'), where('regionId', '==', regionId));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                setStates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } else {
+                // Fallback: This part would ideally call an external API (IBGE)
+                console.warn("No states found in DB for region", regionId);
+                // Toast for dev feedback
+                // toast.info("Sem estados cadastrados para esta região.");
+            }
+        } catch (error) {
+            console.error("Error fetching states:", error);
+        } finally {
+            setLoadingData(false);
+        }
+    };
+
+    const fetchCities = async (regionId: string, stateId: string) => {
+        setLoadingData(true);
+        try {
+            // Fetch cities with contributions
+            // Complex query: cities in state that have contributions?
+            // Or just list cities in state and show count?
+            const q = query(collection(db, 'cities'), where('stateId', '==', stateId));
+            const snapshot = await getDocs(q);
+            if (!snapshot.empty) {
+                setCities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            }
+        } catch (error) {
+            console.error("Error fetching cities:", error);
+        } finally {
+            setLoadingData(false);
+        }
+    };
 
     // Fix renderContent types
     const renderContent = () => {

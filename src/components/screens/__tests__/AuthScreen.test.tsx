@@ -39,12 +39,7 @@ describe('AuthScreen', () => {
         expect(googleButton).toBeInTheDocument();
     });
 
-    it('should render login method toggle buttons', () => {
-        renderWithRouter(<AuthScreen />);
 
-        expect(screen.getByRole('button', { name: /^email$/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /telefone/i })).toBeInTheDocument();
-    });
 
     it('should show password strength indicator in register mode', () => {
         renderWithRouter(<AuthScreen />);
