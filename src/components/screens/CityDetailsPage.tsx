@@ -13,12 +13,9 @@ import {
     Users2,
     Scaling,
     ArrowLeft,
-    Filter,
     Search,
-    Printer,
     FileDown,
     MapPin,
-    AlertCircle,
     CheckSquare,
     Square
 } from 'lucide-react';
@@ -72,7 +69,6 @@ const CityDetailsPage: React.FC = () => {
     // Filters & Search
     const [filterStatus, setFilterStatus] = useState<string>('Todos'); // Default Todos
     const [searchTerm, setSearchTerm] = useState('');
-    const [searchType, setSearchType] = useState('title'); // title, id, category
 
     // Selection
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -99,7 +95,7 @@ const CityDetailsPage: React.FC = () => {
 
                 if (!snap.empty) {
                     const doc = snap.docs[0];
-                    const cityData = { id: doc.id, ...doc.data() };
+                    const cityData: any = { id: doc.id, ...doc.data() };
                     setCity(cityData); // Contains latest counts & demographics
                     setDemographics(cityData.demographics);
 
