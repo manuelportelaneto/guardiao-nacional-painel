@@ -12,6 +12,7 @@ import AdminModeration from './components/screens/AdminModeration';
 
 import CitySelector from './components/screens/CitySelector';
 import CityDashboard from './components/screens/CityDashboard';
+import CityDetailsPage from './components/screens/CityDetailsPage';
 import TasksKanban from './components/screens/TasksKanban';
 import DepartmentsCRM from './components/screens/DepartmentsCRM';
 import AdminCommunication from './components/screens/AdminCommunication';
@@ -90,6 +91,11 @@ function App() {
                         <Route path="dashboard" element={<Navigate to="/admin" replace />} />
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="cities" element={<AdminCities />} />
+                        <Route path="cities/:cityId" element={
+                            <React.Suspense fallback={<div>Carregando...</div>}>
+                                <CityDetailsPage />
+                            </React.Suspense>
+                        } />
                         <Route path="moderation" element={<AdminModeration />} />
 
                         <Route path="communication" element={<AdminCommunication />} />

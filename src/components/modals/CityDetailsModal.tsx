@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
 import {
     MapPin,
     Calendar,
@@ -10,10 +11,17 @@ import {
     History,
     Building2,
     Users,
-    FileText
+    FileText,
+    RefreshCw,
+    Loader2,
+    LandPlot,
+    Users2,
+    Scaling
 } from 'lucide-react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
+import { db, functions } from '../../firebaseConfig'; // Import functions
+import { httpsCallable } from 'firebase/functions';
+import { toast } from 'sonner';
 import ContributionDetailModal from '../screens/ContributionDetailModal';
 
 interface CityDetailsModalProps {
@@ -21,6 +29,21 @@ interface CityDetailsModalProps {
     open: boolean;
     onClose: () => void;
 }
+
+const translateCategory = (cat: string) => {
+    const map: Record<string, string> = {
+        'leisure': 'Lazer',
+        'services': 'Serviços',
+        'transport': 'Transporte',
+        'safety': 'Segurança',
+        'infrastructure': 'Infraestrutura',
+        'environment': 'Meio Ambiente',
+        'education': 'Educação',
+        'health': 'Saúde',
+        'other': 'Outros'
+    };
+    return map[cat] || cat;
+};
 
 const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose }) => {
     const [contributions, setContributions] = useState<any[]>([]);
@@ -30,19 +53,24 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
     const [selectedContribution, setSelectedContribution] = useState<any>(null);
     const [detailModalOpen, setDetailModalOpen] = useState(false);
 
+    // Enrichment State
+    const [enriching, setEnriching] = useState(false);
+    const [demographics, setDemographics] = useState<any>(null);
+
     useEffect(() => {
         if (city && open) {
             fetchCityContributions();
+            setDemographics(city.demographics || null);
         }
     }, [city, open]);
 
     const fetchCityContributions = async () => {
         setLoadingContribs(true);
         try {
-            // Now we can query strictly by 'city' field thanks to migration
             const q = query(
                 collection(db, 'contributions'),
                 where('city', '==', city.name),
+                where('status', '==', 'Aprovado'), // Filter ONLY Approved
                 orderBy('createdAt', 'desc')
             );
             const snapshot = await getDocs(q);
@@ -58,16 +86,41 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
         }
     };
 
+    const handleEnrich = async () => {
+        setEnriching(true);
+        try {
+            const enrichFn = httpsCallable(functions, 'enrichCityData');
+            const res = await enrichFn({ cityName: city.name, uf: city.uf });
+            const data = res.data as any;
+            if (data.success) {
+                setDemographics(data.demographics);
+                toast.success("Dados atualizados com sucesso!");
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Erro ao buscar dados do IBGE.");
+        } finally {
+            setEnriching(false);
+        }
+    };
+
     if (!city) return null;
 
     const formatDate = (date: any) => {
         if (!date) return 'N/A';
-        return date.toDate ? date.toDate().toLocaleDateString('pt-BR') : new Date(date).toLocaleDateString('pt-BR');
+        // Handle Firestore Timestamp or ISO string or Date object
+        if (date?.toDate) return date.toDate().toLocaleDateString('pt-BR');
+        const d = new Date(date);
+        return isNaN(d.getTime()) ? 'N/A' : d.toLocaleDateString('pt-BR');
     };
+
+    // Calculate displayed count (filtered)
+    // Use the fetched list length as the source of truth for "Aprovados" inside the modal
+    const displayCount = contributions.length;
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0">
+            <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0" aria-describedby="city-details-desc">
                 <DialogHeader className="p-6 pb-2 bg-gradient-to-r from-blue-50 to-white">
                     <DialogTitle className="flex items-center gap-3 text-2xl">
                         <div className="h-12 w-12 rounded-full bg-blue-100 flex items-center justify-center border-2 border-blue-200">
@@ -78,11 +131,14 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
                             <div className="flex gap-2 mt-1">
                                 <Badge variant="outline" className="text-xs font-normal text-gray-500 uppercase">{city.uf} - {city.region}</Badge>
                                 <Badge className="bg-blue-600">
-                                    {city.totalContributions || contributions.length || 0} Registros
+                                    {displayCount} Aprovados
                                 </Badge>
                             </div>
                         </div>
                     </DialogTitle>
+                    <DialogDescription id="city-details-desc" className="sr-only">
+                        Detalhes e contribuições da cidade de {city.name}, {city.uf}.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <Tabs defaultValue="history" className="flex-1 flex flex-col overflow-hidden">
@@ -90,11 +146,11 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
                         <TabsList className="w-full justify-start h-12 bg-transparent p-0">
                             <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full px-4 text-gray-600 data-[state=active]:text-blue-600">
                                 <FileText className="w-4 h-4 mr-2" />
-                                Contribuições e Ocorrências
+                                Ocorrências
                             </TabsTrigger>
                             <TabsTrigger value="info" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full px-4 text-gray-600 data-[state=active]:text-blue-600">
                                 <MapPin className="w-4 h-4 mr-2" />
-                                Dados do Município
+                                Município
                             </TabsTrigger>
                         </TabsList>
                     </div>
@@ -135,7 +191,7 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
                                                 <p className="text-sm text-gray-600 line-clamp-2 mb-3 leading-relaxed">{contrib.description}</p>
                                                 <div className="flex flex-wrap gap-3 text-xs text-gray-500 items-center">
                                                     <span className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded-md border border-gray-100"><Calendar className="w-3 h-3" /> {formatDate(contrib.createdAt)}</span>
-                                                    <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-100"><Star className="w-3 h-3" /> {contrib.category}</span>
+                                                    <span className="flex items-center gap-1 bg-blue-50 text-blue-700 px-2 py-1 rounded-md border border-blue-100"><Star className="w-3 h-3" /> {translateCategory(contrib.category)}</span>
                                                     {contrib.likes > 0 && (
                                                         <span className="flex items-center gap-1 text-pink-600"><Users className="w-3 h-3" /> {contrib.likes} apoios</span>
                                                     )}
@@ -149,8 +205,61 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
 
                         <TabsContent value="info" className="mt-0">
                             <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle>Dados Demográficos Governamentais</CardTitle>
+                                    <Button size="sm" variant="outline" onClick={handleEnrich} disabled={enriching}>
+                                        {enriching ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                                        {enriching ? 'Buscando...' : 'Atualizar Dados'}
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    {demographics ? (
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
+                                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                                <div className="flex items-center gap-2 text-blue-800 mb-1">
+                                                    <Users2 className="w-4 h-4" />
+                                                    <p className="text-sm font-semibold uppercase">População</p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-gray-900">{demographics.population?.toLocaleString('pt-BR') || 'N/A'}</p>
+                                                <p className="text-xs text-blue-600 mt-1">Fonte: IBGE</p>
+                                            </div>
+
+                                            <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                                                <div className="flex items-center gap-2 text-green-800 mb-1">
+                                                    <LandPlot className="w-4 h-4" />
+                                                    <p className="text-sm font-semibold uppercase">Área Territorial</p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-gray-900">{demographics.area?.toLocaleString('pt-BR')} km²</p>
+                                            </div>
+
+                                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                                                <div className="flex items-center gap-2 text-purple-800 mb-1">
+                                                    <Scaling className="w-4 h-4" />
+                                                    <p className="text-sm font-semibold uppercase">Densidade</p>
+                                                </div>
+                                                <p className="text-2xl font-bold text-gray-900">{demographics.density} hab/km²</p>
+                                            </div>
+
+                                            <div className="col-span-2 md:col-span-3 pt-4 border-t border-gray-100 mt-2">
+                                                <p className="text-xs text-gray-500">
+                                                    Última atualização dos dados: {demographics.lastUpdated ? formatDate(demographics.lastUpdated) : 'N/A'}
+                                                </p>
+                                                <p className="text-xs text-gray-400">Código IBGE: {demographics.ibgeId}</p>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-10 text-gray-500">
+                                            <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+                                            <p>Dados demográficos não disponíveis.</p>
+                                            <p className="text-sm">Clique em "Atualizar Dados" para buscar no IBGE.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            <Card className="mt-6">
                                 <CardHeader>
-                                    <CardTitle>Detalhes Geográficos</CardTitle>
+                                    <CardTitle>Detalhes Geográficos do Sistema</CardTitle>
                                 </CardHeader>
                                 <CardContent className="grid grid-cols-2 gap-4">
                                     <div>
@@ -166,8 +275,8 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
                                         <p className="font-mono text-xs">{city.id}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm text-gray-500">Última Atualização</p>
-                                        <p className="font-medium">{city.updatedAt ? formatDate(city.updatedAt) : 'N/A'}</p>
+                                        <p className="text-sm text-gray-500">Registros Totais</p>
+                                        <p className="font-medium">{city.totalContributions || 0}</p>
                                     </div>
                                 </CardContent>
                             </Card>

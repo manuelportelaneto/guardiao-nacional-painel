@@ -40,14 +40,14 @@ const ContributionDetailModal: React.FC<ContributionDetailModalProps> = ({ contr
 
     return (
         <Dialog open={open} onOpenChange={onClose}>
-            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+            <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden" aria-describedby="contribution-desc">
                 <DialogHeader className="p-6 pb-2">
                     <div className="flex justify-between items-start gap-4">
                         <div className="space-y-1">
                             <DialogTitle className="text-xl font-bold leading-tight">
                                 {contribution.title || 'Sem título'}
                             </DialogTitle>
-                            <DialogDescription className="flex items-center gap-2">
+                            <DialogDescription id="contribution-desc" className="flex items-center gap-2">
                                 <Tag className="w-3 h-3" /> {contribution.category || 'Geral'}
                             </DialogDescription>
                         </div>

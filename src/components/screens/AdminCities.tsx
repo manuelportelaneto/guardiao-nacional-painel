@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../firebaseConfig';
-import { collection, query, getDocs, where } from 'firebase/firestore';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -12,8 +10,12 @@ import {
     MapPin,
     ArrowLeft,
     Database,
-    AlertCircle
+    AlertCircle,
+    RefreshCw
 } from 'lucide-react';
+import { db, functions } from '../../firebaseConfig';
+import { collection, getDocs } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import { toast } from 'sonner';
 import CityDetailsModal from '../modals/CityDetailsModal';
 
@@ -25,9 +27,10 @@ interface GeoLevel {
     stateId?: string;
 }
 
-
+import { useNavigate } from 'react-router-dom';
 
 const AdminCities: React.FC = () => {
+    const navigate = useNavigate();
     // Hierarchical navigation state
     const [currentLevel, setCurrentLevel] = useState<GeoLevel>({ type: 'country', name: 'Brasil', id: 'br' });
     const [breadcrumb, setBreadcrumb] = useState<GeoLevel[]>([{ type: 'country', name: 'Brasil', id: 'br' }]);
@@ -38,11 +41,37 @@ const AdminCities: React.FC = () => {
     const [cities, setCities] = useState<any[]>([]);
 
     // Modal State
-    const [selectedCity, setSelectedCity] = useState<any>(null);
+    const [selectedCity] = useState<any>(null); // Kept layout but unused
+    // const [isCityModalOpen, setIsCityModalOpen] = useState(false); // Removed modal
     const [isCityModalOpen, setIsCityModalOpen] = useState(false);
 
     // City Level Data
     const [loadingData, setLoadingData] = useState(false);
+
+    // Sync State
+    const [syncing, setSyncing] = useState(false);
+
+    const handleSync = async () => {
+        setSyncing(true);
+        try {
+            const syncFn = httpsCallable(functions, 'recalculateCityCounts');
+            const res = await syncFn();
+            const data = res.data as any;
+            if (data.success) {
+                toast.success(`Sincronização concluída! ${data.updated} cidades atualizadas.`);
+                // Refresh list
+                const current = currentLevel;
+                if (current.type === 'country') fetchRegions();
+                else if (current.type === 'region' && current.id) fetchStates(current.id);
+                else if (current.type === 'state' && current.id) fetchCities(current.regionId!, current.id);
+            }
+        } catch (e) {
+            console.error(e);
+            toast.error("Erro ao sincronizar contadores.");
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     useEffect(() => {
         if (currentLevel.type === 'country') {
@@ -72,21 +101,14 @@ const AdminCities: React.FC = () => {
     const fetchRegions = async () => {
         setLoadingData(true);
         try {
-            // Mocking dynamic regions for now or fetch from 'regions' collection if exists
-            // Assuming simplified static regions for Brazil or fetching from DB
-            const regionsRef = collection(db, 'regions');
+            // Fetch from territories/br/regions
+            const regionsRef = collection(db, 'territories', 'br', 'regions');
             const snapshot = await getDocs(regionsRef);
             if (!snapshot.empty) {
                 setRegions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             } else {
-                // Fallback hardcoded if no DB data
-                setRegions([
-                    { id: 'norte', name: 'Norte' },
-                    { id: 'nordeste', name: 'Nordeste' },
-                    { id: 'centro-oeste', name: 'Centro-Oeste' },
-                    { id: 'sudeste', name: 'Sudeste' },
-                    { id: 'sul', name: 'Sul' }
-                ]);
+                console.warn('No regions found in territories/br/regions');
+                setRegions([]);
             }
         } catch (error) {
             console.error("Error fetching regions:", error);
@@ -99,40 +121,39 @@ const AdminCities: React.FC = () => {
     const fetchStates = async (regionId: string) => {
         setLoadingData(true);
         try {
-            // Fetch states filtered by region, or just all states and filter client side if small
-            // Using public IBGE API or internal DB? Assuming internal DB structure
-            // If internal DB doesn't have structure, we might need to fallback.
-            // Let's assume 'states' collection exists
-            const q = query(collection(db, 'states'), where('regionId', '==', regionId));
-            const snapshot = await getDocs(q);
+            // Fetch states from territories/br/regions/{regionId}/states
+            const statesRef = collection(db, 'territories', 'br', 'regions', regionId, 'states');
+            const snapshot = await getDocs(statesRef);
+
             if (!snapshot.empty) {
                 setStates(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             } else {
-                // Fallback: This part would ideally call an external API (IBGE)
                 console.warn("No states found in DB for region", regionId);
-                // Toast for dev feedback
-                // toast.info("Sem estados cadastrados para esta região.");
+                setStates([]);
             }
         } catch (error) {
             console.error("Error fetching states:", error);
+            toast.error("Erro ao carregar estados");
         } finally {
             setLoadingData(false);
         }
     };
 
-    const fetchCities = async (_regionId: string, stateId: string) => {
+    const fetchCities = async (regionId: string, stateId: string) => {
         setLoadingData(true);
         try {
-            // Fetch cities with contributions
-            // Complex query: cities in state that have contributions?
-            // Or just list cities in state and show count?
-            const q = query(collection(db, 'cities'), where('stateId', '==', stateId));
-            const snapshot = await getDocs(q);
+            // Fetch cities from territories/br/regions/{regionId}/states/{stateId}/cities
+            const citiesRef = collection(db, 'territories', 'br', 'regions', regionId, 'states', stateId, 'cities');
+            const snapshot = await getDocs(citiesRef);
+
             if (!snapshot.empty) {
                 setCities(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } else {
+                setCities([]);
             }
         } catch (error) {
             console.error("Error fetching cities:", error);
+            toast.error("Erro ao carregar cidades");
         } finally {
             setLoadingData(false);
         }
@@ -157,7 +178,14 @@ const AdminCities: React.FC = () => {
                             </CardHeader>
                             <CardContent>
                                 <CardTitle className="text-lg">{region.name}</CardTitle>
-                                <p className="text-sm text-gray-500 mt-1">Região administrativa</p>
+                                <div className="flex flex-col gap-1 mt-2">
+                                    <span className="text-xs text-gray-400">Região administrativa</span>
+                                    {region.statesCount !== undefined && (
+                                        <Badge variant="secondary" className="w-fit text-xs mt-1">
+                                            {region.statesCount} estados
+                                        </Badge>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     ))}
@@ -182,6 +210,16 @@ const AdminCities: React.FC = () => {
                             </CardHeader>
                             <CardContent>
                                 <CardTitle className="text-xl font-mono">{state.name}</CardTitle>
+                                <div className="flex flex-col gap-1 mt-2">
+                                    <span className="text-xs text-gray-500">
+                                        {state.citiesCount || 0} municípios
+                                    </span>
+                                    {state.totalContributions > 0 && (
+                                        <Badge variant="outline" className="w-fit text-xs border-green-200 text-green-700">
+                                            {state.totalContributions} ocorrências
+                                        </Badge>
+                                    )}
+                                </div>
                             </CardContent>
                         </Card>
                     ))}
@@ -213,8 +251,9 @@ const AdminCities: React.FC = () => {
                                     key={city.id || city.name}
                                     className="cursor-pointer hover:shadow-md hover:border-blue-300"
                                     onClick={() => {
-                                        setSelectedCity(city);
-                                        setIsCityModalOpen(true);
+                                        // Cache city for DetailsPage
+                                        sessionStorage.setItem(`city_${city.id}`, JSON.stringify(city));
+                                        navigate(`/admin/cities/${city.id}`);
                                     }}
                                 >
                                     <CardContent className="p-4 flex items-center justify-between">
@@ -224,7 +263,14 @@ const AdminCities: React.FC = () => {
                                             </div>
                                             <div>
                                                 <span className="font-semibold text-gray-700 block">{city.name}</span>
-                                                <span className="text-xs text-gray-500">{city.totalContributions ? `${city.totalContributions} registros` : 'Ver registros'}</span>
+                                                <div className="flex gap-1 mt-1">
+                                                    <Badge variant="secondary" className="text-[10px] px-1 h-5">
+                                                        {city.totalContributions || 0} total
+                                                    </Badge>
+                                                    <Badge className="bg-blue-600 text-[10px] px-1 h-5">
+                                                        {city.approvedContributions || 0} ok
+                                                    </Badge>
+                                                </div>
                                             </div>
                                         </div>
                                         <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -247,10 +293,16 @@ const AdminCities: React.FC = () => {
                     <h2 className="text-3xl font-bold text-gray-900 font-outfit">Diretório Geográfico</h2>
                     <p className="text-gray-500">Navegue pelas contribuições organizadas hierarquicamente.</p>
                 </div>
-                <Badge variant="secondary" className="gap-1">
-                    <Database className="w-3 h-3" />
-                    Modo Dinâmico
-                </Badge>
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" onClick={handleSync} disabled={syncing} size="sm">
+                        {syncing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
+                        Sincronizar
+                    </Button>
+                    <Badge variant="secondary" className="gap-1">
+                        <Database className="w-3 h-3" />
+                        Modo Dinâmico
+                    </Badge>
+                </div>
             </div>
 
             {/* Breadcrumb Navigation */}

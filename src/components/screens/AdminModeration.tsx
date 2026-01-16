@@ -530,7 +530,7 @@ const AdminModeration: React.FC = () => {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-2">
                     <TabsTrigger value="reports">Denúncias ({reports.length})</TabsTrigger>
-                    <TabsTrigger value="queue">Fila IA ({moderationQueue.length})</TabsTrigger>
+                    <TabsTrigger value="queue">Em Análise ({moderationQueue.length})</TabsTrigger>
                     <TabsTrigger value="approved">Aprovados ({approvedList.length})</TabsTrigger>
                     <TabsTrigger value="rejected">Rejeitados ({rejectedList.length})</TabsTrigger>
                     <TabsTrigger value="trash">Lixo ({trashList.length})</TabsTrigger>
