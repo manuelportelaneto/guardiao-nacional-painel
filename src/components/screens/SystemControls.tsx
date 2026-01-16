@@ -105,8 +105,6 @@ const SystemControls: React.FC = () => {
                 isApproachingLimit: !!storageAlert,
                 backupCount: backupLogs.length
             });
-            isApproachingLimit: !!storageAlert,
-                backupCount: backupLogs.length
         });
     } catch (error) {
         console.warn('Could not fetch backup status:', error);
