@@ -187,6 +187,7 @@ const AdminDashboard: React.FC = () => {
                 let status = c.status || 'Em Análise';
                 // Normalize labels
                 if (status === 'pending' || status === 'Pendente') status = 'Em Análise';
+                if (status === 'Publicado') status = 'Aprovado';
 
                 statusMap[status] = (statusMap[status] || 0) + 1;
             });

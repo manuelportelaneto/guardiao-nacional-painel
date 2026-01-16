@@ -136,6 +136,11 @@ const CityDetailsPage: React.FC = () => {
     useEffect(() => {
         if (city) {
             fetchContributions(true);
+
+            // Auto-enrich if missing or incomplete, but do not force refresh
+            if (!city.demographics || !city.demographics.population) {
+                handleEnrich(false);
+            }
         }
     }, [city, filterStatus, searchTerm]); // Trigger on filter change. Search might need debounce.
 
@@ -190,23 +195,34 @@ const CityDetailsPage: React.FC = () => {
         }
     };
 
-    const handleEnrich = async () => {
+    const handleEnrich = async (force = true) => {
         if (!city) return;
         setEnriching(true);
         try {
             const enrichFn = httpsCallable(functions, 'enrichCityData');
-            const res = await enrichFn({ cityName: city.name, uf: city.uf });
+            // Pass 'force' parameter to backend
+            const res = await enrichFn({ cityName: city.name, uf: city.uf, force });
             const data = res.data as any;
             if (data.success) {
+                // Only toast if it was a forced update or purely new data?
+                // If it was auto, maybe suppression is better?
+                // For now, let's toast only if changes or success.
+                // If cached, 'data.cached' is true.
+
                 setDemographics(data.demographics);
                 const updated = { ...city, demographics: data.demographics };
                 setCity(updated);
                 sessionStorage.setItem(`city_${cityId}`, JSON.stringify(updated));
-                toast.success("Dados atualizados com sucesso!");
+
+                if (force) {
+                    toast.success("Dados atualizados com sucesso!");
+                } else if (!data.cached) {
+                    toast.success("Dados demográficos carregados.");
+                }
             }
         } catch (e) {
             console.error(e);
-            toast.error("Erro ao buscar dados do IBGE.");
+            if (force) toast.error("Erro ao buscar dados do IBGE.");
         } finally {
             setEnriching(false);
         }
@@ -280,7 +296,7 @@ const CityDetailsPage: React.FC = () => {
             <Card className="print:hidden">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-lg font-medium">Dados Demográficos</CardTitle>
-                    <Button size="sm" variant="outline" onClick={handleEnrich} disabled={enriching}>
+                    <Button size="sm" variant="outline" onClick={() => handleEnrich(true)} disabled={enriching}>
                         {enriching ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <RefreshCw className="w-4 h-4 mr-2" />}
                         Att. Dados
                     </Button>

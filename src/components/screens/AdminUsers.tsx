@@ -34,6 +34,7 @@ const AdminUsers: React.FC = () => {
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [searchType, setSearchType] = useState<'email' | 'name' | 'cpf' | 'id'>('email');
     const [searchTerm, setSearchTerm] = useState('');
+    const [cityFilter, setCityFilter] = useState(''); // New City Filter State
 
     // Pagination State
     const [lastVisible, setLastVisible] = useState<any>(null);
@@ -198,65 +199,91 @@ const AdminUsers: React.FC = () => {
         }
     };
     const handleSearch = async () => {
-        if (!searchTerm.trim()) {
-            setLastVisible(null);
-            fetchUsers(false); // Reset to initial list
-            return;
-        }
         setLoading(true);
         try {
             // Search logic
-            let q;
             const term = searchTerm.trim();
+            const city = cityFilter.trim();
 
-            if (searchType === 'id') {
-                // ID exact match
-                // We can use documentId() logic or just fetch the doc directly for best performance/accuracy
-                // But for simplicity in list view, let's just fetch it and wrap in array
+            if (!term && !city) {
+                setLastVisible(null);
+                fetchUsers(false);
+                return;
+            }
+
+            let results: UserManagement[] = [];
+
+            if (searchType === 'id' && term) {
                 const docRef = doc(db, 'users', term);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
                     const data = docSnap.data();
-                    setUsers([{
+                    const user = {
                         id: docSnap.id,
                         ...data,
                         displayName: data.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Usuário sem Nome',
                         phoneNumber: data.phone || data.phoneNumber || null
-                    } as UserManagement]);
-                } else {
-                    setUsers([]);
+                    } as UserManagement;
+
+                    // Apply City Filter if present
+                    if (!city || (user.city && user.city.toLowerCase().includes(city.toLowerCase()))) {
+                        results = [user];
+                    }
                 }
-                setHasMore(false);
-                setLoading(false);
-                return;
+            } else {
+                // If we have a Search Term, query by it
+                // If ONLY City, query by City (requires index maybe? or just checking local props if we can't query)
+                // Range filters only work on one field.
+
+                let q;
+                if (term) {
+                    const field = searchType === 'cpf' ? 'cpf' : searchType === 'name' ? 'displayName' : 'email';
+                    q = query(
+                        collection(db, 'users'),
+                        where(field, '>=', term),
+                        where(field, '<=', term + '\uf8ff'),
+                        limit(50)
+                    );
+                } else if (city) {
+                    // Only City Filter - might need index for 'city'
+                    q = query(
+                        collection(db, 'users'),
+                        where('city', '>=', city),
+                        where('city', '<=', city + '\uf8ff'),
+                        limit(50)
+                    );
+                }
+
+                if (q) {
+                    const querySnapshot = await getDocs(q);
+                    const usersData = querySnapshot.docs.map(doc => {
+                        const data = doc.data();
+                        return {
+                            id: doc.id,
+                            ...data,
+                            displayName: data.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Usuário sem Nome',
+                            phoneNumber: data.phone || data.phoneNumber || null
+                        };
+                    }) as UserManagement[];
+
+                    // Apply Secondary Filter (Client Side)
+                    results = usersData.filter(u => {
+                        let match = true;
+                        // If we searched by term, filter by city
+                        if (term && city) {
+                            match = match && (!!u.city && u.city.toLowerCase().includes(city.toLowerCase()));
+                        }
+                        // If we searched by city, filter by term (if any? no, logic covered above)
+                        return match;
+                    });
+                }
             }
 
-            const field = searchType === 'cpf' ? 'cpf' : searchType === 'name' ? 'displayName' : 'email';
-            q = query(
-                collection(db, 'users'),
-                where(field, '>=', term),
-                where(field, '<=', term + '\uf8ff'),
-                limit(50)
-            );
-
-            const querySnapshot = await getDocs(q);
-
-            // Disable pagination for search mode for simplicity
             setHasMore(false);
-
-            const usersData = querySnapshot.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data,
-                    displayName: data.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Usuário sem Nome',
-                    phoneNumber: data.phone || data.phoneNumber || null
-                };
-            }) as UserManagement[];
-            setUsers(usersData);
+            setUsers(results);
         } catch (error) {
             console.error("Search error:", error);
-            toast.error("Erro na busca");
+            toast.error("Erro na busca (Verifique se os índices estão criados)");
         } finally {
             setLoading(false);
         }
@@ -302,6 +329,16 @@ const AdminUsers: React.FC = () => {
                             onChange={(e) => setSearchTerm(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                         />
+                        {/* New Flexible City Filter (Merged with Search) */}
+                        <div className="absolute right-0 top-0 bottom-0 flex items-center pr-2 md:w-1/3 border-l border-gray-100">
+                            <Input
+                                placeholder="Cidade (Opcional)"
+                                className="border-0 focus-visible:ring-0 text-sm h-full"
+                                value={cityFilter}
+                                onChange={(e) => setCityFilter(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                            />
+                        </div>
                     </div>
                     <Button onClick={handleSearch} className="h-11 px-4 md:px-8 touch-manipulation">
                         Buscar

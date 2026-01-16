@@ -17,6 +17,8 @@ export interface UserManagement {
     phoneNumber?: string;
     createdAt?: any; // Firestore Timestamp
     lastLoginAt?: any; // Firestore Timestamp
+    city?: string;
+    uf?: string;
 }
 
 /**
