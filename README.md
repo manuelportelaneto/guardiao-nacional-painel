@@ -249,6 +249,16 @@ O projeto utiliza **Tailwind CSS v4** com tema customizado:
 - [x] CI/CD com GitHub Actions ✅
 - [ ] Criação de Índices Compostos no Firestore (Status + Data)
 
+## 🛡️ Módulo de Inteligência (Sala de Guerra)
+Nova funcionalidade V12 para monitoramento estratégico:
+
+*   **Grafo de Conexões**: Visualização interativa de rede (Prefeitura, Empresas, Pessoas).
+*   **Análise de Risco**: Termômetro de estabilidade política baseado em notícias.
+*   **Alertas Críticos**: Feed de prioridade gerado por IA.
+
+Para acessar: Menu Lateral -> **Sala de Guerra**.
+Requires: `VITE_SUPABASE_URL` configurado.
+
 ## 🧪 Testes Automatizados
 
 O projeto possui uma suite completa de testes automatizados:

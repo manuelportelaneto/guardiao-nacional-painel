@@ -34,6 +34,7 @@ import {
     ShieldAlert,
     Map as MapIcon,
     Plug,
+    Activity,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -315,6 +316,13 @@ const AdminDashboard: React.FC = () => {
                         onClick={() => navigate('/admin/intelligence')}
                     >
                         <MapIcon className="mr-2 h-4 w-4" /> Inteligência
+                    </Button>
+                    <Button
+                        variant={location.pathname.includes('war-room') ? "secondary" : "ghost"}
+                        className={`w-full justify-start ${!location.pathname.includes('war-room') && 'text-white hover:text-white hover:bg-slate-800'}`}
+                        onClick={() => navigate('/admin/war-room')}
+                    >
+                        <Activity className="mr-2 h-4 w-4" /> Sala de Guerra
                     </Button>
 
                     {/* Removed deprecated Alertas button */}
