@@ -149,7 +149,7 @@ const CityDetailsPage: React.FC = () => {
         setLoadingContribs(true);
         try {
             // Base Query
-            let constraints: any[] = [
+            const constraints: any[] = [
                 where('city', '==', city.name),
                 orderBy('createdAt', 'desc'),
                 limit(PAGE_SIZE)

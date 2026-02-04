@@ -1,368 +1,96 @@
 # Guardião Nacional - Painel Administrativo
 
+![Status](https://img.shields.io/badge/status-active-success.svg)
+![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
+![Stack](https://img.shields.io/badge/stack-React%20v19-blue)
+![Admin](https://img.shields.io/badge/role-super_admin-red)
+
 Painel de administração web para gerenciamento de ocorrências e serviços municipais da plataforma Guardião Nacional.
 
-## 📋 Sobre o Projeto
+## 🏗️ Arquitetura e Fluxo
 
-O **Guardião Nacional Painel** é uma aplicação web administrativa que permite gestores públicos e administradores monitorarem, gerenciarem e responderem às ocorrências recebidas através do aplicativo móvel Guardião Nacional.
-
-### Principais Funcionalidades
-
-- **Sistema de Autenticação**
-  - Login com email/senha
-  - Login com Google (OAuth)
-  - Login com telefone (SMS)
-  - Recuperação de senha
-
-- **Hub de Painéis**
-  - Painel Geral (super admin)
-  - Painéis Municipais (gestores locais)
-  - Controle de acesso baseado em roles
-
-- **Dashboard Geral (Super Admin)**
-  - Métricas globais da plataforma em tempo real (Firestore)
-  - Gráficos de ocorrências e resoluções
-  - Estatísticas de usuários e municípios
-
-- **Gestão Geográfica Hierárquica** ✨ NEW
-  - Navegação Brasil > Região > Estado > Cidade
-  - Descoberta automática de novas cidades via contribuições
-  - Cards interativos para cada nível geográfico
-
-- **Gestão Avançada de Usuários** ✨ NEW
-  - Interface em Cards (substituiu tabela)
-  - Busca por Nome, Email ou CPF
-  - Badges de Gamificação e Status de Doador
-  - Suporte a Níveis Profissionais (Servidor, Empresa Lvl 1-3)
-  - Suporte a Níveis Profissionais (Servidor, Empresa Lvl 1-3)
-  - Ações: Promover, Demover, Bloquear, Remover
-
-- **Moderação de Conteúdo Refinada** ✨ IMPROVED
-  - Fluxos claros para "Remover Conteúdo" (Punição) vs "Ignorar Denúncia" (Manter aprovado)
-  - Filtros avançados por localização e categoria
-  - Visualização detalhada de denúncias com ID do reporter e conteúdo original completo
-  - **Visualização de Risco por IA** ✨ NEW
-    - Badges coloridos indicando nível de risco (1-5)
-    - Detalhe percentual de probabilidade da IA
-  - Auditoria com ID completo do usuário e metadados de IA
-
-- **Sistema de Alertas e Engajamento** ✨ NEW
-  - Envio de broadcast para cidadãos
-  - Segmentação por Geolocalização (Estado, Cidade, Bairro)
-  - Segmentação por Faixa Etária
-  - Targeting baseado em residência ou última localização
-  - Histórico de envios com métricas
-
-  - Histórico de envios com métricas
-
-- **Controle e Manutenção (System Controls)** ✨ NEW
-  - **Feature Flags em Tempo Real**: Ative/desative funcionalidades sem deploy
-  - **Controle de Anúncios**: Switch global para ligar/desligar publicidade
-  - **Modo Manutenção**: Bloqueio de acesso para usuários comuns
-  - **Gamificação**: Pausa global do sistema de XP
-  - Seleção automática ou manual de município
-  - Dashboard específico por cidade
-  - Kanban de tarefas (ocorrências)
-  - CRM de secretarias e servidores
-  - **Relatórios Técnicos (PDF/Excel)** ✨ NEW
-    - Exportação de ocorrências filtradas por período e categoria
-    - PDF técnico com cabeçalho e rodapé oficial
-    - Excel completo para auditoria interna da prefeitura
-    - Conformidade com anonimização de dados pessoais
-
-## 🚀 Tecnologias
-
-- **React** 19.2.0
-- **TypeScript** 5.7.2
-- **Vite** 5.4.21
-- **Tailwind CSS** 4.1.17
-- **Firebase** 11.2.0 (Auth, Firestore)
-- **React Router** 7.1.1
-- **Recharts** 2.15.0 (gráficos)
-- **Radix UI** (componentes)
-- **Lucide React** (ícones)
-
-## 📁 Estrutura do Projeto
-
-```
-procuradoria-painel/
-├── src/
-│   ├── components/
-│   │   ├── screens/          # Páginas principais
-│   │   │   ├── AuthScreen.tsx
-│   │   │   ├── RoleHub.tsx
-│   │   │   ├── AdminDashboard.tsx
-│   │   │   ├── CitySelector.tsx
-│   │   │   ├── CityDashboard.tsx
-│   │   │   ├── TasksKanban.tsx
-│   │   │   └── DepartmentsCRM.tsx
-│   │   └── ui/               # Componentes reutilizáveis
-│   │       ├── button.tsx
-│   │       ├── card.tsx
-│   │       ├── input.tsx
-│   │       ├── sheet.tsx
-│   │       └── ...
-│   ├── context/
-│   │   └── AuthContext.tsx   # Autenticação global
-│   ├── firebaseConfig.ts     # Configuração Firebase
-│   ├── App.tsx               # Roteamento
-│   ├── main.tsx              # Entry point
-│   └── index.css             # Estilos globais
-├── public/
-│   └── logo-new.jpg
-├── .env                      # Variáveis de ambiente
-└── package.json
+```mermaid
+graph TD
+    Admin((Gestor)) -->|Login| Auth[Auth System]
+    Auth -->|Role Check| Hub[Role Hub]
+    
+    Hub -->|Super Admin| Global[Dashboard Geral]
+    Hub -->|Prefeito| City[Dashboard Municipal]
+    Hub -->|Servidor| Task[Kanban de Tarefas]
+    
+    subgraph "Core Admin Features"
+        Global --> Analytics[Métricas Firestore]
+        City --> Map[Mapa de Calor]
+        City --> CRM[Gestão de Secretarias]
+        Task --> Update[Status de Ocorrências]
+    end
+    
+    subgraph "Intelligence"
+        Global --> WarRoom[Sala de Guerra]
+        WarRoom --> Risk[Análise de Risco IA]
+        WarRoom --> Network[Grafo de Conexões]
+    end
 ```
 
-## ⚙️ Instalação e Configuração
+## 🚀 Funcionalidades Principais
 
-### Pré-requisitos
+### Gestão e Monitoramento
+- **Multi-nível**: Brasil > Estado > Município.
+- **Kanban**: Gestão visual de ocorrências (A Fazer, Em Andamento, Concluído).
+- **CRM**: Gestão de servidores e secretarias municipais.
 
-- Node.js 18+ 
-- npm ou yarn
-- Conta Firebase configurada
+### Inteligência (Sala de Guerra)
+- **Análise de Risco**: Monitoramento de estabilidade política via IA.
+- **Grafo de Conexões**: Visualização de relacionamento entre entidades.
 
-### 1. Clone o repositório
+### Controle do Sistema
+- **Webhooks**: Integração com sistemas externos (CRM, ERPs Municipais).
+- **Security Rules 2.0**: Controle granular de acesso por nível de cidade e função.
+- **Insights Preditivos**: Alertas automáticos de "Hotspots" e tendências de problemas.
+- **Feature Flags**: Ativação/desativação de módulos em tempo real.
+- **Moderação**: Filtros de IA para conteúdo impróprio.
+- **Auditoria**: Logs detalhados de ações administrativas.
+
+## 🛠️ Stack Tecnológico
+
+| Camada | Tecnologia |
+|--------|------------|
+| **Frontend** | React 19, Vite 5, TypeScript |
+| **Estilização** | Tailwind CSS v4, Shadcn/UI |
+| **Gráficos** | Recharts, React Force Graph |
+| **Backend** | Firebase (Auth, Firestore, Hosting) |
+| **Testes** | Playwright (E2E), Vitest (Unit) |
+
+## 📦 Instalação
 
 ```bash
+# 1. Clone o repositório
 git clone https://github.com/manuelportelaneto/procuradoria-cidada-painel.git
-cd procuradoria-cidada-painel
-```
 
-### 2. Instale as dependências
-
-```bash
+# 2. Instale dependências
 npm install
-```
 
-### 3. Configure as variáveis de ambiente
+# 3. Configure .env
+cp .env.example .env
 
-Crie um arquivo `.env` na raiz do projeto:
-
-```env
-VITE_FIREBASE_API_KEY=your_api_key
-VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
-VITE_FIREBASE_PROJECT_ID=your_project_id
-VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
-VITE_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-VITE_FIREBASE_APP_ID=your_app_id
-VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
-```
-
-### 4. Execute em desenvolvimento
-
-```bash
+# 4. Inicie
 npm run dev
 ```
 
-Acesse: `http://localhost:5173` ou `https://guardiao-painel-72130.web.app` (Produção)
+## 🧪 Testes
 
-### 5. Build para produção
-
-```bash
-npm run build
-```
-
-Os arquivos compilados estarão em `dist/`
-
-## 🎯 Fluxo de Uso
-
-1. **Login** → Autentique-se usando email, Google ou telefone
-2. **Hub de Painéis** → Escolha entre Painel Geral ou Painel Municipal
-3. **Painel Geral** → Visualize métricas globais (super admin)
-4. **Selecionar Município** → Escolha qual cidade gerenciar
-5. **Dashboard Municipal** → Veja métricas específicas da cidade
-6. **Tarefas (Kanban)** → Gerencie ocorrências em quadro kanban
-7. **Secretarias (CRM)** → Administre departamentos e servidores
-
-## 🔐 Estrutura de Permissões
-
-### Roles no Firestore
-
-```javascript
-users/{userId}:
-  - role: 'admin' | 'super_admin' | 'city_admin' | 'user'
-  - cities: ['maua', 'santo-andre', ...] // Municípios vinculados
-```
-
-- **admin / super_admin / presidente**: Acesso total ao Painel Geral
-- **governador**: Acesso a dados estaduais
-- **prefeito** (antigo city_admin): Acesso ao dashboard municipal
-- **servidor**: Acesso restrito a CRM e Tarefas
-- **user**: Sem acesso ao painel
-
-## 🗺️ Municípios Disponíveis
-
-- Mauá/SP
-- Santo André/SP
-- São Caetano do Sul/SP
-- São Paulo/SP
-
-## 📊 Dashboard - Métricas
-
-### Painel Geral
-- Total de Usuários
-- Ocorrências Ativas
-- Resolvidos no Mês
-- Número de Prefeituras
-
-### Painel Municipal
-- Usuários Ativos
-- Ocorrências Ativas
-- Resolvidos no Mês
-- Número de Secretarias
-
-## 🎨 Design System
-
-O projeto utiliza **Tailwind CSS v4** com tema customizado:
-
-- **Cores**: Primary (blue), Orange (municipal), Red, Green
-- **Componentes**: shadcn/ui (Radix UI + Tailwind)
-- **Tipografia**: System fonts
-- **Dark Mode**: Preparado para implementação
-
-## 🔄 Roteamento
-
-```
-/               → Login (AuthScreen)
-/hub            → Hub de Painéis (RoleHub)
-/admin/*        → Dashboard Geral (AdminDashboard)
-/city/select    → Seleção de Município (CitySelector)
-/city/:id/dashboard    → Dashboard Municipal
-/city/:id/tasks        → Kanban de Tarefas
-/city/:id/departments  → CRM Secretarias
-```
-
-## 🚧 Roadmap
-
-- [x] Integração com Firestore (dados reais) ✅
-- [x] Hierarquia Geográfica (Brasil > Região > Estado > Cidade) ✅
-- [x] Gestão Avançada de Usuários (Cards, Busca CPF, Badges) ✅
-- [x] Relatórios exportáveis (PDF/Excel) ✅
-- [ ] CRUD de tarefas no kanban
-- [ ] Drag-and-drop no kanban
-- [ ] CRUD de secretarias e servidores
-- [x] Moderação de Conteúdo ✅
-- [x] Sistema de notificações ✅
-- [ ] Dark mode
-- [x] Testes automatizados ✅
-- [x] CI/CD com GitHub Actions ✅
-- [ ] Criação de Índices Compostos no Firestore (Status + Data)
-
-## 🛡️ Módulo de Inteligência (Sala de Guerra)
-Nova funcionalidade V12 para monitoramento estratégico:
-
-*   **Grafo de Conexões**: Visualização interativa de rede (Prefeitura, Empresas, Pessoas).
-*   **Análise de Risco**: Termômetro de estabilidade política baseado em notícias.
-*   **Alertas Críticos**: Feed de prioridade gerado por IA.
-
-Para acessar: Menu Lateral -> **Sala de Guerra**.
-Requires: `VITE_SUPABASE_URL` configurado.
-
-## 🧪 Testes Automatizados
-
-O projeto possui uma suite completa de testes automatizados:
-
-### Testes Implementados
-
-- **28 testes** passando em 4 arquivos
-- **Cobertura**: Componentes principais, segurança e integrações
-
-#### Tipos de Teste
-
-1. **Testes Unitários** (13 testes)
-   - AuthScreen: Login, registro, validação
-   - TasksKanban: Renderização, colunas, tarefas
-
-2. **Testes de Segurança** (10 testes)
-   - Validação de email, senha, telefone
-   - Proteção contra XSS
-   - Sanitização de inputs
-
-3. **Testes de Integração** (5 testes)
-   - Fluxos de autenticação completos
-
-### Stack de Testes
-
-- **Vitest** 2.1.8 - Test runner
-- **React Testing Library** - Testes de componentes
-- **jsdom** - Ambiente de teste
-- **@vitest/coverage-v8** - Coverage reports
-
-### Scripts de Teste
+O projeto possui cobertura de testes unitários e E2E.
 
 ```bash
-npm run test              # Rodar todos os testes
-npm run test:ui           # Interface UI para testes
-npm run test:coverage     # Gerar relatório de cobertura
-npm run test:security     # Audit + validação de env
-npm run test:env          # Validar variáveis de ambiente
+# Unitários
+npm run test
+
+# Segurança
+npm run test:security
+
+# E2E (Playwright)
+npm run test:e2e
 ```
 
-### CI/CD
-
-GitHub Actions configurado para rodar automaticamente:
-- ✅ Testes em cada push/PR (com mocks Firebase)
-- ✅ ESLint e TypeScript check (continue-on-error)
-- ✅ Security audit (npm audit)
-- ✅ Coverage reports
-- ✅ Build verification (Vite only, sem tsc)
-
-**Correções Aplicadas (2025-12-31):**
-- Mock completo do Firebase em `src/test/setup.ts`
-- Variáveis de ambiente mock para CI
-- Build usa `npx vite build` para evitar erros TS em componentes UI
-
-## 📝 Scripts Disponíveis
-
-```bash
-# Desenvolvimento
-npm run dev              # Servidor de desenvolvimento
-npm run build            # Build de produção
-npm run preview          # Preview do build
-npm run lint             # Verificar código com ESLint
-
-# Testes
-npm run test             # Rodar testes
-npm run test:ui          # UI interativa de testes
-npm run test:coverage    # Relatório de cobertura
-npm run test:security    # Testes de segurança
-```
-
-## 🤝 Contribuindo
-
-1. Fork o projeto
-2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
-3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
-4. Push para a branch (`git push origin feature/AmazingFeature`)
-5. Abra um Pull Request
-
-## 📄 Licença
-
-Este projeto é privado e de propriedade da Procuradoria Cidadã.
-
-## 👥 Autores
-
-- **Manuel Portela** - Desenvolvedor Principal
-
-## 🔗 Links Relacionados
-
-- [Procuradoria Cidadã Mobile](https://github.com/manuelportelaneto/procuradoria-cidada)
-- [Procuradoria Cidadã Website](https://github.com/manuelportelaneto/procuradoria-cidada-website)
-- [Documentação Firebase](https://firebase.google.com/docs)
-
-## 🔄 Últimas Atualizações (Jan 2026) - Versão 2.1.0
-### Phase 3: Final Polish & UX
-- **Refinamento de Perfil e Usuários**:
-    - Modal integrado para detalhes de contribuição no histórico do usuário.
-    - Extrato detalhado de pontos de gamificação (fonte dos pontos).
-    - Busca de usuários por ID exato.
-- **Sistema de Auditoria**:
-    - Logs detalhados de todas as ações administrativas (Ban, Role Change, Configurações).
-    - Visualização protegida na nova aba "Logs do Sistema".
-- **Comunicação e Engajamento**:
-    - Módulo de "Mensageria" para envio de broadcasts e notificações segmentadas.
-    - Histórico de mensagens enviadas.
-- **System Controls**:
-    - Centralização de configurações globais (Feature Flags, Manutenção).
-    - Controle de análise de IA e Gamificação.
+---
+**Desenvolvido por Cloud Matrix**

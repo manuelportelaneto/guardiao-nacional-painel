@@ -20,6 +20,7 @@ import AdminLogs from './components/screens/AdminLogs';
 import IntelligenceMap from './components/screens/IntelligenceMap';
 import AdminIntegrations from './components/screens/AdminIntegrations';
 import WarRoom from './components/screens/WarRoom';
+import CitySettings from './components/screens/CitySettings';
 import type { UserRole } from './types/user';
 
 // Wrapper for protected routes
@@ -128,6 +129,11 @@ function App() {
                     <Route path="/city/:cityId/departments" element={
                         <PrivateRoute>
                             <DepartmentsCRM />
+                        </PrivateRoute>
+                    } />
+                    <Route path="/city/:cityId/settings" element={
+                        <PrivateRoute>
+                            <CitySettings />
                         </PrivateRoute>
                     } />
                 </Routes>

@@ -39,9 +39,48 @@ export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contributi
                                     <p><span className="text-gray-400">Status:</span> {contribution.status}</p>
                                     <p className="font-bold text-yellow-400">Risco Calculado: Nível {contribution.riskLevel || 'N/A'}</p>
 
+
+                                    {/* Gemini Analysis (New Object) */}
+                                    {contribution.aiAnalysis && !Array.isArray(contribution.aiAnalysis) && (
+                                        <div className="mt-2 pt-2 border-t border-slate-700">
+                                            <p className="text-gray-400 mb-1 font-semibold uppercase tracking-wider text-[10px]">Análise Gemini 1.5 Flash:</p>
+                                            <div className="p-2 rounded bg-slate-800 space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">Recomendação IA:</span>
+                                                    <span className={`font-bold ${(contribution.aiAnalysis as any).autoAction === 'APPROVE' ? 'text-green-400' : (contribution.aiAnalysis as any).autoAction === 'REJECT' ? 'text-red-500' : 'text-yellow-400'}`}>
+                                                        {(contribution.aiAnalysis as any).autoAction}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">Categoria Detectada:</span>
+                                                    <span className="text-blue-300">{(contribution.aiAnalysis as any).detectedCategory}</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">Relevância:</span>
+                                                    <span>{((contribution.aiAnalysis as any).relevanceScore * 100).toFixed(0)}%</span>
+                                                </div>
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">Conflito Texto/Img:</span>
+                                                    <span className={(contribution.aiAnalysis as any).contentMismatch ? 'text-red-400' : 'text-green-400'}>
+                                                        {(contribution.aiAnalysis as any).contentMismatch ? 'DETECTADO' : 'Nenhum'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-gray-300 italic text-xs border-t border-slate-700 pt-1 mt-1">
+                                                    "{(contribution.aiAnalysis as any).reason}"
+                                                </p>
+                                                {(contribution.aiAnalysis as any).entities && (contribution.aiAnalysis as any).entities.length > 0 && (
+                                                    <p className="text-[10px] text-gray-500">
+                                                        Entities: {(contribution.aiAnalysis as any).entities.join(', ')}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Legacy Vision API (Array) */}
                                     {contribution.aiAnalysis && Array.isArray(contribution.aiAnalysis) && (
                                         <div className="mt-2 pt-2 border-t border-slate-700">
-                                            <p className="text-gray-400 mb-1 font-semibold uppercase tracking-wider text-[10px]">Análise de Imagem (SafeSearch):</p>
+                                            <p className="text-gray-400 mb-1 font-semibold uppercase tracking-wider text-[10px]">Análise de Imagem (Legacy):</p>
                                             {contribution.aiAnalysis.map((res: any, idx: number) => (
                                                 <div key={idx} className={`p-2 rounded mb-1 ${res.isSafe ? 'bg-slate-800' : 'bg-red-900/30 border border-red-500/50'}`}>
                                                     <p className={`font-bold ${res.isSafe ? 'text-green-400' : 'text-red-400'}`}>

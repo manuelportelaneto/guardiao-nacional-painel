@@ -1,0 +1,441 @@
+
+> guardiao-painel@0.0.0 test
+> vitest
+
+
+[1m[44m DEV [49m[22m [34mv4.0.16 [39m[90m/home/ubuntu/Documents/Projetos/guardiao/guardiao-painel[39m
+
+ [31m❯[39m src/components/screens/__tests__/AuthScreen.test.tsx [2m([22m[2m7 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 687[2mms[22m[39m
+[31m     [31m×[31m should render login form by default[39m[32m 230[2mms[22m[39m
+     [32m✓[39m should toggle between login and register modes[32m 167[2mms[22m[39m
+     [32m✓[39m should show Google sign-in button[32m 50[2mms[22m[39m
+     [32m✓[39m should show password strength indicator in register mode[32m 86[2mms[22m[39m
+     [32m✓[39m should require terms acceptance in register mode[32m 107[2mms[22m[39m
+     [32m✓[39m should validate email input format[32m 23[2mms[22m[39m
+     [32m✓[39m should validate password input type[32m 20[2mms[22m[39m
+ [32m✓[39m src/__tests__/unit/moderationUtils.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m src/__tests__/security/input-validation.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [31m❯[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 274[2mms[22m[39m
+     [32m✓[39m should render the kanban board[32m 116[2mms[22m[39m
+     [32m✓[39m should render all kanban columns[32m 45[2mms[22m[39m
+     [32m✓[39m should display mock tasks in received column[32m 36[2mms[22m[39m
+[31m     [31m×[31m should display task categories correctly[39m[32m 76[2mms[22m[39m
+ [32m✓[39m src/__tests__/unit/config.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/__tests__/integration/auth-flow.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/components/screens/__tests__/AuthScreen.test.tsx[2m > [22mAuthScreen[2m > [22mshould render login form by default
+[31m[1mTestingLibraryElementError[22m[39m: Found multiple elements with the role "heading" and name `/guardião nacional/i`
+
+Here are the matching elements:
+
+Ignored nodes: comments, script, style
+[36m<h1[39m
+  [33mclass[39m=[32m"text-xl font-bold text-primary"[39m
+[36m>[39m
+  [0mGuardião Nacional[0m
+[36m</h1>[39m
+
+Ignored nodes: comments, script, style
+[36m<h1[39m
+  [33mclass[39m=[32m"text-2xl font-bold tracking-tight text-blue-900"[39m
+[36m>[39m
+  [0mGuardião Nacional[0m
+[36m</h1>[39m
+
+(If this is intentional, then use the `*AllBy*` variant of the query (like `queryAllByText`, `getAllByText`, or `findAllByText`)).
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"h-screen bg-background flex flex-col"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center justify-center pt-16 pb-8"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center space-x-3"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"w-16 h-16 rounded-full flex items-center justify-center overflow-hidden"[39m
+          [36m>[39m
+            [36m<img[39m
+              [33malt[39m=[32m"Logo"[39m
+              [33mclass[39m=[32m"w-full h-full object-cover"[39m
+              [33msrc[39m=[32m"/logo-new.jpg"[39m
+            [36m/>[39m
+          [36m</div>[39m
+          [36m<div>[39m
+            [36m<h1[39m
+              [33mclass[39m=[32m"text-xl font-bold text-primary"[39m
+            [36m>[39m
+              [0mGuardião Nacional[0m
+            [36m</h1>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"text-sm text-gray-600"[39m
+            [36m>[39m
+              [0mSua voz, sua comunidade[0m
+            [36m</p>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex-1 px-6"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"max-w-sm mx-auto"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"text-center"[39m
+          [36m>[39m
+            [36m<h1[39m
+              [33mclass[39m=[32m"text-2xl font-bold tracking-tight text-blue-900"[39m
+            [36m>[39m
+              [0mGuardião Nacional[0m
+            [36m</h1>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"text-gray-600"[39m
+            [36m>[39m
+              [0mAcesse sua conta para continuar[0m
+            [36m</p>[39m
+          [36m</div>[39m
+          [36m<button[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive bg-background text-foreground hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 px-4 py-2 has-[>svg]:px-3 w-full mb-6 h-12 border-2"[39m
+            [33mdata-slot[39m=[32m"button"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33mclass[39m=[32m"w-5 h-5 mr-2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"[39m
+                [33mfill[39m=[32m"#4285F4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"[39m
+                [33mfill[39m=[32m"#34A853"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"[39m
+                [33mfill[39m=[32m"#FBBC05"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"[39m
+                [33mfill[39m=[32m"#EA4335"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [0mContinuar com Google[0m
+          [36m</button>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"relative mb-6"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"bg-border shrink-0 data-[orientation=horizontal]:h-px data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-px"[39m
+              [33mdata-orientation[39m=[32m"horizontal"[39m
+              [33mdata-slot[39m=[32m"separator-root"[39m
+              [33mrole[39m=[32m"none"[39m
+            [36m/>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-background px-3 text-sm text-gray-500"[39m
+            [36m>[39m
+              [0mou[0m
+            [36m</span>[39m
+          [36m</div>[39m
+          [36m<form[39m
+            [33mclass[39m=[32m"space-y-4"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"space-y-2"[39m
+            [36m>[39m
+              [36m<label[39m
+                [33mclass[39m=[32m"flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50"[39m
+                [33mdata-slot[39m=[32m"label"[39m
+                [33mfor[39m=[32m"email"[39m
+              [36m>[39m
+                [0mEmail[0m
+              [36m</label>[39m
+              [36m<input[39m
+                [33mclass[39m=[32m"file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-base bg-input-background transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"[39m
+                [33mdata-slot[39m=[32m"input"[39m
+                [33mid[39m=[32m"email"[39m
+                [33mrequired[39m=[32m""[39m
+                [33mtype[39m=[32m"email"[39m
+                [33mvalue[39m=[32m""[39m
+              [36m/>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"space-y-2"[39m
+            [36m>[39m
+              [36m<label[39m
+                [33mclass[39m=[32m"flex items-center gap-2 text-sm leading-none font-medium select-none group-data-[disabled=true]:pointer-events-none group-data-[disabled=true]:opacity-50 peer-disabled:cursor-not-allowed peer-disabled:opacity-50"[39m
+                [33mdata-slot[39m=[32m"label"[39m
+                [33mfor[39m=[32m"password"[39m
+              [36m>[39m
+                [0mSenha[0m
+              [36m</label>[39m
+              [36m<input[39m
+                [33mclass[39m=[32m"file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-md border px-3 py-1 text-base bg-input-background transition-[color,box-shadow] outline-none file:inline-flex file:h-7 file:border-0 file:bg-transparent file:text-sm file:font-medium disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive"[39m
+                [33mdata-slot[39m=[32m"input"[39m
+                [33mid[39m=[32m"password"[39m
+                [33mrequired[39m=[32m""[39m
+                [33mtype[39m=[32m"password"[39m
+                [33mvalue[39m=[32m""[39m
+              [36m/>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"flex justify-end"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33mclass[39m=[32m"text-sm text-primary hover:underline"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [0mEsqueceu sua senha?[0m
+              [36m</button>[39m
+            [36m</div>[39m
+            [36m<button[39m
+              [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive text-primary-foreground px-4 py-2 has-[>svg]:px-3 w-full h-12 bg-primary hover:bg-primary/90"[39m
+              [33mdata-slot[39m=[32m"button"[39m
+              [33mtype[39m=[32m"submit"[39m
+            [36m>[39m
+              [0mEntrar[0m
+            [36m</button>[39m
+          [36m</form>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"mt-6 text-center"[39m
+          [36m>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"text-gray-600"[39m
+            [36m>[39m
+              [0mNão tem uma conta?[0m
+              [0m [0m
+              [36m<button[39m
+                [33mclass[39m=[32m"text-primary hover:underline bg-transparent border-none cursor-pointer font-medium"[39m
+              [36m>[39m
+                [0mCriar conta[0m
+              [36m</button>[39m
+            [36m</p>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m getElementError node_modules/@testing-library/dom/dist/query-helpers.js:[2m20:35[22m[39m
+[90m [2m❯[22m getMultipleElementsFoundError node_modules/@testing-library/dom/dist/query-helpers.js:[2m23:10[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m55:13[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/components/screens/__tests__/AuthScreen.test.tsx:[2m14:23[22m[39m
+    [90m 12| [39m        [34mrenderWithRouter[39m([33m<[39m[33mAuthScreen[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m 13| [39m
+    [90m 14| [39m        expect(screen.getByRole('heading', { name: /guardião nacional/…
+    [90m   | [39m                      [31m^[39m
+    [90m 15| [39m        expect(screen.getByRole('button', { name: /entrar/i })).toBeIn…
+    [90m 16| [39m        [34mexpect[39m(screen[33m.[39m[34mgetByLabelText[39m([36m/email/i[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/components/screens/__tests__/TasksKanban.test.tsx[2m > [22mTasksKanban[2m > [22mshould display task categories correctly
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an element with the text: INFRASTRUCTURE. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex h-screen bg-gray-50 overflow-hidden"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex-1 flex flex-col min-w-0"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"bg-white border-b px-8 py-4 flex items-center justify-between shrink-0"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex items-center gap-4"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-controls[39m=[32m"radix-_r_14_"[39m
+              [33maria-expanded[39m=[32m"false"[39m
+              [33maria-haspopup[39m=[32m"dialog"[39m
+              [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:text-accent-foreground dark:hover:bg-accent/50 size-9 rounded-md hover:bg-gray-100"[39m
+              [33mdata-slot[39m=[32m"sheet-trigger"[39m
+              [33mdata-state[39m=[32m"closed"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33maria-hidden[39m=[32m"true"[39m
+                [33mclass[39m=[32m"lucide lucide-menu h-6 w-6"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M4 5h16"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M4 12h16"[39m
+                [36m/>[39m
+                [36m<path[39m
+                  [33md[39m=[32m"M4 19h16"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+            [36m</button>[39m
+            [36m<div>[39m
+              [36m<h1[39m
+                [33mclass[39m=[32m"text-2xl font-bold tracking-tight text-gray-900"[39m
+              [36m>[39m
+                [0mGestão de Demandas[0m
+              [36m</h1>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"text-sm text-gray-500"[39m
+              [36m>[39m
+                [0mFluxo de trabalho de [0m
+              [36m</p>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex-1 overflow-x-auto overflow-y-hidden p-8"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex h-full gap-6 min-w-max pb-4"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"flex-1 min-w-[300px] flex flex-col h-full bg-gray-50/50 rounded-xl border border-gray-100"[39m
+            [36m>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"p-4 rounded-t-xl border-b border-gray-100 bg-white sticky top-0 z-10 flex items-center justify-between"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"flex items-center gap-2"[39m
+                [36m>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"w-3 h-3 rounded-full bg-blue-500"[39m
+                  [36m/>[39m
+                  [36m<h3[39m
+                    [33mclass[39m=[32m"font-semibold text-gray-700"[39m
+                  [36m>[39m
+                    [0mRecebidas[0m
+                  [36m</h3>[39m
+                [36m</div>[39m
+                [36m<span[39m
+                  [33mclass[39m=[32m"text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded-full"[39m
+                [36m>[39m
+                  [0m2[0m
+                [36m</span>[39m
+              [36m</div>[39m
+              [36m<div[39m
+                [33mclass[39m=[32m"p-3 space-y-3 overflow-y-auto flex-1 custom-scrollbar"[39m
+              [36m>[39m
+                [36m<div[39m
+                  [33mclass[39m=[32m"text-card-foreground flex flex-col gap-6 rounded-xl border cursor-pointer hover:shadow-lg transition-all duration-200 border-gray-200 group bg-white"[39m
+                  [33mdata-slot[39m=[32m"card"[39m
+                [36m>[39m
+                  [36m<div[39m
+                    [33mclass[39m=[32m"[&:last-child]:pb-6 p-4"[39m
+                    [33mdata-slot[39m=[32m"card-content"[39m
+                  [36m>[39m
+                    [36m<div[39m
+                      [33mclass[39m=[32m"flex justify-between items-start mb-2"[39m
+                    [36m>[39m
+                      [36m<span[39m
+                        [33mclass[39m=[32m"text-xs font-semibold text-gray-500 uppercase tracking-wider"[39m
+                      [36m>[39m
+                        [0minfrastructure[0m
+                      [36m</span>[39m
+                      [36m<button[39m
+                        [33maria-expanded[39m=[32m"false"[39m
+                        [33maria-haspopup[39m=[32m"menu"[39m
+                        [33mclass[39m=[32m"inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 shrink-0 [&_svg]:shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive hover:bg-accent dark:hover:bg-accent/50 size-9 rounded-md h-6 w-6 -mr-2 text-gray-400 hover:text-gray-600"[39m
+                        [33mdata-slot[39m=[32m"dropdown-menu-trigger"[39m
+                        [33mdata-state[39m=[32m"closed"[39m
+                        [33mid[39m=[32m"radix-_r_17_"[39m
+                        [33mtype[39m=[32m"button"[39m
+                      [36m>[39m
+                        [36m<svg[39m
+                          [33maria-hidden[39m=[32m"true"[39m
+                          [33mclass[39m=[32m"lucide lucide-ellipsis-vertical h-4 w-4"[39m
+                          [33mfill[39m=[32m"none"[39m
+                          [33mheight[39m=[32m"24"[39m
+                          [33mstroke[39m=[32m"curre...
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/components/screens/__tests__/TasksKanban.test.tsx:[2m104:23[22m[39m
+    [90m102| [39m
+    [90m103| [39m        [90m// Check for categories[39m
+    [90m104| [39m        [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'INFRASTRUCTURE'[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m105| [39m        [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'SECURITY'[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+    [90m106| [39m    })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m4 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m46 passed[39m[22m[90m (48)[39m
+[2m   Start at [22m 16:52:19
+[2m   Duration [22m 8.53s[2m (transform 1.02s, setup 2.41s, import 5.48s, tests 1.02s, environment 5.11s)[22m
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/components/screens/__tests__/AuthScreen.test.tsx [22m[34mx1 [34m[39m
+
+ [31m❯[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 274[2mms[22m[39m
+     [32m✓[39m should render the kanban board[32m 116[2mms[22m[39m
+     [32m✓[39m should render all kanban columns[32m 45[2mms[22m[39m
+     [32m✓[39m should display mock tasks in received column[32m 36[2mms[22m[39m
+[31m     [31m×[31m should display task categories correctly[39m[32m 76[2mms[22m[39m
+ [32m✓[39m src/components/screens/__tests__/AuthScreen.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 848[2mms[22m[39m
+     [33m[2m✓[22m[39m should render login form by default [33m 352[2mms[22m[39m
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m1 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m10 passed[39m[22m[90m (11)[39m
+[2m   Start at [22m 16:52:53
+[2m   Duration [22m 1.89s
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/components/screens/__tests__/TasksKanban.test.tsx [22m[34mx1 [34m[39m
+
+ [32m✓[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 496[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 16:53:12
+[2m   Duration [22m 6.16s
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/components/screens/TasksKanban.tsx [22m[34mx2 [34m[39m
+
+ [32m✓[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 473[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 22:04:00
+[2m   Duration [22m 7.20s
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/hooks/useContributions.ts [22m[34mx3 [34m[39m
+
+ [32m✓[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 308[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 22:04:11
+[2m   Duration [22m 6.51s
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m

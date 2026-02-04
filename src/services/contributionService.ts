@@ -4,7 +4,9 @@ import {
     query,
     where,
     getDocs,
-    orderBy
+    orderBy,
+    doc,
+    updateDoc
 } from 'firebase/firestore';
 import type { ReportData } from './reportService';
 
@@ -61,5 +63,16 @@ export const contributionService = {
         }
 
         return data;
+    },
+
+    /**
+     * Atualiza o status de uma ocorrência
+     */
+    async updateStatus(contributionId: string, newStatus: string): Promise<void> {
+        const docRef = doc(db, 'contributions', contributionId);
+        await updateDoc(docRef, {
+            status: newStatus,
+            updatedAt: new Date()
+        });
     }
 };

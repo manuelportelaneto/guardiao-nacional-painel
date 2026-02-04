@@ -1,0 +1,43 @@
+
+> guardiao-painel@0.0.0 test
+> vitest
+
+
+[1m[44m DEV [49m[22m [34mv4.0.16 [39m[90m/home/ubuntu/Documents/Projetos/guardiao/guardiao-painel[39m
+
+ [32m✓[39m src/components/screens/__tests__/AuthScreen.test.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 547[2mms[22m[39m
+ [32m✓[39m src/__tests__/unit/moderationUtils.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m src/__tests__/unit/config.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 261[2mms[22m[39m
+ [32m✓[39m src/__tests__/security/input-validation.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m src/__tests__/integration/auth-flow.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m6 passed[39m[22m[90m (6)[39m
+[2m      Tests [22m [1m[32m48 passed[39m[22m[90m (48)[39m
+[2m   Start at [22m 16:53:20
+[2m   Duration [22m 6.75s[2m (transform 867ms, setup 1.47s, import 4.92s, tests 874ms, environment 3.93s)[22m
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/components/screens/TasksKanban.tsx [22m[34mx1 [34m[39m
+
+ [32m✓[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 368[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 22:04:00
+[2m   Duration [22m 7.17s
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/hooks/useContributions.ts [22m[34mx2 [34m[39m
+
+ [32m✓[39m src/components/screens/__tests__/TasksKanban.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 500[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 22:04:11
+[2m   Duration [22m 6.45s
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m

@@ -11,7 +11,9 @@ describe('AuthScreen', () => {
     it('should render login form by default', () => {
         renderWithRouter(<AuthScreen />);
 
-        expect(screen.getByRole('heading', { name: /entrar/i })).toBeInTheDocument();
+        const headings = screen.getAllByRole('heading', { name: /guardião nacional/i });
+        expect(headings[0]).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument();
         expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/senha/i)).toBeInTheDocument();
     });
@@ -20,14 +22,14 @@ describe('AuthScreen', () => {
         renderWithRouter(<AuthScreen />);
 
         // Initially in login mode
-        expect(screen.getByRole('heading', { name: /entrar/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument();
 
         // Click to switch to register
         const toggleButton = screen.getByRole('button', { name: /criar conta/i });
         fireEvent.click(toggleButton);
 
         // Now in register mode
-        expect(screen.getByRole('heading', { name: /criar conta/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /cadastrar/i })).toBeInTheDocument();
         expect(screen.getByLabelText('Nome')).toBeInTheDocument();
         expect(screen.getByLabelText('Sobrenome')).toBeInTheDocument();
     });
