@@ -36,15 +36,17 @@ import {
     DialogFooter
 } from '../ui/dialog';
 import { toast } from 'sonner';
-import { notificationService } from '../../services/notificationService';
-import { loggingService } from '../../services/loggingService';
+import { moderationService, type ModerationItem } from '../../services/moderationService';
 import { useAuth } from '../../context/AuthContext';
-
+import { useModerationStore } from '../../stores/moderationStore';
 import { ModerationCard } from './moderation/ModerationCard';
 import { ModerationFilters } from './moderation/ModerationFilters';
 import { ModerationDetails } from './moderation/ModerationDetails';
 import { ReplyDialog, ConfirmActionDialog } from './moderation';
-import { useModerationStore } from '../../stores/moderationStore';
+import type { Contribution } from '../../types/contribution';
+import { notificationService } from '../../services/notificationService';
+import { loggingService } from '../../services/loggingService';
+import { automationService } from '../../services/automationService';
 
 interface Report {
     id: string;
@@ -54,10 +56,6 @@ interface Report {
     createdAt: Timestamp;
     status: 'pending' | 'approved' | 'rejected';
 }
-
-import type { Contribution } from '../../types/contribution';
-
-// Local Contribution interface removed in favor of shared type
 
 interface ReportWithContribution extends Report {
     contribution?: Contribution;
@@ -75,14 +73,8 @@ const AdminModeration: React.FC = () => {
     const { currentUser } = useAuth();
     const [reports, setReports] = useState<ReportWithContribution[]>([]);
 
-    // ... (rest of state)
-
-    // ... (inside handleReportAction)
-
-    // ...
-
     // Lists
-    const [moderationQueue, setModerationQueue] = useState<Contribution[]>([]);
+    const [moderationQueue, setModerationQueue] = useState<ModerationItem[]>([]);
     const [approvedList, setApprovedList] = useState<Contribution[]>([]);
     const [rejectedList, setRejectedList] = useState<Contribution[]>([]);
     const [trashList, setTrashList] = useState<Contribution[]>([]);
@@ -123,11 +115,6 @@ const AdminModeration: React.FC = () => {
 
     // Helper: Mask User Data
     const getDisplayUser = (id: string, name?: string) => {
-        // Privacy: First Name + Full ID (for Audit field as requested, though this function is used generically. 
-        // If this function is only for the cards, the user asked for "campo 'IA & Auditoria'". 
-        // Reviewing the code, this usage at line 410 is for the card author.
-        // User said: "todas as contribuições pendentes de análise aparecem com o ID de apenas 1 usuário... preciso que o ID completo... apareça no campo 'IA & Auditoria'".
-        // I will update this generic helper to return the full ID, but visually check if it breaks layout. The user requested full ID.
         const firstName = name ? name.split(' ')[0] : 'Usuário';
         return `${firstName} (ID: ${id})`;
     };
@@ -189,16 +176,29 @@ const AdminModeration: React.FC = () => {
                 // Contributions Queues
                 const contributionsRef = collection(db, 'contributions');
 
+
+                // ...
+
                 // 1. Queue (Em Análise) - dedicated query to ensure we see ALL pending items
-                // Using basic query without composite index requirement if possible, or just standard
                 const unsubscribeQueue = onSnapshot(query(contributionsRef, where('status', '==', 'Em Análise')), (snapshot) => {
-                    const queueItems = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
-                    // Client-side sort to be safe
+                    const queueItems = snapshot.docs.map(d => {
+                        const contrib = { id: d.id, ...d.data() } as Contribution;
+                        const { score, reasons } = moderationService.calculatePriority(contrib);
+                        return {
+                            ...contrib,
+                            priorityScore: score,
+                            priorityReasons: reasons
+                        } as ModerationItem;
+                    });
+
+                    // Smart Sort: Priority Score (Desc) -> Oldest First
                     queueItems.sort((a, b) => {
+                        if (b.priorityScore !== a.priorityScore) {
+                            return b.priorityScore - a.priorityScore; // Higher score first
+                        }
                         const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0;
                         const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0;
-                        return timeA - timeB; // Oldest first for queue usually? Or newest? Let's do Oldest first for "FIFO" feel, or User preference. Actually code used default which is random. Let's do Newest first for consistency.
-                        return timeB - timeA;
+                        return timeA - timeB; // Older first if same score
                     });
                     setModerationQueue(queueItems);
                 }, (error) => {
@@ -264,6 +264,13 @@ const AdminModeration: React.FC = () => {
                         deletionReason: 'Removido via Denúncia'
                     });
 
+                    // Trigger Automation (Rejeitado)
+                    // We need to fetch contribution data ideally, but we have report.contribution which is likely partial
+                    // We'll pass what we have
+                    if (report.contribution) {
+                        await automationService.runAutomation('status_updated', { ...report.contribution, id: report.contributionId, status: 'Rejeitado', rejectionReason: reason });
+                    }
+
                     // 2. Notify User (Try to fetch email)
                     try {
                         // We need to fetch the user to get the email since it's not on the contribution
@@ -293,6 +300,10 @@ const AdminModeration: React.FC = () => {
                 // Legacy / Direct Delete (Keep as fallback or for other contexts)
                 if (report.contributionId) {
                     await updateDoc(doc(db, 'contributions', report.contributionId), { status: 'Lixo', deletionReason: 'Removido via Denúncia' });
+                    // Trigger Automation (Lixo)
+                    if (report.contribution) {
+                        await automationService.runAutomation('status_updated', { ...report.contribution, id: report.contributionId, status: 'Lixo' });
+                    }
                 }
                 await updateDoc(doc(db, 'reports', report.id), { status: 'approved' });
                 toast.success("Conteúdo movido para Lixo.");
@@ -331,6 +342,9 @@ const AdminModeration: React.FC = () => {
                     rating: approvalRating, // Save Admin Rating
                     approvedAt: Timestamp.now()
                 });
+
+                // Trigger Automation
+                await automationService.runAutomation('status_updated', { ...contrib, status: 'Aprovado' });
 
                 // Notify User (Alert)
                 if (contrib.userId) {
@@ -386,6 +400,10 @@ const AdminModeration: React.FC = () => {
                     rejectionReason: reason,
                     rejectedAt: Timestamp.now()
                 });
+
+                // Trigger Automation
+                await automationService.runAutomation('status_updated', { ...contrib, status: 'Rejeitado', rejectionReason: reason });
+
 
                 // Notify User (Alert) - Rejected
                 if (contrib.userId) {

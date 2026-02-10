@@ -6,9 +6,11 @@ import {
     getDocs,
     orderBy,
     doc,
-    updateDoc
+    updateDoc,
+    getDoc
 } from 'firebase/firestore';
 import type { ReportData } from './reportService';
+import { automationService } from './automationService';
 
 export const contributionService = {
     /**
@@ -74,5 +76,15 @@ export const contributionService = {
             status: newStatus,
             updatedAt: new Date()
         });
+
+        // Trigger Automation
+        // We need to fetch the contribution data first to pass it to the engine, 
+        // but for now we'll pass the ID and let the engine handle it or just pass minimal data
+        // Ideally runAutomation should fetch if needed, but current impl expects full entity.
+        // Let's fetch it for correctness.
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            await automationService.runAutomation('status_updated', { id: contributionId, ...snap.data() });
+        }
     }
 };

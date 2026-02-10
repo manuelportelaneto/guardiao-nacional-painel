@@ -6,6 +6,7 @@ import RoleHub from './components/screens/RoleHub';
 import SystemControls from './components/screens/SystemControls';
 import { Toaster } from 'sonner';
 import AdminDashboard from './components/screens/AdminDashboard';
+import AdminOverview from './components/screens/AdminOverview';
 import AdminUsers from './components/screens/AdminUsers';
 import AdminCities from './components/screens/AdminCities';
 import AdminModeration from './components/screens/AdminModeration';
@@ -18,7 +19,8 @@ import DepartmentsCRM from './components/screens/DepartmentsCRM';
 import AdminCommunication from './components/screens/AdminCommunication';
 import AdminLogs from './components/screens/AdminLogs';
 import IntelligenceMap from './components/screens/IntelligenceMap';
-import AdminIntegrations from './components/screens/AdminIntegrations';
+import ActionEngine from './components/screens/ActionEngine';
+import AdminAutomations from './components/screens/AdminAutomations';
 import WarRoom from './components/screens/WarRoom';
 import CitySettings from './components/screens/CitySettings';
 import type { UserRole } from './types/user';
@@ -90,7 +92,7 @@ function App() {
                         </PrivateRoute>
                     }>
                         <Route index element={<Navigate to="dashboard" replace />} />
-                        <Route path="dashboard" element={<Navigate to="/admin" replace />} />
+                        <Route path="dashboard" element={<AdminOverview />} />
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="cities" element={<AdminCities />} />
                         <Route path="cities/:cityId" element={
@@ -104,7 +106,8 @@ function App() {
                         <Route path="settings" element={<SystemControls />} />
                         <Route path="logs" element={<AdminLogs />} />
                         <Route path="intelligence" element={<IntelligenceMap />} />
-                        <Route path="integrations" element={<AdminIntegrations />} />
+                        <Route path="integrations" element={<ActionEngine />} />
+                        <Route path="automations" element={<AdminAutomations />} />
                         <Route path="war-room" element={<WarRoom />} />
                     </Route>
 

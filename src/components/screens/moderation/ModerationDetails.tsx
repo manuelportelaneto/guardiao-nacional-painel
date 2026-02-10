@@ -39,6 +39,20 @@ export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contributi
                                     <p><span className="text-gray-400">Status:</span> {contribution.status}</p>
                                     <p className="font-bold text-yellow-400">Risco Calculado: Nível {contribution.riskLevel || 'N/A'}</p>
 
+                                    {/* Smart Queue Priority */}
+                                    {(contribution as any).priorityScore !== undefined && (
+                                        <div className="mt-2 pt-2 border-t border-slate-700">
+                                            <p className="font-bold text-blue-300">Prioridade Smart Queue: {(contribution as any).priorityScore}/100</p>
+                                            {(contribution as any).priorityReasons && (contribution as any).priorityReasons.length > 0 && (
+                                                <ul className="list-disc list-inside text-gray-400 text-[10px] mt-1">
+                                                    {(contribution as any).priorityReasons.map((r: string, idx: number) => (
+                                                        <li key={idx}>{r}</li>
+                                                    ))}
+                                                </ul>
+                                            )}
+                                        </div>
+                                    )}
+
 
                                     {/* Gemini Analysis (New Object) */}
                                     {contribution.aiAnalysis && !Array.isArray(contribution.aiAnalysis) && (

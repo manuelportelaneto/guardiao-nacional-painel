@@ -56,6 +56,25 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
                 );
             }
         }
+
+        // Priority Score Badge
+        if ('priorityScore' in item) {
+            const score = (item as any).priorityScore; // Cast because Contribution doesn't normally have it
+            if (score > 0) {
+                let scoreColor = "bg-blue-50 text-blue-700 border-blue-200";
+                if (score >= 50) scoreColor = "bg-red-50 text-red-700 border-red-200";
+                else if (score >= 30) scoreColor = "bg-orange-50 text-orange-700 border-orange-200";
+
+                const reasons = (item as any).priorityReasons?.join('\n') || 'Calculado automaticamente';
+
+                elements.push(
+                    <Badge key="priority" variant="outline" className={`${scoreColor} text-[10px] cursor-help`} title={reasons}>
+                        Prioridade: {score}
+                    </Badge>
+                );
+            }
+        }
+
         return <div className="flex flex-wrap gap-1 mt-1">{elements}</div>;
     };
 

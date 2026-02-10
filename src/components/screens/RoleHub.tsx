@@ -4,8 +4,9 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { LogOut, Shield, MapPin, Building2, LayoutDashboard } from 'lucide-react';
+import { Shield, MapPin, Building2, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
+import CommandLayout from '../layout/CommandLayout';
 
 const RoleHub: React.FC = () => {
     const { currentUser, logout } = useAuth();
@@ -103,26 +104,17 @@ const RoleHub: React.FC = () => {
 
     // Role-Based Dashboard Access
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
-            <header className="flex justify-between items-center mb-10 max-w-6xl mx-auto">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900 font-outfit">
-                        Bem-vindo, {currentUser?.displayName?.split(' ')[0]}
-                    </h1>
-                    <p className="text-gray-500">
-                        painel de controle • {role === 'super_admin' ? 'Nacional' : role === 'admin' ? 'Estadual' : 'Municipal'}
-                    </p>
-                </div>
-                <button
-                    onClick={handleLogout}
-                    className="flex items-center gap-2 text-red-600 hover:bg-red-50 px-4 py-2 rounded-lg transition-colors font-medium border border-red-100"
-                >
-                    <LogOut size={18} />
-                    Sair
-                </button>
-            </header>
+        <CommandLayout>
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-gray-900 font-outfit mb-2">
+                    Visão Geral
+                </h1>
+                <p className="text-gray-500">
+                    Selecione um módulo para iniciar ou visualizar o resumo operacional.
+                </p>
+            </div>
 
-            <main className="max-w-6xl mx-auto grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
 
                 {/* 1. NATIONAL PANEL (Super Admin / President) */}
                 {role === 'super_admin' && (
@@ -150,7 +142,6 @@ const RoleHub: React.FC = () => {
                 {(role === 'super_admin' || role === 'admin') && (
                     <div
                         onClick={() => navigate('/admin/dashboard?scope=state')}
-                        // Note: We might need to handle 'scope' query param in AdminDashboard later
                         className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-green-300 transition-all group relative overflow-hidden"
                     >
                         <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -190,8 +181,8 @@ const RoleHub: React.FC = () => {
                         </span>
                     </div>
                 )}
-            </main>
-        </div>
+            </div>
+        </CommandLayout>
     );
 };
 
