@@ -42,7 +42,7 @@ describe('Input Validation', () => {
             ];
 
             xssEmails.forEach((email) => {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
                 const containsHtml = /<[^>]*>/.test(email);
                 const containsScript = /script|javascript:/i.test(email);
 

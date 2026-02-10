@@ -30,7 +30,7 @@ describe('config', () => {
         });
 
         it('should use correct base URL format', () => {
-            const baseUrl = `https://${FIREBASE_REGION}-${FIREBASE_PROJECT_ID}.cloudfunctions.net`;
+            // const baseUrl = `https://${FIREBASE_REGION}-${FIREBASE_PROJECT_ID}.cloudfunctions.net`;
             expect(CLOUD_FUNCTIONS.generateApiKey).toContain(FIREBASE_REGION);
             expect(CLOUD_FUNCTIONS.generateApiKey).toContain(FIREBASE_PROJECT_ID);
         });

@@ -4,10 +4,6 @@ import {
     Plus,
     Trash2,
     Save,
-    Play,
-    MoreHorizontal,
-    AlertTriangle,
-    CheckCircle,
     Zap
 } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -39,9 +35,7 @@ import type {
     AutomationRule,
     Condition,
     AutomationAction,
-    TriggerType,
-    ConditionOperator,
-    ActionType
+    TriggerType
 } from '../../types/automation';
 
 const AdminAutomations: React.FC = () => {

@@ -5,15 +5,13 @@ import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 import 'leaflet.heat';
 import { intelligenceService, type HeatmapPoint, type IntelligenceFilters } from '../../services/intelligenceService';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
-import { Loader2, RefreshCw, Filter, Layers, Map as MapIcon, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, RefreshCw, Layers, Map as MapIcon, Calendar as CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 // Leaflet Icons
 import icon from 'leaflet/dist/images/marker-icon.png';

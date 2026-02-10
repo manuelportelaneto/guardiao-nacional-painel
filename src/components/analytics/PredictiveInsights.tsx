@@ -20,12 +20,14 @@ const PredictiveInsights: React.FC<PredictiveInsightsProps> = ({ contributions }
 
         // 1. Weekly Trend Analysis
         const thisWeekCount = contributions.filter(c => {
-            const d = (c.createdAt as any)?.toDate ? (c.createdAt as any).toDate() : new Date(c.createdAt as string);
+            const val = c.createdAt as unknown;
+            const d = (val as { toDate: () => Date }).toDate ? (val as { toDate: () => Date }).toDate() : new Date(val as string);
             return d >= currentWeekStart;
         }).length;
 
         const lastWeekCount = contributions.filter(c => {
-            const d = (c.createdAt as any)?.toDate ? (c.createdAt as any).toDate() : new Date(c.createdAt as string);
+            const val = c.createdAt as unknown;
+            const d = (val as { toDate: () => Date }).toDate ? (val as { toDate: () => Date }).toDate() : new Date(val as string);
             return isWithinInterval(d, { start: lastWeekStart, end: lastWeekEnd });
         }).length;
 
