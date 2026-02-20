@@ -67,15 +67,15 @@ const AdminLogs: React.FC = () => {
     return (
         <div className="space-y-6">
             <div>
-                <h1 className="text-3xl font-bold tracking-tight">Monitoramento do Sistema</h1>
-                <p className="text-muted-foreground">Histórico de ações, erros e solicitações de suporte.</p>
+                <h1 className="text-3xl font-bold tracking-tight">Monitoramento de Ameaças & Logs</h1>
+                <p className="text-muted-foreground">Histórico de auditoria, tentativas de intrusão, erros e solicitações de suporte.</p>
             </div>
 
             <Tabs defaultValue="audit" className="w-full" onValueChange={setActiveTab}>
                 <TabsList>
                     <TabsTrigger value="audit" className="gap-2">
                         <ShieldAlert className="w-4 h-4" />
-                        Auditoria
+                        Auditoria & Ameaças
                     </TabsTrigger>
                     <TabsTrigger value="errors" className="gap-2">
                         <AlertTriangle className="w-4 h-4" />

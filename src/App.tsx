@@ -21,6 +21,7 @@ import AdminLogs from './components/screens/AdminLogs';
 import IntelligenceMap from './components/screens/IntelligenceMap';
 import ActionEngine from './components/screens/ActionEngine';
 import AdminAutomations from './components/screens/AdminAutomations';
+import AdminMonetization from './components/screens/AdminMonetization';
 import WarRoom from './components/screens/WarRoom';
 import CitySettings from './components/screens/CitySettings';
 import type { UserRole } from './types/user';
@@ -108,6 +109,7 @@ function App() {
                         <Route path="intelligence" element={<IntelligenceMap />} />
                         <Route path="integrations" element={<ActionEngine />} />
                         <Route path="automations" element={<AdminAutomations />} />
+                        <Route path="monetization" element={<AdminMonetization />} />
                         <Route path="war-room" element={<WarRoom />} />
                     </Route>
 

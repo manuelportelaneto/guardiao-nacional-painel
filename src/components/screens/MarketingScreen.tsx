@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import {
@@ -35,7 +36,7 @@ const MarketingScreen: React.FC = () => {
                     <h1 className="text-3xl font-bold tracking-tight">Marketing & Campanhas</h1>
                     <p className="text-muted-foreground">Gerencie anúncios, promoções e análise de conversão.</p>
                 </div>
-                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Button className="bg-blue-600 hover:bg-blue-700" onClick={() => toast.info('Em breve: Criação de campanhas de Marketing')}>
                     <Plus className="mr-2 h-4 w-4" /> Nova Campanha
                 </Button>
             </div>

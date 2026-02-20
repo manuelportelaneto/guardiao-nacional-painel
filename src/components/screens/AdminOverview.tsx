@@ -73,7 +73,25 @@ const AdminOverview: React.FC = () => {
         today.setHours(0, 0, 0, 0);
 
         const unsubContribs = onSnapshot(collection(db, 'contributions'), (snap) => {
-            const contribs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+            let contribs = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+
+            // Apply Region Filter
+            if (regionFilter !== 'all') {
+                contribs = contribs.filter(c => c.state?.toLowerCase() === regionFilter.toLowerCase() || c.city?.toLowerCase() === regionFilter.toLowerCase());
+            }
+
+            // Apply Date Range Filter
+            if (dateRange.from) {
+                contribs = contribs.filter(c => {
+                    if (!c.createdAt) return false;
+                    const cDate = (c.createdAt as any).toDate ? (c.createdAt as any).toDate() : new Date(c.createdAt);
+                    if (dateRange.to) {
+                        return cDate >= dateRange.from! && cDate <= new Date(dateRange.to!.getTime() + 86400000); // include full day
+                    }
+                    return cDate >= dateRange.from!;
+                });
+            }
+
             setRecentContributions(contribs); // Store for InsightsWidget
 
             const total = contribs.length;
@@ -168,7 +186,7 @@ const AdminOverview: React.FC = () => {
             unsubContribs();
             unsubUsers();
         };
-    }, []);
+    }, [regionFilter, dateRange]);
 
     const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 

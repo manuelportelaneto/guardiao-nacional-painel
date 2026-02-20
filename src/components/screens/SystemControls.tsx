@@ -7,7 +7,7 @@ import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
-import { Settings, Shield, Zap, Database, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-react';
+import { Settings, Shield, Zap, Database, AlertTriangle, CheckCircle, RefreshCw, Globe } from 'lucide-react';
 import { Progress } from '../ui/progress';
 
 interface SystemSettings {
@@ -19,6 +19,7 @@ interface SystemSettings {
     enableAiTextAnalysis: boolean;
     notifyOnApproval: boolean;
     notifyOnRejection: boolean;
+    overseasAccessEnabled: boolean;
     // Message Templates
     welcomeMessage?: string;
     approvedMessage?: string;
@@ -47,6 +48,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     enableAiTextAnalysis: true,
     notifyOnApproval: true,
     notifyOnRejection: true,
+    overseasAccessEnabled: false,
     welcomeMessage: "Bem-vindo ao Guardião Nacional! Estamos felizes em tê-lo conosco.",
     approvedMessage: "Sua contribuição '{title}' foi aprovada! Obrigado por ajudar a melhorar nossa cidade.",
     rejectedMessage: "Sua contribuição '{title}' não pôde ser aprovada. Verifique nossas diretrizes.",
@@ -230,6 +232,31 @@ const SystemControls: React.FC = () => {
                                 </Label>
                                 <p className="text-xs text-muted-foreground">
                                     Ativa badges, níveis e missões.
+                                </p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Overseas Access */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Acesso Internacional</CardTitle>
+                        <Globe className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="flex items-center space-x-4 mt-4">
+                            <Switch
+                                id="overseasAccessEnabled"
+                                checked={settings.overseasAccessEnabled}
+                                onCheckedChange={() => handleToggle('overseasAccessEnabled')}
+                            />
+                            <div className="flex-1 space-y-1">
+                                <Label htmlFor="overseasAccessEnabled" className="text-sm font-medium leading-none">
+                                    Exceção P/ Exterior (Bypass WAF)
+                                </Label>
+                                <p className="text-xs text-muted-foreground">
+                                    Abertura pontual/programada para um usuário em viagem.
                                 </p>
                             </div>
                         </div>

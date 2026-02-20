@@ -3,7 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, useMap, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
+
+// leaflet.heat requires global L
+(window as any).L = L;
 import 'leaflet.heat';
+
 import { intelligenceService, type HeatmapPoint, type IntelligenceFilters } from '../../services/intelligenceService';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -47,12 +51,13 @@ const HeatmapLayer = ({ points }: { points: HeatmapPoint[] }) => {
     useEffect(() => {
         if (!points.length) return;
         const heatPoints = points.map(p => [p.lat, p.lng, p.intensity] as [number, number, number]);
+
         const heat = (L as any).heatLayer(heatPoints, {
-            radius: 25,
+            radius: 20, // Optimized for precision
             blur: 15,
-            maxZoom: 17,
+            maxZoom: 15, // Optimal for neighborhood/city level
             max: 1.0,
-            gradient: { 0.4: 'blue', 0.6: 'cyan', 0.7: 'lime', 0.8: 'yellow', 1.0: 'red' }
+            gradient: { 0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.8: 'orange', 1.0: 'red' }
         });
         heat.addTo(map);
         return () => { map.removeLayer(heat); };

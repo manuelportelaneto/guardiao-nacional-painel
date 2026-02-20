@@ -296,7 +296,7 @@ const AdminUsers: React.FC = () => {
                     <h2 className="text-3xl font-bold text-gray-900 font-outfit">Gestão de Usuários</h2>
                     <p className="text-gray-500">Administre perfis, cargos e permissões avançadas.</p>
                 </div>
-                <Button className="gap-2 bg-blue-600 hover:bg-blue-700">
+                <Button className="gap-2 bg-blue-600 hover:bg-blue-700" onClick={() => toast.info('Em breve: Criação manual de usuários pelo painel')}>
                     <Plus className="w-4 h-4" />
                     Adicionar Usuário
                 </Button>

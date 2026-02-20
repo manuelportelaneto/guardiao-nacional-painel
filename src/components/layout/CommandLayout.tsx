@@ -15,7 +15,8 @@ import {
     ChevronLeft,
     ChevronRight,
     Zap,
-    MessageSquare
+    MessageSquare,
+    DollarSign
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -112,6 +113,7 @@ const CommandLayout: React.FC<CommandLayoutProps> = ({ children }) => {
         { label: 'Comunicação', icon: MessageSquare, path: '/admin/communication', roles: ['super_admin', 'admin'] },
         { label: 'Logs do Sistema', icon: Shield, path: '/admin/logs', roles: ['super_admin'] },
         { label: 'Automação', icon: Zap, path: '/admin/automations', roles: ['super_admin', 'admin'] },
+        { label: 'Monetização', icon: DollarSign, path: '/admin/monetization', roles: ['super_admin'] },
         { label: 'Integrações', icon: Zap, path: '/admin/integrations', roles: ['super_admin'] },
         { label: 'Configurações', icon: Settings, path: '/admin/settings', roles: ['super_admin'] },
     ];
