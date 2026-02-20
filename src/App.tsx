@@ -24,6 +24,8 @@ import AdminAutomations from './components/screens/AdminAutomations';
 import AdminMonetization from './components/screens/AdminMonetization';
 import WarRoom from './components/screens/WarRoom';
 import CitySettings from './components/screens/CitySettings';
+import ReportsScreen from './components/screens/ReportsScreen';
+import ApiKeysScreen from './components/screens/ApiKeysScreen';
 import type { UserRole } from './types/user';
 
 // Wrapper for protected routes
@@ -111,6 +113,8 @@ function App() {
                         <Route path="automations" element={<AdminAutomations />} />
                         <Route path="monetization" element={<AdminMonetization />} />
                         <Route path="war-room" element={<WarRoom />} />
+                        <Route path="reports" element={<ReportsScreen />} />
+                        <Route path="api-keys" element={<ApiKeysScreen />} />
                     </Route>
 
                     {/* City Selection */}
