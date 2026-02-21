@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, useMap, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, useMapEvents, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 
@@ -8,7 +8,7 @@ import L from 'leaflet';
 (window as any).L = L;
 import 'leaflet.heat';
 
-import { intelligenceService, type HeatmapPoint, type IntelligenceFilters } from '../../services/intelligenceService';
+import { intelligenceService, type HeatmapPoint, type IntelligenceFilters, type MapBounds } from '../../services/intelligenceService';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner';
@@ -29,7 +29,6 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
-// Custom Icons for categories/severity can be added here
 const HighRiskIcon = L.divIcon({
     className: 'custom-div-icon',
     html: "<div style='background-color: #ef4444; width: 12px; height: 12px; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 4px rgba(0,0,0,0.3);'></div>",
@@ -53,9 +52,9 @@ const HeatmapLayer = ({ points }: { points: HeatmapPoint[] }) => {
         const heatPoints = points.map(p => [p.lat, p.lng, p.intensity] as [number, number, number]);
 
         const heat = (L as any).heatLayer(heatPoints, {
-            radius: 20, // Optimized for precision
+            radius: 20,
             blur: 15,
-            maxZoom: 15, // Optimal for neighborhood/city level
+            maxZoom: 15,
             max: 1.0,
             gradient: { 0.2: 'blue', 0.4: 'cyan', 0.6: 'lime', 0.8: 'orange', 1.0: 'red' }
         });
@@ -66,13 +65,30 @@ const HeatmapLayer = ({ points }: { points: HeatmapPoint[] }) => {
     return null;
 };
 
+/** Registers map movement events and triggers data reload on pan/zoom. */
+const BoundsTracker = ({ onBoundsChange }: { onBoundsChange: (bounds: MapBounds) => void }) => {
+    const map = useMapEvents({
+        moveend: () => {
+            const b = map.getBounds();
+            onBoundsChange({
+                minLat: b.getSouth(),
+                maxLat: b.getNorth(),
+                minLng: b.getWest(),
+                maxLng: b.getEast()
+            });
+        }
+    });
+    return null;
+};
+
 const IntelligenceMap: React.FC = () => {
     const [viewMode, setViewMode] = useState<'heatmap' | 'clusters'>('clusters');
     const [heatmapPoints, setHeatmapPoints] = useState<HeatmapPoint[]>([]);
     const [clusterData, setClusterData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [currentBounds, setCurrentBounds] = useState<MapBounds | undefined>(undefined);
+    const boundsDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Default filters: last 30 days
     const [filters, setFilters] = useState<IntelligenceFilters>({
         status: 'all',
         category: 'all',
@@ -85,7 +101,6 @@ const IntelligenceMap: React.FC = () => {
         to: filters.endDate
     });
 
-    // Update filters when dateRange changes
     useEffect(() => {
         setFilters(prev => ({
             ...prev,
@@ -94,15 +109,15 @@ const IntelligenceMap: React.FC = () => {
         }));
     }, [dateRange]);
 
-    const loadData = async () => {
+    const loadData = async (bounds?: MapBounds) => {
         setLoading(true);
         try {
             if (viewMode === 'heatmap') {
-                const data = await intelligenceService.getHeatmapPoints(filters);
+                const data = await intelligenceService.getHeatmapPoints(filters, bounds);
                 setHeatmapPoints(data);
                 toast.success(`${data.length} pontos de calor carregados.`);
             } else {
-                const data = await intelligenceService.getMapData(filters);
+                const data = await intelligenceService.getMapData(filters, bounds);
                 setClusterData(data);
                 toast.success(`${data.length} ocorrências carregadas.`);
             }
@@ -114,8 +129,17 @@ const IntelligenceMap: React.FC = () => {
         }
     };
 
+    // Debounced bounds change handler to prevent rapid re-fetches on pan
+    const handleBoundsChange = (bounds: MapBounds) => {
+        setCurrentBounds(bounds);
+        if (boundsDebounceRef.current) clearTimeout(boundsDebounceRef.current);
+        boundsDebounceRef.current = setTimeout(() => {
+            loadData(bounds);
+        }, 600);
+    };
+
     useEffect(() => {
-        loadData();
+        loadData(currentBounds);
     }, [filters, viewMode]);
 
     return (
@@ -179,7 +203,7 @@ const IntelligenceMap: React.FC = () => {
                     </div>
                 </div>
 
-                <Button variant="ghost" size="sm" onClick={loadData} disabled={loading}>
+                <Button variant="ghost" size="sm" onClick={() => loadData(currentBounds)} disabled={loading}>
                     {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                 </Button>
             </div>
@@ -191,6 +215,8 @@ const IntelligenceMap: React.FC = () => {
                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
                         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
                     />
+                    {/* Bounding box tracker — reloads data on pan/zoom */}
+                    <BoundsTracker onBoundsChange={handleBoundsChange} />
 
                     {viewMode === 'heatmap' && <HeatmapLayer points={heatmapPoints} />}
 

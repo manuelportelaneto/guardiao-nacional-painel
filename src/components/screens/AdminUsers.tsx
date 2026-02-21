@@ -58,10 +58,10 @@ const AdminUsers: React.FC = () => {
         if (isLoadMore) setIsLoadingMore(true);
         else setLoading(true);
         try {
-            let q = query(collection(db, 'users'), orderBy('email'), limit(USERS_PER_PAGE));
+            let q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), limit(USERS_PER_PAGE));
 
             if (isLoadMore && lastVisible) {
-                q = query(collection(db, 'users'), orderBy('email'), startAfter(lastVisible), limit(USERS_PER_PAGE));
+                q = query(collection(db, 'users'), orderBy('createdAt', 'desc'), startAfter(lastVisible), limit(USERS_PER_PAGE));
             }
 
             const querySnapshot = await getDocs(q);

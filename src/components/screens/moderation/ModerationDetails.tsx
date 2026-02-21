@@ -12,11 +12,7 @@ interface ModerationDetailsProps {
 
 export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contribution, onClose }) => {
 
-    // Helper Mask (Ideally shared)
-    const getDisplayUser = (id: string, name?: string) => {
-        const firstName = name ? name.split(' ')[0] : 'Usuário';
-        return `${firstName} (ID: ${id})`;
-    };
+
 
     return (
         <Dialog open={!!contribution} onOpenChange={onClose}>
@@ -27,15 +23,18 @@ export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contributi
                         {contribution.imageUrl && <img src={contribution.imageUrl} className="w-full h-80 object-cover rounded" alt="Full" />}
                         <div className="grid grid-cols-2 gap-4">
                             <div><Label className="text-gray-500">Título</Label><p className="font-medium">{contribution.title}</p></div>
-                            <div><Label className="text-gray-500">Autor</Label><p>{getDisplayUser(contribution.userId, (contribution as any).authorName)}</p></div>
+                            <div><Label className="text-gray-500">Privacidade</Label><p className="text-sm italic text-gray-400">Nome Oculto (LGPD)</p></div>
                             <div className="col-span-2"><Label className="text-gray-500">Descrição</Label><p className="text-sm bg-gray-50 p-2 rounded">{contribution.description}</p></div>
                             <div className="col-span-2 border-t pt-2"><Label className="text-gray-500">IA & Auditoria</Label>
-                                <div className="bg-slate-900 text-green-400 p-4 rounded-lg font-mono text-xs overflow-auto space-y-2 border border-slate-700">
-                                    <div className="flex justify-between border-b border-slate-700 pb-1 mb-2">
-                                        <span className="text-gray-400">ID:</span>
-                                        <span className="text-blue-300">{contribution.id}</span>
+                                <div className="bg-slate-900 text-green-400 p-4 rounded-lg font-mono text-xs space-y-2 border border-slate-700">
+                                    <div className="flex flex-col border-b border-slate-700 pb-2 mb-2 gap-1">
+                                        <span className="text-gray-400 text-[10px] uppercase">ID Contribuição:</span>
+                                        <span className="text-blue-300 break-all">{contribution.id}</span>
                                     </div>
-                                    <p><span className="text-gray-400">User ID:</span> {contribution.userId}</p>
+                                    <div className="flex flex-col gap-1 pb-2 border-b border-slate-700/50 mb-2">
+                                        <span className="text-gray-400 text-[10px] uppercase">User ID (Autor):</span>
+                                        <span className="text-gray-300 break-all">{contribution.userId}</span>
+                                    </div>
                                     <p><span className="text-gray-400">Status:</span> {contribution.status}</p>
                                     <p className="font-bold text-yellow-400">Risco Calculado: Nível {contribution.riskLevel || 'N/A'}</p>
 
@@ -82,9 +81,26 @@ export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contributi
                                                 <p className="text-gray-300 italic text-xs border-t border-slate-700 pt-1 mt-1">
                                                     "{(contribution.aiAnalysis as any).reason}"
                                                 </p>
-                                                {(contribution.aiAnalysis as any).entities && (contribution.aiAnalysis as any).entities.length > 0 && (
-                                                    <p className="text-[10px] text-gray-500">
-                                                        Entities: {(contribution.aiAnalysis as any).entities.join(', ')}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Local Regex Analysis */}
+                                    {(contribution as any).regexAnalysis && (
+                                        <div className="mt-2 pt-2 border-t border-slate-700">
+                                            <p className="text-gray-400 mb-1 font-semibold uppercase tracking-wider text-[10px]">Inteligência Local (Regex):</p>
+                                            <div className="p-2 rounded bg-slate-800 space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="text-gray-400">Status Local:</span>
+                                                    <span className={`font-bold ${(contribution as any).regexAnalysis.isSafe ? 'text-green-400' : 'text-red-400'}`}>
+                                                        {(contribution as any).regexAnalysis.isSafe ? 'SEGURO' : 'ALERTA'}
+                                                    </span>
+                                                </div>
+                                                {(contribution as any).regexAnalysis.matchedWords?.length > 0 && (
+                                                    <p className="text-[10px] text-red-300 flex flex-wrap gap-1">
+                                                        Gatilhos: {(contribution as any).regexAnalysis.matchedWords.map((w: string) => (
+                                                            <span key={w} className="bg-red-950 px-1 rounded">{w}</span>
+                                                        ))}
                                                     </p>
                                                 )}
                                             </div>

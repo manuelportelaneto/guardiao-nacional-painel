@@ -16,11 +16,7 @@ interface ModerationCardProps {
 
 export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onClick, onAction, onReply }) => {
 
-    // Helper Mask (Duplicated from parent momentarily, ideally shared utils)
-    const getDisplayUser = (id: string, name?: string) => {
-        const firstName = name ? name.split(' ')[0] : 'Usuário';
-        return `${firstName} (ID: ${id})`;
-    };
+
 
     const formatDate = (date: any) => {
         if (!date) return 'Data desconhecida';
@@ -92,9 +88,12 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
                 )}
                 <h4 className="font-semibold text-sm line-clamp-2">{item.title}</h4>
                 {renderRiskBadges()}
-                <div className="text-xs text-gray-500 flex items-center gap-1">
-                    <User className="w-3 h-3" />
-                    {getDisplayUser(item.userId || 'unknown', (item as any).authorName)}
+                <div className="text-xs text-gray-500 flex flex-col gap-1">
+                    <div className="flex items-center gap-1">
+                        <User className="w-3 h-3" />
+                        <span className="font-medium">Usuário Oculto (LGPD)</span>
+                    </div>
+                    <span className="text-[10px] break-all opacity-70 ml-4">ID: {item.userId || 'unknown'}</span>
                 </div>
 
                 {/* Actions Bar */}

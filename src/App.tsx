@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthScreen from './components/screens/AuthScreen';
@@ -9,24 +9,34 @@ import AdminDashboard from './components/screens/AdminDashboard';
 import AdminOverview from './components/screens/AdminOverview';
 import AdminUsers from './components/screens/AdminUsers';
 import AdminCities from './components/screens/AdminCities';
-import AdminModeration from './components/screens/AdminModeration';
-
 import CitySelector from './components/screens/CitySelector';
 import CityDashboard from './components/screens/CityDashboard';
 import CityDetailsPage from './components/screens/CityDetailsPage';
 import TasksKanban from './components/screens/TasksKanban';
 import DepartmentsCRM from './components/screens/DepartmentsCRM';
 import AdminCommunication from './components/screens/AdminCommunication';
-import AdminLogs from './components/screens/AdminLogs';
-import IntelligenceMap from './components/screens/IntelligenceMap';
-import ActionEngine from './components/screens/ActionEngine';
-import AdminAutomations from './components/screens/AdminAutomations';
-import AdminMonetization from './components/screens/AdminMonetization';
-import WarRoom from './components/screens/WarRoom';
 import CitySettings from './components/screens/CitySettings';
-import ReportsScreen from './components/screens/ReportsScreen';
 import ApiKeysScreen from './components/screens/ApiKeysScreen';
 import type { UserRole } from './types/user';
+
+// Lazy-loaded heavy modules (code splitting for faster initial load)
+const AdminModeration = lazy(() => import('./components/screens/AdminModeration'));
+const IntelligenceMap = lazy(() => import('./components/screens/IntelligenceMap'));
+const AdminLogs = lazy(() => import('./components/screens/AdminLogs'));
+const ReportsScreen = lazy(() => import('./components/screens/ReportsScreen'));
+const AdminAutomations = lazy(() => import('./components/screens/AdminAutomations'));
+const AdminMonetization = lazy(() => import('./components/screens/AdminMonetization'));
+const WarRoom = lazy(() => import('./components/screens/WarRoom'));
+const ActionEngine = lazy(() => import('./components/screens/ActionEngine'));
+const AiFeedbackScreen = lazy(() => import('./components/screens/AiFeedbackScreen'));
+
+// Full-page loading fallback for lazy-loaded routes
+const PageLoader = () => (
+    <div className="h-full flex items-center justify-center py-20">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+    </div>
+);
+
 
 // Wrapper for protected routes
 interface PrivateRouteProps {
@@ -99,22 +109,40 @@ function App() {
                         <Route path="users" element={<AdminUsers />} />
                         <Route path="cities" element={<AdminCities />} />
                         <Route path="cities/:cityId" element={
-                            <React.Suspense fallback={<div>Carregando...</div>}>
+                            <Suspense fallback={<PageLoader />}>
                                 <CityDetailsPage />
-                            </React.Suspense>
+                            </Suspense>
                         } />
-                        <Route path="moderation" element={<AdminModeration />} />
-
+                        <Route path="moderation" element={
+                            <Suspense fallback={<PageLoader />}><AdminModeration /></Suspense>
+                        } />
                         <Route path="communication" element={<AdminCommunication />} />
                         <Route path="settings" element={<SystemControls />} />
-                        <Route path="logs" element={<AdminLogs />} />
-                        <Route path="intelligence" element={<IntelligenceMap />} />
-                        <Route path="integrations" element={<ActionEngine />} />
-                        <Route path="automations" element={<AdminAutomations />} />
-                        <Route path="monetization" element={<AdminMonetization />} />
-                        <Route path="war-room" element={<WarRoom />} />
-                        <Route path="reports" element={<ReportsScreen />} />
+                        <Route path="logs" element={
+                            <Suspense fallback={<PageLoader />}><AdminLogs /></Suspense>
+                        } />
+                        <Route path="intelligence" element={
+                            <Suspense fallback={<PageLoader />}><IntelligenceMap /></Suspense>
+                        } />
+                        <Route path="integrations" element={
+                            <Suspense fallback={<PageLoader />}><ActionEngine /></Suspense>
+                        } />
+                        <Route path="automations" element={
+                            <Suspense fallback={<PageLoader />}><AdminAutomations /></Suspense>
+                        } />
+                        <Route path="monetization" element={
+                            <Suspense fallback={<PageLoader />}><AdminMonetization /></Suspense>
+                        } />
+                        <Route path="war-room" element={
+                            <Suspense fallback={<PageLoader />}><WarRoom /></Suspense>
+                        } />
+                        <Route path="reports" element={
+                            <Suspense fallback={<PageLoader />}><ReportsScreen /></Suspense>
+                        } />
                         <Route path="api-keys" element={<ApiKeysScreen />} />
+                        <Route path="ai-feedback" element={
+                            <Suspense fallback={<PageLoader />}><AiFeedbackScreen /></Suspense>
+                        } />
                     </Route>
 
                     {/* City Selection */}

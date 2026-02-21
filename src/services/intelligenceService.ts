@@ -1,5 +1,5 @@
 import { db } from '../firebaseConfig';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, type DocumentData } from 'firebase/firestore';
 
 export interface HeatmapPoint {
     lat: number;
@@ -14,97 +14,95 @@ export interface IntelligenceFilters {
     endDate?: Date;
 }
 
+/** Geographic bounding box from the current Leaflet map viewport. */
+export interface MapBounds {
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+}
+
+const MAX_MARKERS = 500; // Performance cap per viewport load
+
+/** Apply common filters to a Firestore query. */
+function applyFilters(baseQuery: any, filters: IntelligenceFilters) {
+    let q = baseQuery;
+
+    if (filters.status && filters.status !== 'all') {
+        q = query(q, where('status', '==', filters.status));
+    } else {
+        q = query(q, where('status', '!=', 'rejected'));
+    }
+    if (filters.category && filters.category !== 'all') {
+        q = query(q, where('category', '==', filters.category));
+    }
+    if (filters.startDate) {
+        q = query(q, where('createdAt', '>=', filters.startDate));
+    }
+    if (filters.endDate) {
+        const end = new Date(filters.endDate);
+        end.setHours(23, 59, 59, 999);
+        q = query(q, where('createdAt', '<=', end));
+    }
+    return q;
+}
+
+/** Filter results client-side by map viewport bounds to avoid Geo queries that require a separate Geo library. */
+function filterByBounds(docs: any[], bounds: MapBounds) {
+    return docs.filter(d => {
+        const lat = d.location?.latitude;
+        const lng = d.location?.longitude;
+        if (!lat || !lng) return false;
+        return lat >= bounds.minLat && lat <= bounds.maxLat &&
+            lng >= bounds.minLng && lng <= bounds.maxLng;
+    });
+}
+
 export const intelligenceService = {
     /**
-     * Fetches data points for the heatmap based on filters.
-     * Optimized to fetch only necessary fields (location, severity/risk).
+     * Fetches heatmap points, optionally clipped to the current map viewport.
      */
-    getHeatmapPoints: async (filters: IntelligenceFilters): Promise<HeatmapPoint[]> => {
+    getHeatmapPoints: async (filters: IntelligenceFilters, bounds?: MapBounds): Promise<HeatmapPoint[]> => {
         try {
-            let q = query(collection(db, 'contributions'));
-
-            // Apply filters
-            if (filters.status && filters.status !== 'all') {
-                q = query(q, where('status', '==', filters.status));
-            } else {
-                q = query(q, where('status', '!=', 'rejected'));
-            }
-
-            if (filters.category && filters.category !== 'all') {
-                q = query(q, where('category', '==', filters.category));
-            }
-
-            if (filters.startDate) {
-                q = query(q, where('createdAt', '>=', filters.startDate));
-            }
-            if (filters.endDate) {
-                const end = new Date(filters.endDate);
-                end.setHours(23, 59, 59, 999);
-                q = query(q, where('createdAt', '<=', end));
-            }
-
-            // Order by for compound queries might require specific index
-            // For now, we rely on client-side sorting if needed or index creation
-            // q = query(q, orderBy('createdAt', 'desc'));
-
-            q = query(q, limit(1000));
+            let q = applyFilters(query(collection(db, 'contributions')), filters);
+            q = query(q, limit(bounds ? 2000 : 1000)); // Fetch more when bounds filtering will reduce count
 
             const snapshot = await getDocs(q);
+            let docs = snapshot.docs.map(doc => doc.data() as DocumentData);
 
-            const points: HeatmapPoint[] = [];
+            if (bounds) docs = filterByBounds(docs, bounds);
 
-            snapshot.forEach(doc => {
-                const data = doc.data();
-                if (data.location && data.location.latitude && data.location.longitude) {
-                    let intensity = 0.5;
-                    if (data.riskLevel && data.riskLevel >= 4) intensity = 1.0;
-                    else if (data.riskLevel === 3) intensity = 0.8;
-
-                    points.push({
-                        lat: data.location.latitude,
-                        lng: data.location.longitude,
-                        intensity
-                    });
-                }
-            });
-
-            return points;
+            return docs
+                .filter(data => data['location']?.latitude && data['location']?.longitude)
+                .slice(0, MAX_MARKERS)
+                .map(data => ({
+                    lat: data['location'].latitude,
+                    lng: data['location'].longitude,
+                    intensity: data['riskLevel'] >= 4 ? 1.0 : data['riskLevel'] === 3 ? 0.8 : 0.5
+                }));
         } catch (error) {
             console.error("Error fetching heatmap data:", error);
             throw error;
         }
     },
 
-    getMapData: async (filters: IntelligenceFilters): Promise<any[]> => {
+    /**
+     * Fetches cluster map markers, clipped to the current viewport when bounds are provided.
+     * Limits to MAX_MARKERS for performance.
+     */
+    getMapData: async (filters: IntelligenceFilters, bounds?: MapBounds): Promise<any[]> => {
         try {
-            let q = query(collection(db, 'contributions'));
-
-            if (filters.status && filters.status !== 'all') {
-                q = query(q, where('status', '==', filters.status));
-            } else {
-                q = query(q, where('status', '!=', 'rejected'));
-            }
-
-            if (filters.category && filters.category !== 'all') {
-                q = query(q, where('category', '==', filters.category));
-            }
-
-            if (filters.startDate) {
-                q = query(q, where('createdAt', '>=', filters.startDate));
-            }
-            if (filters.endDate) {
-                const end = new Date(filters.endDate);
-                end.setHours(23, 59, 59, 999);
-                q = query(q, where('createdAt', '<=', end));
-            }
-
-            q = query(q, limit(1000));
+            let q = applyFilters(query(collection(db, 'contributions')), filters);
+            q = query(q, limit(bounds ? 2000 : 1000));
 
             const snapshot = await getDocs(q);
+            let docs: Record<string, any>[] = snapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Record<string, any>) }));
 
-            return snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter((data: any) => data.location && data.location.latitude && data.location.longitude);
+            if (bounds) docs = filterByBounds(docs, bounds);
+
+            return docs
+                .filter((data: any) => data.location?.latitude && data.location?.longitude)
+                .slice(0, MAX_MARKERS);
         } catch (error) {
             console.error("Error fetching map data:", error);
             throw error;

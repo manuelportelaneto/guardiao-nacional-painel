@@ -50,7 +50,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
     notifyOnRejection: true,
     overseasAccessEnabled: false,
     welcomeMessage: "Bem-vindo ao Guardião Nacional! Estamos felizes em tê-lo conosco.",
-    approvedMessage: "Sua contribuição '{title}' foi aprovada! Obrigado por ajudar a melhorar nossa cidade.",
+    approvedMessage: "Sua contribuição '{title}' foi publicada e registrada no Guardião Nacional. Os dados enviados serão analisados e, após a aprovação, sua contribuição aparecerá no mapa. Obrigado por contribuir!",
     rejectedMessage: "Sua contribuição '{title}' não pôde ser aprovada. Verifique nossas diretrizes.",
     resolvedMessage: "Ótima notícia! A contribuição '{title}' foi marcada como resolvida."
 };

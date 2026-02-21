@@ -16,7 +16,8 @@ import {
     ChevronRight,
     Zap,
     MessageSquare,
-    DollarSign
+    DollarSign,
+    Brain
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -116,6 +117,7 @@ const CommandLayout: React.FC<CommandLayoutProps> = ({ children }) => {
         { label: 'Monetização', icon: DollarSign, path: '/admin/monetization', roles: ['super_admin'] },
         { label: 'Integrações', icon: Zap, path: '/admin/integrations', roles: ['super_admin'] },
         { label: 'Configurações', icon: Settings, path: '/admin/settings', roles: ['super_admin'] },
+        { label: 'Auditoria de IA', icon: Brain, path: '/admin/ai-feedback', roles: ['super_admin'] },
     ];
 
     // Filter nav items based on user role (simplified check)

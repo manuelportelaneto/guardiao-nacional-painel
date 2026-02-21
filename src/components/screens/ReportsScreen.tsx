@@ -258,11 +258,11 @@ const ReportsScreen: React.FC = () => {
                         <CardHeader>
                             <CardTitle>Volume Diário de Contribuições</CardTitle>
                         </CardHeader>
-                        <CardContent>
-                            <ResponsiveContainer width="100%" height={250}>
+                        <CardContent className="h-[350px] min-h-[350px]">
+                            <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={reportData.byDay}>
                                     <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+                                    <XAxis dataKey="date" />
                                     <YAxis allowDecimals={false} />
                                     <Tooltip />
                                     <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} />
