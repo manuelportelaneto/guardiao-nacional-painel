@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     collection, query, where, getDocs, orderBy, Timestamp
 } from 'firebase/firestore';
@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../ui/input';
 import { toast } from 'sonner';
 import {
-    BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, LineChart, Line
+    BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer
 } from 'recharts';
 import {
     FileText, Download, Calendar, RefreshCw, TrendingUp, CheckCircle, XCircle, Clock
@@ -258,8 +258,8 @@ const ReportsScreen: React.FC = () => {
                         <CardHeader>
                             <CardTitle>Volume Diário de Contribuições</CardTitle>
                         </CardHeader>
-                        <CardContent className="h-[350px] min-h-[350px]">
-                            <ResponsiveContainer width="100%" height="100%">
+                        <CardContent className="h-[350px] overflow-hidden">
+                            <ResponsiveContainer width="100%" height={350} minWidth={0}>
                                 <BarChart data={reportData.byDay}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="date" />
@@ -277,7 +277,7 @@ const ReportsScreen: React.FC = () => {
                             <CardTitle>Contribuições por Categoria</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <ResponsiveContainer width="100%" height={220}>
+                            <ResponsiveContainer width="100%" height={220} minWidth={0} minHeight={0}>
                                 <BarChart layout="vertical" data={Object.entries(reportData.byCategory).map(([name, value]) => ({ name, value }))}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis type="number" allowDecimals={false} />

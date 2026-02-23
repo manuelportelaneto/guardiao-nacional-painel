@@ -520,7 +520,7 @@ const AdminModeration: React.FC = () => {
     if (error) return <div>Error: {error}</div>; // Simple error fallback
 
     return (
-        <div className="p-6 space-y-6 bg-gray-50 min-h-screen pt-16 md:pt-6">
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6 bg-gray-50 min-h-screen pt-4 md:pt-6">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}><ArrowLeft className="h-5 w-5" /></Button>
@@ -546,13 +546,25 @@ const AdminModeration: React.FC = () => {
             />
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5 h-auto gap-2">
-                    <TabsTrigger value="reports">Denúncias ({reports.length})</TabsTrigger>
-                    <TabsTrigger value="queue">Em Análise ({moderationQueue.length})</TabsTrigger>
-                    <TabsTrigger value="approved">Aprovados ({approvedList.length})</TabsTrigger>
-                    <TabsTrigger value="rejected">Rejeitados ({rejectedList.length})</TabsTrigger>
-                    <TabsTrigger value="trash">Lixo ({trashList.length})</TabsTrigger>
-                </TabsList>
+                <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+                    <TabsList className="flex w-max min-w-full md:grid md:w-full md:grid-cols-5 h-auto gap-1 md:gap-2">
+                        <TabsTrigger value="reports" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap">
+                            Denúncias ({reports.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="queue" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap">
+                            Em Análise ({moderationQueue.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="approved" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap">
+                            Aprovados ({approvedList.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="rejected" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap">
+                            Rejeitados ({rejectedList.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="trash" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap">
+                            Lixo ({trashList.length})
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
 
                 {/* TABS CONTENT MAPPING */}
                 {['queue', 'approved', 'rejected', 'trash'].map(tab => (

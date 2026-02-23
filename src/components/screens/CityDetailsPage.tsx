@@ -27,7 +27,8 @@ import {
     orderBy,
     limit,
     startAfter,
-    collectionGroup
+    doc as firestoreDoc,
+    getDoc
 } from 'firebase/firestore';
 import { db, functions } from '../../firebaseConfig';
 import { httpsCallable } from 'firebase/functions';
@@ -82,45 +83,47 @@ const CityDetailsPage: React.FC = () => {
     const [enriching, setEnriching] = useState(false);
     const [demographics, setDemographics] = useState<any>(null);
 
-    // Initial Load - Fetch Fresh City Data
+    // Initial Load - Fetch City Data
     useEffect(() => {
         const fetchCityFresh = async () => {
             if (!cityId) return;
             try {
-                // 1. Try Collection Group Query for Robustness (finds city regardless of region/state)
-                // Note: Requires index on 'id'.
-                const citiesRef = collectionGroup(db, 'cities');
-                const q = query(citiesRef, where('id', '==', cityId), limit(1));
-                const snap = await getDocs(q);
+                // 1. Try direct doc lookup in /cities/{cityId}
+                const directRef = firestoreDoc(db, 'cities', cityId);
+                const directSnap = await getDoc(directRef);
 
-                if (!snap.empty) {
-                    const doc = snap.docs[0];
-                    const cityData: any = { id: doc.id, ...doc.data() };
-                    setCity(cityData); // Contains latest counts & demographics
+                if (directSnap.exists()) {
+                    const cityData: any = { id: directSnap.id, ...directSnap.data() };
+                    setCity(cityData);
                     setDemographics(cityData.demographics);
-
-                    // Cache for fallback speed
                     sessionStorage.setItem(`city_${cityId}`, JSON.stringify(cityData));
                 } else {
-                    // Fallback to Session Storage if offline or index missing
-                    const stored = sessionStorage.getItem(`city_${cityId}`);
-                    if (stored) {
-                        const c = JSON.parse(stored);
-                        setCity(c);
-                        setDemographics(c.demographics);
-                        toast.warning("Usando dados em cache. Algumas informações podem estar desatualizadas.");
+                    // 2. Fallback: query by 'id' field in /cities collection
+                    const q = query(collection(db, 'cities'), where('id', '==', cityId), limit(1));
+                    const snap = await getDocs(q);
+
+                    if (!snap.empty) {
+                        const docSnap = snap.docs[0];
+                        const cityData: any = { id: docSnap.id, ...docSnap.data() };
+                        setCity(cityData);
+                        setDemographics(cityData.demographics);
+                        sessionStorage.setItem(`city_${cityId}`, JSON.stringify(cityData));
                     } else {
-                        // Keep current if valid or redirect?
-                        // If checking directly from URL, redirect.
-                        if (!city) {
-                            toast.error("Cidade não encontrada.");
+                        // 3. Check session storage cache
+                        const stored = sessionStorage.getItem(`city_${cityId}`);
+                        if (stored) {
+                            const c = JSON.parse(stored);
+                            setCity(c);
+                            setDemographics(c.demographics);
+                        } else {
+                            toast.error('Cidade não encontrada.');
                             navigate('/admin/cities');
                         }
                     }
                 }
             } catch (e) {
-                console.error("Error fetching city:", e);
-                // Fallback
+                console.error('Error fetching city:', e);
+                // Fallback to session cache
                 const stored = sessionStorage.getItem(`city_${cityId}`);
                 if (stored) {
                     setCity(JSON.parse(stored));

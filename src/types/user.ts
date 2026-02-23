@@ -8,7 +8,20 @@ export interface UserData {
     firstName?: string;
     lastName?: string;
     displayName?: string;
+    photoURL?: string;
     accessLevel?: number;
-    assignedMunicipalities?: string[]; // IDs of cities managed by gestor/servidor
-    // ... other fields
+    /**
+     * For staff users (servidor, prefeito, etc.) with a single city assignment.
+     * Used for automatic redirect after login.
+     */
+    cityId?: string;
+    /**
+     * For admins/gestores who manage multiple cities.
+     * If set, user is directed to CitySelector to choose which city to manage.
+     */
+    assignedMunicipalities?: string[];
+    /**
+     * The state (UF) the user belongs to (e.g., 'SP', 'RJ').
+     */
+    state?: string;
 }

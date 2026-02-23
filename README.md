@@ -47,9 +47,10 @@ graph TD
 - **Webhooks**: Integração com sistemas externos (CRM, ERPs Municipais).
 - **Security Rules 2.0**: Controle granular de acesso por nível de cidade e função.
 - **Insights Preditivos**: Alertas automáticos de "Hotspots" e tendências de problemas.
-- **Feature Flags**: Ativação/desativação de módulos em tempo real.
-- **Moderação**: Filtros de IA para conteúdo impróprio.
+- **Auto-Moderação**: Filtros de IA para conteúdo impróprio com limiar de auto-publicação otimizado (Risco ≤ 3).
 - **Auditoria**: Logs detalhados de ações administrativas.
+- **Mapa de Inteligência V2**: Visualização de clusters e calor com KPIs de risco em tempo real e filtros avançados.
+- **Dashboard Estratégico**: Visão nacional com métricas de aprovação, resolução e tendências temporais.
 
 ## 🛠️ Stack Tecnológico
 
