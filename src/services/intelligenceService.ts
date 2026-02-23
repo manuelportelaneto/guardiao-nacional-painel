@@ -22,7 +22,7 @@ export interface MapBounds {
     maxLng: number;
 }
 
-const MAX_MARKERS = 500; // Performance cap per viewport load
+const MAX_MARKERS = 2000; // Performance cap per viewport load
 
 /** Apply common filters to a Firestore query. */
 function applyFilters(baseQuery: any, filters: IntelligenceFilters) {

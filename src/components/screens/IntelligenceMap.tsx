@@ -53,11 +53,11 @@ const HeatmapLayer = ({ points }: { points: HeatmapPoint[] }) => {
         if (!points.length) return;
         const heatPoints = points.map(p => [p.lat, p.lng, p.intensity] as [number, number, number]);
         const heat = (L as any).heatLayer(heatPoints, {
-            radius: 25,
-            blur: 18,
+            radius: 20,
+            blur: 15,
             maxZoom: 15,
-            max: 1.0,
-            gradient: { 0.1: '#60a5fa', 0.4: '#34d399', 0.7: '#fbbf24', 0.9: '#f97316', 1.0: '#ef4444' }
+            max: 0.5, // Lower max makes high density areas pop more easily
+            gradient: { 0.2: '#60a5fa', 0.4: '#34d399', 0.6: '#fbbf24', 0.8: '#f97316', 1.0: '#ef4444' }
         });
         heat.addTo(map);
         return () => { map.removeLayer(heat); };
@@ -100,7 +100,7 @@ const IntelligenceMap: React.FC = () => {
     const [filters, setFilters] = useState<IntelligenceFilters>({
         status: 'all',
         category: 'all',
-        startDate: new Date(new Date().setDate(new Date().getDate() - 30)),
+        startDate: new Date(new Date().setDate(new Date().getDate() - 365)),
         endDate: new Date()
     });
 
@@ -329,13 +329,13 @@ const IntelligenceMap: React.FC = () => {
                                             <div className="p-1 min-w-[200px] max-w-[250px]">
                                                 <div className="flex items-center justify-between mb-2">
                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${point.riskLevel >= 4 ? 'bg-red-100 text-red-700'
-                                                            : point.riskLevel === 3 ? 'bg-orange-100 text-orange-700'
-                                                                : 'bg-blue-100 text-blue-700'
+                                                        : point.riskLevel === 3 ? 'bg-orange-100 text-orange-700'
+                                                            : 'bg-blue-100 text-blue-700'
                                                         }`}>
                                                         Risco {point.riskLevel}
                                                     </span>
                                                     <span className={`text-[10px] px-2 py-0.5 rounded-full ${point.status === 'Resolvido' ? 'bg-green-100 text-green-700'
-                                                            : 'bg-yellow-100 text-yellow-700'
+                                                        : 'bg-yellow-100 text-yellow-700'
                                                         }`}>
                                                         {point.status}
                                                     </span>
