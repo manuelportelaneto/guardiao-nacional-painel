@@ -1,7 +1,7 @@
 # Guardião Nacional - Painel Administrativo
 
 ![Status](https://img.shields.io/badge/status-active-success.svg)
-![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
 ![Stack](https://img.shields.io/badge/stack-React%20v19-blue)
 ![Admin](https://img.shields.io/badge/role-super_admin-red)
 
@@ -49,8 +49,8 @@ graph TD
 - **Insights Preditivos**: Alertas automáticos de "Hotspots" e tendências de problemas.
 - **Auto-Moderação**: Filtros de IA para conteúdo impróprio com limiar de auto-publicação otimizado (Risco ≤ 3).
 - **Auditoria**: Logs detalhados de ações administrativas.
-- **Mapa de Inteligência V2**: Visualização de clusters e calor com KPIs de risco em tempo real e filtros avançados.
 - **Dashboard Estratégico**: Visão nacional com métricas de aprovação, resolução e tendências temporais.
+- **Otimização de Heatmap**: Novo motor de renderização no IntelligenceMap com limite de 2000 pontos e ajuste dinâmico de intensidade para hotspots.
 
 ## 🛠️ Stack Tecnológico
 
