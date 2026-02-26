@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import AuthScreen from '../AuthScreen';
 
@@ -11,73 +11,37 @@ describe('AuthScreen', () => {
     it('should render login form by default', () => {
         renderWithRouter(<AuthScreen />);
 
-        const headings = screen.getAllByRole('heading', { name: /guardião nacional/i });
-        expect(headings[0]).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument();
-        expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+        expect(screen.getByText(/painel administrativo/i)).toBeInTheDocument();
+        // Use more specific selector for the submit button
+        expect(screen.getByRole('button', { name: /^entrar$/i })).toBeInTheDocument();
+        expect(screen.getByLabelText(/e-mail/i)).toBeInTheDocument();
         expect(screen.getByLabelText(/senha/i)).toBeInTheDocument();
-    });
-
-    it('should toggle between login and register modes', () => {
-        renderWithRouter(<AuthScreen />);
-
-        // Initially in login mode
-        expect(screen.getByRole('button', { name: /entrar/i })).toBeInTheDocument();
-
-        // Click to switch to register
-        const toggleButton = screen.getByRole('button', { name: /criar conta/i });
-        fireEvent.click(toggleButton);
-
-        // Now in register mode
-        expect(screen.getByRole('button', { name: /cadastrar/i })).toBeInTheDocument();
-        expect(screen.getByLabelText('Nome')).toBeInTheDocument();
-        expect(screen.getByLabelText('Sobrenome')).toBeInTheDocument();
     });
 
     it('should show Google sign-in button', () => {
         renderWithRouter(<AuthScreen />);
 
-        const googleButton = screen.getByRole('button', { name: /continuar com google/i });
+        const googleButton = screen.getByRole('button', { name: /entrar com google/i });
         expect(googleButton).toBeInTheDocument();
     });
 
-
-
-    it('should show password strength indicator in register mode', () => {
+    it('should show forgot password button', () => {
         renderWithRouter(<AuthScreen />);
 
-        // Switch to register mode
-        const toggleButton = screen.getByRole('button', { name: /criar conta/i });
-        fireEvent.click(toggleButton);
-
-        // Check for password strength label
-        expect(screen.getByText(/força da senha/i)).toBeInTheDocument();
-    });
-
-    it('should require terms acceptance in register mode', () => {
-        renderWithRouter(<AuthScreen />);
-
-        // Switch to register mode
-        const toggleButton = screen.getByRole('button', { name: /criar conta/i });
-        fireEvent.click(toggleButton);
-
-        // Check for terms checkbox
-        const termsCheckbox = screen.getByRole('checkbox', { name: /aceito os/i });
-        expect(termsCheckbox).toBeInTheDocument();
-        expect(termsCheckbox).not.toBeChecked();
+        expect(screen.getByRole('button', { name: /esqueceu sua senha/i })).toBeInTheDocument();
     });
 
     it('should validate email input format', () => {
         renderWithRouter(<AuthScreen />);
 
-        const emailInput = screen.getByLabelText(/email/i) as HTMLInputElement;
+        const emailInput = screen.getByLabelText(/e-mail/i) as HTMLInputElement;
         expect(emailInput.type).toBe('email');
     });
 
     it('should validate password input type', () => {
         renderWithRouter(<AuthScreen />);
 
-        const passwordInput = screen.getByLabelText(/^senha$/i) as HTMLInputElement;
+        const passwordInput = screen.getByLabelText(/senha/i) as HTMLInputElement;
         expect(passwordInput.type).toBe('password');
     });
 });

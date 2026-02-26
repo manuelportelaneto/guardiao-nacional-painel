@@ -8,13 +8,12 @@ import {
     XAxis, YAxis,
     CartesianGrid, Tooltip,
     ResponsiveContainer,
-    PieChart, Pie, Cell, Legend,
-    LineChart, Line
+    PieChart, Pie, Cell, Legend
 } from 'recharts';
 import {
     CheckCircle, AlertTriangle, FileText, Users as UsersIcon,
-    Share2, Building2, ThumbsUp, Clock, TrendingUp, Activity,
-    Calendar as CalendarIcon, Filter, Star, RefreshCw
+    Building2, ThumbsUp, Clock, TrendingUp, Activity,
+    Calendar as CalendarIcon, Star, RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';

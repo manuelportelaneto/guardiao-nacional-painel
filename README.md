@@ -1,11 +1,10 @@
 # Guardião Nacional - Painel Administrativo
 
 ![Status](https://img.shields.io/badge/status-active-success.svg)
-![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![URL](https://img.shields.io/badge/url-painel.guardiaonacional.com-red)
 ![Stack](https://img.shields.io/badge/stack-React%20v19-blue)
-![Admin](https://img.shields.io/badge/role-super_admin-red)
 
-Painel de administração web para gerenciamento de ocorrências e serviços municipais da plataforma Guardião Nacional.
+Painel de administração exclusivo servido em `painel.guardiaonacional.com`. Permite o gerenciamento de ocorrências e serviços municipais.
 
 ## 🏗️ Arquitetura e Fluxo
 

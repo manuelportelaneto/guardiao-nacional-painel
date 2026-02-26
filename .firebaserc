@@ -1,5 +1,14 @@
 {
   "projects": {
     "default": "procuradoria-cidada-72130"
+  },
+  "targets": {
+    "procuradoria-cidada-72130": {
+      "hosting": {
+        "painel": [
+          "guardiao-painel-admin"
+        ]
+      }
+    }
   }
 }

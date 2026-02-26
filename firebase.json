@@ -1,6 +1,6 @@
 {
     "hosting": {
-        "site": "guardiao-painel-72130",
+        "target": "painel",
         "public": "dist",
         "ignore": [
             "firebase.json",

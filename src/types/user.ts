@@ -21,6 +21,14 @@ export interface UserData {
      */
     assignedMunicipalities?: string[];
     /**
+     * Rules per city: 1 role per city.
+     */
+    multiCityAccess?: {
+        cityId: string;
+        cityName: string;
+        role: UserRole;
+    }[];
+    /**
      * The state (UF) the user belongs to (e.g., 'SP', 'RJ').
      */
     state?: string;

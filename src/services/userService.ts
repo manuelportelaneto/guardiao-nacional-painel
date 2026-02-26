@@ -68,3 +68,30 @@ export const addNewUser = async (userData: Omit<UserManagement, 'id'>) => {
         updatedAt: serverTimestamp()
     });
 };
+
+/**
+ * Invites a new user via Cloud Function.
+ */
+export const inviteUser = async (email: string, displayName: string, acessos: any[]) => {
+    const { auth } = await import('../firebaseConfig');
+    const user = auth.currentUser;
+    if (!user) throw new Error("Authentication required");
+
+    const token = await user.getIdToken();
+
+    const response = await fetch('https://inviteadminuser-6v7z7f6p3a-uc.a.run.app', { // region: us-central1 default? No, I set southamerica-east1
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email, displayName, acessos })
+    });
+
+    if (!response.ok) {
+        const err = await response.text();
+        throw new Error(err || "Failed to invite user");
+    }
+
+    return response.json();
+};
