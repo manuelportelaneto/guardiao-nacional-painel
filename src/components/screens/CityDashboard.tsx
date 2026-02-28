@@ -15,8 +15,8 @@ import {
 } from 'recharts';
 import {
     FileText,
-    CheckCircle,
-    AlertTriangle,
+    CircleCheck,
+    TriangleAlert,
     Menu,
     LayoutDashboard,
     ClipboardList,
@@ -255,7 +255,7 @@ const CityDashboard: React.FC = () => {
             {/* Error State */}
             {error && (
                 <div className="bg-red-50 p-4 rounded-lg text-red-600 flex items-center gap-2">
-                    <AlertTriangle className="h-5 w-5" />
+                    <TriangleAlert className="h-5 w-5" />
                     Erro ao carregar dados: {(error as Error).message}
                 </div>
             )}
@@ -273,7 +273,7 @@ const CityDashboard: React.FC = () => {
                 <StatCard
                     title="Ocorrências Ativas"
                     value={stats?.active || 0}
-                    icon={<AlertTriangle className="h-4 w-4 text-white" />}
+                    icon={<TriangleAlert className="h-4 w-4 text-white" />}
                     description="Aguardando ação"
                     color="bg-orange-500"
                     isLoading={isLoading}
@@ -281,7 +281,7 @@ const CityDashboard: React.FC = () => {
                 <StatCard
                     title="Resolvidos (Total)"
                     value={stats?.resolved || 0}
-                    icon={<CheckCircle className="h-4 w-4 text-white" />}
+                    icon={<CircleCheck className="h-4 w-4 text-white" />}
                     description="Ocorrências finalizadas"
                     color="bg-green-500"
                     isLoading={isLoading}

@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { TrendingUp, AlertTriangle, Lightbulb, ArrowRight, CheckCircle } from 'lucide-react';
+import { TrendingUp, TriangleAlert, Lightbulb, ArrowRight, CircleCheck } from 'lucide-react';
 import { statsService } from '../../services/statsService';
 import type { Contribution } from '../../types/contribution';
 import { Badge } from '../ui/badge';
@@ -50,7 +50,7 @@ const InsightsWidget: React.FC<InsightsWidgetProps> = ({ contributions, classNam
                     <div className="p-4 space-y-3">
                         {anomalies.length === 0 ? (
                             <div className="text-center py-8 text-gray-500">
-                                <CheckCircle className="w-8 h-8 mx-auto text-green-500 mb-2 opacity-50" />
+                                <CircleCheck className="w-8 h-8 mx-auto text-green-500 mb-2 opacity-50" />
                                 <p>Nenhuma anomalia detectada hoje.</p>
                                 <p className="text-xs">O sistema está operando dentro dos padrões normais.</p>
                             </div>
@@ -61,7 +61,7 @@ const InsightsWidget: React.FC<InsightsWidgetProps> = ({ contributions, classNam
                                     }`}>
                                     <div className="mt-0.5">
                                         {anomaly.severity === 'high' ? (
-                                            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                                            <TriangleAlert className="w-5 h-5 text-red-600 dark:text-red-400" />
                                         ) : (
                                             <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                                         )}
@@ -82,7 +82,7 @@ const InsightsWidget: React.FC<InsightsWidgetProps> = ({ contributions, classNam
                         {/* Smart Suggestion - Mock for Phase 2 */}
                         <div className="p-3 rounded-lg border border-blue-100 bg-blue-50/50 dark:bg-blue-900/10 dark:border-blue-900/50">
                             <div className="flex items-center gap-2 mb-1">
-                                <AlertTriangle className="w-4 h-4 text-blue-500" />
+                                <TriangleAlert className="w-4 h-4 text-blue-500" />
                                 <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">Sugestão de Ação</span>
                             </div>
                             <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">

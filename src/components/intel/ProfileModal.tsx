@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { X, Shield, AlertTriangle, CheckCircle, GraduationCap, Briefcase, Users, Fingerprint } from 'lucide-react';
+import { X, Shield, TriangleAlert, CircleCheck, GraduationCap, Briefcase, Users, Fingerprint } from 'lucide-react';
 
 interface ProfileModalProps {
     isOpen: boolean;
@@ -34,7 +34,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, profile, l
                         </div>
                     ) : !profile ? (
                         <div className="flex flex-col items-center justify-center h-64 space-y-4">
-                            <AlertTriangle className="w-16 h-16 text-yellow-500" />
+                            <TriangleAlert className="w-16 h-16 text-yellow-500" />
                             <p className="text-gray-400">Dossiê ainda não compilado. Aguarde a próxima varredura de inteligência.</p>
                         </div>
                     ) : (
@@ -95,7 +95,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, profile, l
                                 <div className="space-y-6">
                                     <section>
                                         <h3 className="flex items-center gap-2 text-green-400 font-bold mb-3 uppercase text-sm tracking-widest border-b border-green-900/30 pb-1">
-                                            <CheckCircle className="w-4 h-4" /> Pontos Fortes (Histórico)
+                                            <CircleCheck className="w-4 h-4" /> Pontos Fortes (Histórico)
                                         </h3>
                                         <ul className="space-y-2">
                                             {profile.bio_json.history?.good?.map((item: string, i: number) => (
@@ -108,7 +108,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, profile, l
 
                                     <section>
                                         <h3 className="flex items-center gap-2 text-red-500 font-bold mb-3 uppercase text-sm tracking-widest border-b border-red-900/30 pb-1">
-                                            <AlertTriangle className="w-4 h-4" /> Controvérsias & Riscos
+                                            <TriangleAlert className="w-4 h-4" /> Controvérsias & Riscos
                                         </h3>
                                         <ul className="space-y-2">
                                             {profile.bio_json.history?.bad?.map((item: string, i: number) => (

@@ -8,7 +8,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { toast } from 'sonner';
-import { Key, Plus, Trash2, Copy, CheckCircle, XCircle } from 'lucide-react';
+import { Key, Plus, Trash2, Copy, CircleCheck, CircleX } from 'lucide-react';
 
 interface ApiKey {
     id: string;
@@ -157,8 +157,8 @@ const ApiKeysScreen: React.FC = () => {
                             <div className="space-y-0.5 flex-1">
                                 <div className="flex items-center gap-2">
                                     {k.revoked
-                                        ? <XCircle className="w-3.5 h-3.5 text-red-500" />
-                                        : <CheckCircle className="w-3.5 h-3.5 text-green-500" />}
+                                        ? <CircleX className="w-3.5 h-3.5 text-red-500" />
+                                        : <CircleCheck className="w-3.5 h-3.5 text-green-500" />}
                                     <span className="font-medium text-sm">{k.label}</span>
                                     <span className="text-xs text-muted-foreground border rounded px-1.5 py-0.5">{k.scope}</span>
                                     <span className="text-xs text-muted-foreground">({k.cityId})</span>

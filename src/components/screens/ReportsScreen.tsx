@@ -13,7 +13,7 @@ import {
     BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer
 } from 'recharts';
 import {
-    FileText, Download, Calendar, RefreshCw, TrendingUp, CheckCircle, XCircle, Clock
+    FileText, Download, Calendar, RefreshCw, TrendingUp, CircleCheck, CircleX, Clock
 } from 'lucide-react';
 
 interface ReportData {
@@ -232,7 +232,7 @@ const ReportsScreen: React.FC = () => {
                         </Card>
                         <Card>
                             <CardContent className="pt-6 text-center">
-                                <CheckCircle className="w-6 h-6 mx-auto mb-1 text-green-500" />
+                                <CircleCheck className="w-6 h-6 mx-auto mb-1 text-green-500" />
                                 <p className="text-3xl font-bold text-green-600">{reportData.approved}</p>
                                 <p className="text-sm text-muted-foreground">Aprovados</p>
                             </CardContent>
@@ -246,7 +246,7 @@ const ReportsScreen: React.FC = () => {
                         </Card>
                         <Card>
                             <CardContent className="pt-6 text-center">
-                                <XCircle className="w-6 h-6 mx-auto mb-1 text-red-500" />
+                                <CircleX className="w-6 h-6 mx-auto mb-1 text-red-500" />
                                 <p className="text-3xl font-bold text-red-600">{reportData.rejected}</p>
                                 <p className="text-sm text-muted-foreground">Rejeitados</p>
                             </CardContent>

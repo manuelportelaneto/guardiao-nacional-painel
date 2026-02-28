@@ -11,7 +11,7 @@ import {
     PieChart, Pie, Cell, Legend
 } from 'recharts';
 import {
-    CheckCircle, AlertTriangle, FileText, Users as UsersIcon,
+    CircleCheck, TriangleAlert, FileText, Users as UsersIcon,
     Building2, ThumbsUp, Clock, TrendingUp, Activity,
     Calendar as CalendarIcon, Star, RefreshCw
 } from 'lucide-react';
@@ -229,7 +229,7 @@ const AdminOverview: React.FC = () => {
             {/* ─── Alert banner se há muitas em análise ────────────────────────── */}
             {underReview > 10 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+                    <TriangleAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
                     <div>
                         <p className="text-sm font-semibold text-amber-800">Fila de Moderação Alta</p>
                         <p className="text-xs text-amber-700 mt-0.5">
@@ -265,7 +265,7 @@ const AdminOverview: React.FC = () => {
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                     { label: 'Em Análise', value: underReview, icon: Clock, bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' },
-                    { label: 'Aprovadas', value: approved, icon: CheckCircle, bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-100' },
+                    { label: 'Aprovadas', value: approved, icon: CircleCheck, bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-100' },
                     { label: 'Resolvidas', value: resolved, icon: Activity, bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100' },
                     { label: 'Curtidas Totais', value: totalLikes, icon: ThumbsUp, bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-100' },
                 ].map(({ label, value, icon: Icon, bg, text, border }) => (
@@ -409,7 +409,7 @@ const AdminOverview: React.FC = () => {
                                     label: 'Taxa de Resolução',
                                     value: `${total > 0 ? Math.round((resolved / total) * 100) : 0}%`,
                                     sub: `${resolved} resolvidas de ${total}`,
-                                    icon: CheckCircle,
+                                    icon: CircleCheck,
                                     color: 'text-green-500',
                                     bar: total > 0 ? Math.round((resolved / total) * 100) : 0,
                                     barColor: 'bg-green-400'
@@ -418,7 +418,7 @@ const AdminOverview: React.FC = () => {
                                     label: 'Taxa de Rejeição',
                                     value: `${total > 0 ? Math.round((rejected / total) * 100) : 0}%`,
                                     sub: `${rejected} rejeitadas de ${total}`,
-                                    icon: AlertTriangle,
+                                    icon: TriangleAlert,
                                     color: 'text-red-500',
                                     bar: total > 0 ? Math.round((rejected / total) * 100) : 0,
                                     barColor: 'bg-red-400'

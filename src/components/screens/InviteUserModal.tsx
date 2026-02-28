@@ -16,7 +16,7 @@ import {
     MapPin,
     Shield,
     Loader2,
-    AlertCircle
+    CircleAlert
 } from 'lucide-react';
 import {
     Select,
@@ -246,7 +246,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({ open, onClose }) => {
                     </div>
 
                     <div className="bg-blue-50 p-3 rounded-lg flex gap-3 items-start border border-blue-100">
-                        <AlertCircle className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                        <CircleAlert className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
                         <p className="text-xs text-blue-700 leading-relaxed">
                             O usuário poderá gerenciar mais de uma cidade, mas terá apenas <strong>um cargo específico por cidade</strong>.
                             O acesso ao painel principal será definido pelo cargo de maior hierarquia.

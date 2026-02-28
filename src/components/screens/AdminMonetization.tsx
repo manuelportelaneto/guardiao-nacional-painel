@@ -7,7 +7,7 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from 'sonner';
-import { DollarSign, Save, Smartphone, LayoutTemplate, AlertCircle } from 'lucide-react';
+import { DollarSign, Save, Smartphone, LayoutTemplate, CircleAlert } from 'lucide-react';
 import { loggingService } from '../../services/loggingService';
 import { useAuth } from '../../context/AuthContext';
 
@@ -94,7 +94,7 @@ const AdminMonetization: React.FC = () => {
             </div>
 
             <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg flex gap-3 text-yellow-800 text-sm">
-                <AlertCircle className="h-5 w-5 shrink-0" />
+                <CircleAlert className="h-5 w-5 shrink-0" />
                 <p>
                     <strong>Atenção:</strong> Alterar as chaves de anúncio pode levar algumas horas para ser propagado em todos os clientes devido ao cache.
                 </p>

@@ -8,7 +8,7 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { toast } from 'sonner';
-import { Settings, Shield, Zap, Database, AlertTriangle, CheckCircle, RefreshCw, Globe } from 'lucide-react';
+import { Settings, Shield, Zap, Database, TriangleAlert, CircleCheck, RefreshCw, Globe } from 'lucide-react';
 import { Progress } from '../ui/progress';
 
 interface SystemSettings {
@@ -353,7 +353,7 @@ const SystemControls: React.FC = () => {
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-sm font-medium">Campanhas</CardTitle>
-                            <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                            <TriangleAlert className="h-4 w-4 text-muted-foreground" />
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="flex items-center space-x-4 mt-4">
@@ -611,14 +611,14 @@ const SystemControls: React.FC = () => {
 
                                     {backupStatus.isApproachingLimit && (
                                         <div className="flex items-center gap-2 text-orange-600 text-xs bg-orange-50 p-2 rounded">
-                                            <AlertTriangle className="w-4 h-4" />
+                                            <TriangleAlert className="w-4 h-4" />
                                             <span>Armazenamento próximo do limite! Considere limpar backups antigos.</span>
                                         </div>
                                     )}
 
                                     {!backupStatus.isApproachingLimit && backupStatus.lastBackup && (
                                         <div className="flex items-center gap-2 text-green-600 text-xs bg-green-50 p-2 rounded">
-                                            <CheckCircle className="w-4 h-4" />
+                                            <CircleCheck className="w-4 h-4" />
                                             <span>Backups automáticos funcionando normalmente.</span>
                                         </div>
                                     )}

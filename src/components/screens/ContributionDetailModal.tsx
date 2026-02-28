@@ -9,7 +9,7 @@ import {
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Button } from "../ui/button";
-import { MapPin, Calendar, User, Tag, Clock, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { MapPin, Calendar, User, Tag, Clock, CircleCheckBig, CircleX, TriangleAlert } from "lucide-react";
 
 interface ContributionDetailModalProps {
     contribution: any; // Using any for flexibility or Contribution interface
@@ -29,10 +29,10 @@ const ContributionDetailModal: React.FC<ContributionDetailModalProps> = ({ contr
         switch (status) {
             case 'Resolvido':
             case 'Aprovado':
-                return <Badge className="bg-green-100 text-green-700 hover:bg-green-200"><CheckCircle2 className="w-3 h-3 mr-1" /> {status}</Badge>;
+                return <Badge className="bg-green-100 text-green-700 hover:bg-green-200"><CircleCheckBig className="w-3 h-3 mr-1" /> {status}</Badge>;
             case 'Rejeitado':
             case 'Lixo':
-                return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" /> {status}</Badge>;
+                return <Badge variant="destructive"><CircleX className="w-3 h-3 mr-1" /> {status}</Badge>;
             default:
                 return <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200"><Clock className="w-3 h-3 mr-1" /> {status}</Badge>;
         }
@@ -108,7 +108,7 @@ const ContributionDetailModal: React.FC<ContributionDetailModalProps> = ({ contr
                         {contribution.aiAnalysis && (
                             <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
                                 <h4 className="text-xs font-bold text-blue-700 uppercase mb-2 flex items-center gap-1">
-                                    <AlertTriangle className="w-3 h-3" /> Análise IA
+                                    <TriangleAlert className="w-3 h-3" /> Análise IA
                                 </h4>
                                 <div className="text-xs text-blue-800 space-y-1">
                                     {contribution.aiAnalysis.map((analysis: any, idx: number) => (

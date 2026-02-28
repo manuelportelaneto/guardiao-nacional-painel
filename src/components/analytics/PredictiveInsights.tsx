@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { AlertTriangle, TrendingUp, Zap, MapPin } from 'lucide-react';
+import { TriangleAlert, TrendingUp, Zap, MapPin } from 'lucide-react';
 import type { ReportData } from '../../services/reportService';
 import { startOfWeek, endOfWeek, isWithinInterval, subWeeks } from 'date-fns';
 
@@ -101,7 +101,7 @@ const PredictiveInsights: React.FC<PredictiveInsightsProps> = ({ contributions }
             <Card className="bg-gradient-to-br from-orange-50 to-orange-100/50 border-orange-100">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium text-orange-900">Foco Crítico</CardTitle>
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <TriangleAlert className="h-4 w-4 text-orange-600" />
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-2">

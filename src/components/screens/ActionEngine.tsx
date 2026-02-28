@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { CircleCheck, CircleX, CircleAlert, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { automationService } from '../../services/automationService';
 import type { AutomationLog } from '../../types/automation';
@@ -70,11 +70,11 @@ const ActionEngine: React.FC = () => {
                                     <div key={log.id} className="flex items-center justify-between border-b pb-4 last:border-0 last:pb-0">
                                         <div className="flex items-start gap-3">
                                             {log.status === 'success' ? (
-                                                <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
+                                                <CircleCheck className="h-5 w-5 text-green-500 mt-0.5" />
                                             ) : log.status === 'failure' ? (
-                                                <XCircle className="h-5 w-5 text-red-500 mt-0.5" />
+                                                <CircleX className="h-5 w-5 text-red-500 mt-0.5" />
                                             ) : (
-                                                <AlertCircle className="h-5 w-5 text-yellow-500 mt-0.5" />
+                                                <CircleAlert className="h-5 w-5 text-yellow-500 mt-0.5" />
                                             )}
                                             <div>
                                                 <p className="font-medium text-sm">{log.ruleName}</p>

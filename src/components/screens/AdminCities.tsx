@@ -10,7 +10,7 @@ import {
     MapPin,
     ArrowLeft,
     Database,
-    AlertCircle,
+    CircleAlert,
     RefreshCw
 } from 'lucide-react';
 import { db, functions } from '../../firebaseConfig';
@@ -231,7 +231,7 @@ const AdminCities: React.FC = () => {
             return (
                 <div className="space-y-6">
                     <div className="bg-blue-50 p-4 rounded-lg flex items-center gap-2 text-blue-800 text-sm">
-                        <AlertCircle className="w-4 h-4" />
+                        <CircleAlert className="w-4 h-4" />
                         <p>Mostrando municípios que possuem registros ativos na plataforma.</p>
                     </div>
 

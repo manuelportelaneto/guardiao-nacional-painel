@@ -12,7 +12,7 @@ import {
     TableRow,
 } from "../ui/table";
 import { Badge } from '../ui/badge';
-import { Loader2, AlertTriangle, ShieldAlert, Search, MessageSquare } from 'lucide-react';
+import { Loader2, TriangleAlert, ShieldAlert, Search, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
 import type { AuditLog } from '../../types/audit';
 import type { ErrorLog } from '../../types/errorLog';
@@ -78,7 +78,7 @@ const AdminLogs: React.FC = () => {
                         Auditoria & Ameaças
                     </TabsTrigger>
                     <TabsTrigger value="errors" className="gap-2">
-                        <AlertTriangle className="w-4 h-4" />
+                        <TriangleAlert className="w-4 h-4" />
                         Erros
                     </TabsTrigger>
                     <TabsTrigger value="tickets" className="gap-2">

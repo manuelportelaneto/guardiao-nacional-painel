@@ -14,9 +14,9 @@ import {
 
     Loader2,
     MoreVertical,
-    CheckCircle2,
+    CircleCheckBig,
     Clock,
-    XCircle,
+    CircleX,
     ArrowRight
 } from 'lucide-react';
 import { Button } from '../ui/button';
@@ -45,8 +45,8 @@ const CITY_NAMES: { [key: string]: string } = {
 const STATUS_CONFIG = {
     pending: { label: 'Recebidas', color: 'bg-blue-600', textColor: 'text-blue-700', bgColor: 'bg-blue-50', icon: Clock },
     in_progress: { label: 'Em Análise', color: 'bg-yellow-600', textColor: 'text-yellow-700', bgColor: 'bg-yellow-50', icon: Loader2 },
-    completed: { label: 'Resolvidas', color: 'bg-green-600', textColor: 'text-green-700', bgColor: 'bg-green-50', icon: CheckCircle2 },
-    rejected: { label: 'Arquivadas', color: 'bg-gray-600', textColor: 'text-gray-700', bgColor: 'bg-gray-50', icon: XCircle },
+    completed: { label: 'Resolvidas', color: 'bg-green-600', textColor: 'text-green-700', bgColor: 'bg-green-50', icon: CircleCheckBig },
+    rejected: { label: 'Arquivadas', color: 'bg-gray-600', textColor: 'text-gray-700', bgColor: 'bg-gray-50', icon: CircleX },
 };
 
 type StatusType = keyof typeof STATUS_CONFIG;
@@ -127,7 +127,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({ title, tasks, color, status
                             )}
                             {statusKey === 'in_progress' && (
                                 <Button size="sm" variant="outline" className="h-7 text-xs gap-1 hover:bg-green-50 hover:text-green-700 hover:border-green-200" onClick={() => onMoveTask(task.id, 'completed')}>
-                                    Concluir <CheckCircle2 className="h-3 w-3" />
+                                    Concluir <CircleCheckBig className="h-3 w-3" />
                                 </Button>
                             )}
                         </div>

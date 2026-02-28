@@ -92,5 +92,11 @@ npm run test:security
 npm run test:e2e
 ```
 
+## 🔄 Últimas Atualizações (Fevereiro 2026)
+
+- **Dashboard**: Melhorias no `SystemControls`, `AdminOverview`, e componentes visuais do painel.
+- **Segurança**: Refinamentos para acesso e controles administrativos.
+- **Inteligência & Analytics**: Widgets atualizados (`InsightsWidget`) para exibir tendências preditivas.
+
 ---
 **Desenvolvido por Cloud Matrix**

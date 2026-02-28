@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { MapPin, Loader2, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { MapPin, Loader2, ArrowLeft, TriangleAlert } from 'lucide-react';
 import { Button } from '../ui/button';
 
 interface City {
@@ -110,7 +110,7 @@ const CitySelector: React.FC = () => {
             <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
                 <div className="bg-white rounded-2xl shadow-sm border p-10 max-w-md w-full text-center space-y-4">
                     <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto">
-                        <AlertTriangle className="text-amber-500" size={32} />
+                        <TriangleAlert className="text-amber-500" size={32} />
                     </div>
                     <h2 className="text-xl font-bold text-gray-900">Nenhum Município Atribuído</h2>
                     <p className="text-gray-500 text-sm">{error}</p>

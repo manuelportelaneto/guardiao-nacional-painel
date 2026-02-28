@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { toast } from 'sonner';
-import { Brain, ThumbsUp, ThumbsDown, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Brain, ThumbsUp, ThumbsDown, Loader2, CircleCheckBig, CircleX } from 'lucide-react';
 
 interface ContributionWithAI {
     id: string;
@@ -146,8 +146,8 @@ const AiFeedbackScreen: React.FC = () => {
                                     {item.feedback ? (
                                         <div className={`flex items-center gap-2 text-sm font-medium flex-shrink-0 ${item.feedback === 'correct' ? 'text-green-600' : 'text-red-600'}`}>
                                             {item.feedback === 'correct'
-                                                ? <><CheckCircle2 className="w-4 h-4" /> Marcado como Correto</>
-                                                : <><XCircle className="w-4 h-4" /> Marcado como Errado</>
+                                                ? <><CircleCheckBig className="w-4 h-4" /> Marcado como Correto</>
+                                                : <><CircleX className="w-4 h-4" /> Marcado como Errado</>
                                             }
                                         </div>
                                     ) : (

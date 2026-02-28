@@ -16,7 +16,7 @@ import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import {
     Loader2, RefreshCw, Layers, Map as MapIcon,
-    Calendar as CalendarIcon, AlertTriangle, TrendingUp, MapPin, BarChart2
+    Calendar as CalendarIcon, TriangleAlert, TrendingUp, MapPin, ChartBarBig
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
@@ -237,7 +237,7 @@ const IntelligenceMap: React.FC = () => {
                         className="h-8 text-xs"
                         onClick={() => setShowPanel(p => !p)}
                     >
-                        <BarChart2 size={14} className="mr-1" />
+                        <ChartBarBig size={14} className="mr-1" />
                         {showPanel ? 'Ocultar KPIs' : 'KPIs'}
                     </Button>
                     <Button variant="outline" size="sm" className="h-8" onClick={() => loadData(currentBounds)} disabled={loading}>
@@ -253,8 +253,8 @@ const IntelligenceMap: React.FC = () => {
                 {showPanel && viewMode === 'clusters' && (
                     <div className="w-52 shrink-0 flex flex-col gap-2 overflow-y-auto">
                         <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1">Distribuição de Risco</p>
-                        <KpiCard label="Alto Risco" value={highRisk} color="bg-red-50 border-red-200 text-red-700" icon={AlertTriangle} />
-                        <KpiCard label="Médio Risco" value={mediumRisk} color="bg-orange-50 border-orange-200 text-orange-700" icon={AlertTriangle} />
+                        <KpiCard label="Alto Risco" value={highRisk} color="bg-red-50 border-red-200 text-red-700" icon={TriangleAlert} />
+                        <KpiCard label="Médio Risco" value={mediumRisk} color="bg-orange-50 border-orange-200 text-orange-700" icon={TriangleAlert} />
                         <KpiCard label="Baixo Risco" value={lowRisk} color="bg-blue-50 border-blue-200 text-blue-700" icon={MapPin} />
                         <KpiCard label="Resolvidos" value={resolved} color="bg-green-50 border-green-200 text-green-700" icon={TrendingUp} />
 

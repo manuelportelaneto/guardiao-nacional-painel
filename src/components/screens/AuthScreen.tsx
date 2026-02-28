@@ -165,7 +165,7 @@ const AuthScreen: React.FC = () => {
         {/* Logo Header */}
         <div className="flex flex-col items-center mb-8">
           <div className="w-16 h-16 rounded-full overflow-hidden mb-4 shadow-md border-2 border-white">
-            <img src="/logo-new.jpg" alt="Logo" className="w-full h-full object-cover" />
+            <img src="/logo.png?v=3" alt="Logo" className="w-full h-full object-cover" />
           </div>
           <h1 className="text-xl font-bold text-primary">Guardião Nacional</h1>
           <p className="text-sm text-slate-500 mt-1">Painel Administrativo</p>
