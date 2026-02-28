@@ -24,6 +24,7 @@ import {
   DialogDescription,
 } from '../ui/dialog';
 import { useAuth } from '../../context/AuthContext';
+import { loggingService } from '../../services/loggingService';
 
 // Roles that have access to the admin panel
 const AUTHORIZED_ROLES = [
@@ -75,6 +76,13 @@ const AuthScreen: React.FC = () => {
         setShowAccessDeniedModal(true);
         return;
       }
+
+      await loggingService.logAudit(
+        'LOGIN_SUCCESS',
+        uid,
+        uid,
+        { role, agent: navigator.userAgent, method: 'auth/login' }
+      ).catch(e => console.warn('Failed to log login action', e));
 
       toast.success('Login realizado com sucesso!');
       navigate('/hub');

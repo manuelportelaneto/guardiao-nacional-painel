@@ -7,6 +7,7 @@ import {
     MapPin,
     Users,
     Shield,
+    ShieldAlert,
     Building2,
     Settings,
     LogOut,
@@ -17,7 +18,8 @@ import {
     Zap,
     MessageSquare,
     DollarSign,
-    Brain
+    Brain,
+    Database
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -108,11 +110,13 @@ const CommandLayout: React.FC<CommandLayoutProps> = ({ children }) => {
         { label: 'Visão Geral', icon: LayoutDashboard, path: '/admin/dashboard', roles: ['super_admin', 'admin', 'presidente'] },
         // { label: 'Sala de Guerra', icon: Shield, path: '/admin/war-room', roles: ['super_admin', 'admin', 'presidente'] },
         { label: 'Mapa de Inteligência', icon: MapPin, path: '/admin/intelligence', roles: ['super_admin', 'admin', 'city_admin'] },
+        { label: 'Ingestão Graal', icon: Database, path: '/admin/graal-ingest', roles: ['super_admin'] },
         { label: 'Moderação', icon: Users, path: '/admin/moderation', roles: ['super_admin', 'admin', 'moderator'] },
         { label: 'Usuários', icon: Users, path: '/admin/users', roles: ['super_admin'] },
         { label: 'Cidades', icon: Building2, path: '/admin/cities', roles: ['super_admin', 'admin'] },
         { label: 'Comunicação', icon: MessageSquare, path: '/admin/communication', roles: ['super_admin', 'admin'] },
         { label: 'Logs do Sistema', icon: Shield, path: '/admin/logs', roles: ['super_admin'] },
+        { label: 'Falhas / Crash', icon: ShieldAlert, path: '/admin/crash-reports', roles: ['super_admin'] },
         { label: 'Automação', icon: Zap, path: '/admin/automations', roles: ['super_admin', 'admin'] },
         { label: 'Monetização', icon: DollarSign, path: '/admin/monetization', roles: ['super_admin'] },
         { label: 'Integrações', icon: Zap, path: '/admin/integrations', roles: ['super_admin'] },

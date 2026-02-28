@@ -7,9 +7,10 @@ import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { toast } from 'sonner';
-import { DollarSign, Save, Smartphone, LayoutTemplate, CircleAlert } from 'lucide-react';
+import { DollarSign, Save, Smartphone, LayoutTemplate, CircleAlert, Users, MapPin } from 'lucide-react';
 import { loggingService } from '../../services/loggingService';
 import { useAuth } from '../../context/AuthContext';
+import { Checkbox } from '../ui/checkbox';
 
 interface AdsConfig {
     showAds: boolean;
@@ -18,6 +19,8 @@ interface AdsConfig {
     admobInterstitialUnitId: string;
     adsensePublisherId: string;
     adsenseSlotId: string;
+    targetCities: string;
+    targetProfiles: string[];
 }
 
 const DEFAULT_CONFIG: AdsConfig = {
@@ -26,7 +29,9 @@ const DEFAULT_CONFIG: AdsConfig = {
     admobBannerUnitId: '',
     admobInterstitialUnitId: '',
     adsensePublisherId: '',
-    adsenseSlotId: ''
+    adsenseSlotId: '',
+    targetCities: '',
+    targetProfiles: ['Cidadão', 'Vip']
 };
 
 const AdminMonetization: React.FC = () => {
@@ -207,6 +212,65 @@ const AdminMonetization: React.FC = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Configurações de Segmentação */}
+            <Card className="shadow-sm border-blue-100">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                        <Users className="h-5 w-5 text-blue-500" />
+                        Segmentação (Público-Alvo)
+                    </CardTitle>
+                    <CardDescription>
+                        Filtre quem deverá ver anúncios no aplicativo guardião-nacional.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    <div className="space-y-3">
+                        <Label className="flex items-center gap-2 text-sm font-semibold">
+                            <MapPin className="h-4 w-4 text-gray-500" />
+                            Cidades Alvo
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                            Digite os nomes das cidades separados por vírgula (ex: São Paulo, Campinas). Deixe em branco para exibir em todas.
+                        </p>
+                        <Input
+                            id="targetCities"
+                            value={config.targetCities || ''}
+                            onChange={(e) => handleChange('targetCities', e.target.value)}
+                            placeholder="Cidades..."
+                            className="text-sm"
+                        />
+                    </div>
+
+                    <div className="space-y-3">
+                        <Label className="flex items-center gap-2 text-sm font-semibold">
+                            <Users className="h-4 w-4 text-gray-500" />
+                            Perfis de Usuário
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                            Selecione quais perfis sociais verão os anúncios nas telas do aplicativo e site.
+                        </p>
+                        <div className="flex gap-4">
+                            {['Cidadão', 'Vip', 'Servidor', 'Motorista', 'Jornalista'].map((role) => (
+                                <div key={role} className="flex items-center space-x-2">
+                                    <Checkbox
+                                        id={`role-${role}`}
+                                        checked={config.targetProfiles?.includes(role)}
+                                        onCheckedChange={(checked) => {
+                                            const current = config.targetProfiles || [];
+                                            const updated = checked
+                                                ? [...current, role]
+                                                : current.filter(r => r !== role);
+                                            handleChange('targetProfiles', updated);
+                                        }}
+                                    />
+                                    <Label htmlFor={`role-${role}`} className="text-sm cursor-pointer">{role}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };

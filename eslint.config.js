@@ -19,6 +19,9 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    linterOptions: {
+      reportUnusedDisableDirectives: false,
+    },
     rules: {
       // Relax strict rules to warnings (allow builds to pass)
       '@typescript-eslint/no-explicit-any': 'warn',

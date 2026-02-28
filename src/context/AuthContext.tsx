@@ -3,6 +3,7 @@ import { type User, onAuthStateChanged, signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import type { UserData } from '../types/user';
+import { loggingService } from '../services/loggingService';
 
 /**
  * @interface AuthContextType
@@ -78,6 +79,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const logout = async () => {
+    if (currentUser) {
+      await loggingService.logAudit(
+        'LOGOUT',
+        currentUser.uid,
+        currentUser.uid,
+        { agent: navigator.userAgent, method: 'auth/logout' }
+      ).catch(e => console.warn('Failed to log logout action', e));
+    }
     await signOut(auth);
     setUserData(null);
   };

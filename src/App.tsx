@@ -17,6 +17,7 @@ import DepartmentsCRM from './components/screens/DepartmentsCRM';
 import AdminCommunication from './components/screens/AdminCommunication';
 import CitySettings from './components/screens/CitySettings';
 import ApiKeysScreen from './components/screens/ApiKeysScreen';
+import { GlobalErrorBoundary } from './components/GlobalErrorBoundary';
 import type { UserRole } from './types/user';
 
 // Lazy-loaded heavy modules (code splitting for faster initial load)
@@ -29,6 +30,8 @@ const AdminMonetization = lazy(() => import('./components/screens/AdminMonetizat
 const WarRoom = lazy(() => import('./components/screens/WarRoom'));
 const ActionEngine = lazy(() => import('./components/screens/ActionEngine'));
 const AiFeedbackScreen = lazy(() => import('./components/screens/AiFeedbackScreen'));
+const AdminCrashReports = lazy(() => import('./components/screens/AdminCrashReports'));
+const GraalIngest = lazy(() => import('./components/screens/GraalIngest').then(m => ({ default: m.GraalIngest })));
 
 // Full-page loading fallback for lazy-loaded routes
 const PageLoader = () => (
@@ -82,101 +85,109 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 function App() {
     return (
-        <Router>
-            <AuthProvider>
-                <Routes>
-                    <Route path="/" element={
-                        <PublicRoute>
-                            <AuthScreen />
-                        </PublicRoute>
-                    } />
+        <GlobalErrorBoundary>
+            <Router>
+                <AuthProvider>
+                    <Routes>
+                        <Route path="/" element={
+                            <PublicRoute>
+                                <AuthScreen />
+                            </PublicRoute>
+                        } />
 
-                    {/* HUB - Acessível para todos os autorizados */}
-                    <Route path="/hub" element={
-                        <PrivateRoute>
-                            <RoleHub />
-                        </PrivateRoute>
-                    } />
+                        {/* HUB - Acessível para todos os autorizados */}
+                        <Route path="/hub" element={
+                            <PrivateRoute>
+                                <RoleHub />
+                            </PrivateRoute>
+                        } />
 
-                    {/* Admin Section - Only Admins & Presidente */}
-                    <Route path="/admin" element={
-                        <PrivateRoute allowedRoles={['super_admin', 'admin', 'presidente']}>
-                            <AdminDashboard />
-                        </PrivateRoute>
-                    }>
-                        <Route index element={<Navigate to="dashboard" replace />} />
-                        <Route path="dashboard" element={<AdminOverview />} />
-                        <Route path="users" element={<AdminUsers />} />
-                        <Route path="cities" element={<AdminCities />} />
-                        <Route path="cities/:cityId" element={
-                            <Suspense fallback={<PageLoader />}>
-                                <CityDetailsPage />
-                            </Suspense>
-                        } />
-                        <Route path="moderation" element={
-                            <Suspense fallback={<PageLoader />}><AdminModeration /></Suspense>
-                        } />
-                        <Route path="communication" element={<AdminCommunication />} />
-                        <Route path="settings" element={<SystemControls />} />
-                        <Route path="logs" element={
-                            <Suspense fallback={<PageLoader />}><AdminLogs /></Suspense>
-                        } />
-                        <Route path="intelligence" element={
-                            <Suspense fallback={<PageLoader />}><IntelligenceMap /></Suspense>
-                        } />
-                        <Route path="integrations" element={
-                            <Suspense fallback={<PageLoader />}><ActionEngine /></Suspense>
-                        } />
-                        <Route path="automations" element={
-                            <Suspense fallback={<PageLoader />}><AdminAutomations /></Suspense>
-                        } />
-                        <Route path="monetization" element={
-                            <Suspense fallback={<PageLoader />}><AdminMonetization /></Suspense>
-                        } />
-                        <Route path="war-room" element={
-                            <Suspense fallback={<PageLoader />}><WarRoom /></Suspense>
-                        } />
-                        <Route path="reports" element={
-                            <Suspense fallback={<PageLoader />}><ReportsScreen /></Suspense>
-                        } />
-                        <Route path="api-keys" element={<ApiKeysScreen />} />
-                        <Route path="ai-feedback" element={
-                            <Suspense fallback={<PageLoader />}><AiFeedbackScreen /></Suspense>
-                        } />
-                    </Route>
+                        {/* Admin Section - Only Admins & Presidente */}
+                        <Route path="/admin" element={
+                            <PrivateRoute allowedRoles={['super_admin', 'admin', 'presidente']}>
+                                <AdminDashboard />
+                            </PrivateRoute>
+                        }>
+                            <Route index element={<Navigate to="dashboard" replace />} />
+                            <Route path="dashboard" element={<AdminOverview />} />
+                            <Route path="users" element={<AdminUsers />} />
+                            <Route path="cities" element={<AdminCities />} />
+                            <Route path="cities/:cityId" element={
+                                <Suspense fallback={<PageLoader />}>
+                                    <CityDetailsPage />
+                                </Suspense>
+                            } />
+                            <Route path="moderation" element={
+                                <Suspense fallback={<PageLoader />}><AdminModeration /></Suspense>
+                            } />
+                            <Route path="communication" element={<AdminCommunication />} />
+                            <Route path="settings" element={<SystemControls />} />
+                            <Route path="logs" element={
+                                <Suspense fallback={<PageLoader />}><AdminLogs /></Suspense>
+                            } />
+                            <Route path="intelligence" element={
+                                <Suspense fallback={<PageLoader />}><IntelligenceMap /></Suspense>
+                            } />
+                            <Route path="integrations" element={
+                                <Suspense fallback={<PageLoader />}><ActionEngine /></Suspense>
+                            } />
+                            <Route path="automations" element={
+                                <Suspense fallback={<PageLoader />}><AdminAutomations /></Suspense>
+                            } />
+                            <Route path="monetization" element={
+                                <Suspense fallback={<PageLoader />}><AdminMonetization /></Suspense>
+                            } />
+                            <Route path="war-room" element={
+                                <Suspense fallback={<PageLoader />}><WarRoom /></Suspense>
+                            } />
+                            <Route path="graal-ingest" element={
+                                <Suspense fallback={<PageLoader />}><GraalIngest /></Suspense>
+                            } />
+                            <Route path="reports" element={
+                                <Suspense fallback={<PageLoader />}><ReportsScreen /></Suspense>
+                            } />
+                            <Route path="crash-reports" element={
+                                <Suspense fallback={<PageLoader />}><AdminCrashReports /></Suspense>
+                            } />
+                            <Route path="api-keys" element={<ApiKeysScreen />} />
+                            <Route path="ai-feedback" element={
+                                <Suspense fallback={<PageLoader />}><AiFeedbackScreen /></Suspense>
+                            } />
+                        </Route>
 
-                    {/* City Selection */}
-                    <Route path="/city/select" element={
-                        <PrivateRoute>
-                            <CitySelector />
-                        </PrivateRoute>
-                    } />
+                        {/* City Selection */}
+                        <Route path="/city/select" element={
+                            <PrivateRoute>
+                                <CitySelector />
+                            </PrivateRoute>
+                        } />
 
-                    {/* City Dashboard - Admins, Gestores, Servidores */}
-                    <Route path="/city/:cityId/dashboard" element={
-                        <PrivateRoute>
-                            <CityDashboard />
-                        </PrivateRoute>
-                    } />
-                    <Route path="/city/:cityId/tasks" element={
-                        <PrivateRoute>
-                            <TasksKanban />
-                        </PrivateRoute>
-                    } />
-                    <Route path="/city/:cityId/departments" element={
-                        <PrivateRoute>
-                            <DepartmentsCRM />
-                        </PrivateRoute>
-                    } />
-                    <Route path="/city/:cityId/settings" element={
-                        <PrivateRoute>
-                            <CitySettings />
-                        </PrivateRoute>
-                    } />
-                </Routes>
-                <Toaster />
-            </AuthProvider>
-        </Router>
+                        {/* City Dashboard - Admins, Gestores, Servidores */}
+                        <Route path="/city/:cityId/dashboard" element={
+                            <PrivateRoute>
+                                <CityDashboard />
+                            </PrivateRoute>
+                        } />
+                        <Route path="/city/:cityId/tasks" element={
+                            <PrivateRoute>
+                                <TasksKanban />
+                            </PrivateRoute>
+                        } />
+                        <Route path="/city/:cityId/departments" element={
+                            <PrivateRoute>
+                                <DepartmentsCRM />
+                            </PrivateRoute>
+                        } />
+                        <Route path="/city/:cityId/settings" element={
+                            <PrivateRoute>
+                                <CitySettings />
+                            </PrivateRoute>
+                        } />
+                    </Routes>
+                    <Toaster />
+                </AuthProvider>
+            </Router>
+        </GlobalErrorBoundary>
     );
 }
 

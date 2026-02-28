@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../ui/checkbox';
 import { toast } from 'sonner';
 import { Send, Target, Smartphone, Mail, Bell, MessageSquare, Users } from 'lucide-react';
+import { Switch } from '../ui/switch';
 import { StandardLocationFilter } from '../common/StandardLocationFilter';
 import type { LocationFilterState } from '../common/StandardLocationFilter';
 
@@ -20,6 +21,7 @@ const MessageComposer: React.FC = () => {
     const [title, setTitle] = useState('');
     const [body, setBody] = useState('');
     const [imageUrl, setImageUrl] = useState('');
+    const [isEmergency, setIsEmergency] = useState(false);
 
     // Channels State
     const [channels, setChannels] = useState({
@@ -73,6 +75,8 @@ const MessageComposer: React.FC = () => {
                     body,
                     imageUrl,
                 },
+                tag: isEmergency ? 'Emergência' : 'Geral',
+                type: isEmergency ? 'emergency' : 'info',
                 channels: selectedChannels,
                 filters: {
                     isTargetAll,
@@ -100,6 +104,7 @@ const MessageComposer: React.FC = () => {
             setTitle('');
             setBody('');
             setImageUrl('');
+            setIsEmergency(false);
             setIsTargetAll(true);
             setLocationFilter({});
             setTargetUserIds('');
@@ -160,6 +165,7 @@ const MessageComposer: React.FC = () => {
                             id="title"
                             placeholder="Ex: Alerta de Tempestade ou Novidades na Cidade"
                             value={title}
+                            className={isEmergency ? "border-red-400 focus-visible:ring-red-500" : ""}
                             onChange={e => setTitle(e.target.value)}
                         />
                     </div>
@@ -169,12 +175,22 @@ const MessageComposer: React.FC = () => {
                         <Textarea
                             id="body"
                             placeholder="Digite o conteúdo aqui..."
-                            className="min-h-[120px]"
+                            className={`min-h-[120px] ${isEmergency ? "border-red-400 focus-visible:ring-red-500" : ""}`}
                             value={body}
                             onChange={e => setBody(e.target.value)}
                         />
-                        <div className="text-xs text-muted-foreground text-right">
-                            {body.length} caracteres
+                        <div className="text-xs text-muted-foreground flex justify-between">
+                            <span className="flex items-center gap-2">
+                                <Switch
+                                    id="emergency-mode"
+                                    checked={isEmergency}
+                                    onCheckedChange={setIsEmergency}
+                                />
+                                <Label htmlFor="emergency-mode" className={`font-semibold cursor-pointer ${isEmergency ? 'text-red-600' : 'text-slate-600'}`}>
+                                    🚨 Marcar como Alerta de Emergência
+                                </Label>
+                            </span>
+                            <span>{body.length} caracteres</span>
                         </div>
                     </div>
 
@@ -268,7 +284,7 @@ const MessageComposer: React.FC = () => {
                 </div>
 
                 <Button
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-white"
+                    className={`w-full ${isEmergency ? 'bg-red-600 hover:bg-red-700' : 'bg-slate-900 hover:bg-slate-800'} text-white`}
                     size="lg"
                     onClick={handleSend}
                     disabled={loading}

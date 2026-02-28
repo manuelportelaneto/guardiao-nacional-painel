@@ -20,5 +20,6 @@ export type AuditAction =
     | 'CONTRIBUTION_REJECT'
     | 'SETTINGS_UPDATE'
     | 'LOGIN_SUCCESS'
+    | 'LOGOUT'
     | 'USER_ROLE_CHANGE'
     | 'AI_RETROACTIVE_ANALYSIS';

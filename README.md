@@ -41,8 +41,10 @@ graph TD
 ### Inteligência (Sala de Guerra)
 - **Análise de Risco**: Monitoramento de estabilidade política via IA.
 - **Grafo de Conexões**: Visualização de relacionamento entre entidades.
+- **Ingestão Graal (Upload Seguro)**: Recepção massiva SysAdmin de arquivos `.graal` para upload assíncrono de contribuições de zona cega (Calamidade sem internet) utilizando Cloud Functions validadoras.
 
 ### Controle do Sistema
+- **Notificações em Massa (Emergency)**: Interface do Message Composer com Switch nativa geradora de pacotes tipo "Emergência" para CEPs e cidadãos afetados.
 - **Webhooks**: Integração com sistemas externos (CRM, ERPs Municipais).
 - **Security Rules 2.0**: Controle granular de acesso por nível de cidade e função.
 - **Insights Preditivos**: Alertas automáticos de "Hotspots" e tendências de problemas.
