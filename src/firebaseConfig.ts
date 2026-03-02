@@ -1,5 +1,6 @@
 // src/firebaseConfig.ts
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
@@ -19,6 +20,16 @@ const firebaseConfig = {
 
 // Inicializa o Firebase
 const app = initializeApp(firebaseConfig);
+
+// Proteção Anti-Bot via App Check (GCP)
+export let appCheck: any;
+if (typeof window !== "undefined") {
+    const recaptchaKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY || '6LeIxAcTAAAAAJcZVRqyHh71UMIEGNQ_MXjiZKhI';
+    appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaEnterpriseProvider(recaptchaKey),
+        isTokenAutoRefreshEnabled: true
+    });
+}
 
 // Exporta as instâncias dos serviços que vamos usar
 export const auth = getAuth(app);

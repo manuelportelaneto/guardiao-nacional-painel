@@ -9,7 +9,7 @@ import {
 import { Badge } from "../ui/badge";
 import { ScrollArea } from "../ui/scroll-area";
 import { Button } from "../ui/button";
-import { MapPin, Calendar, User, Tag, Clock, CircleCheckBig, CircleX, TriangleAlert } from "lucide-react";
+import { MapPin, Calendar, User, Tag, Clock, CircleCheckBig, CircleX, TriangleAlert, Activity, Zap } from "lucide-react";
 
 interface ContributionDetailModalProps {
     contribution: any; // Using any for flexibility or Contribution interface
@@ -103,6 +103,34 @@ const ContributionDetailModal: React.FC<ContributionDetailModalProps> = ({ contr
                                 </div>
                             )}
                         </div>
+
+                        {/* Civic Endorsements & Boosts */}
+                        {(contribution.endorsementCount > 0 || contribution.boostCount > 0 || contribution.impactMetrics) && (
+                            <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                                <h4 className="text-xs font-bold text-orange-800 uppercase mb-3 flex items-center justify-between">
+                                    <span className="flex items-center gap-1.5"><Activity className="w-3.5 h-3.5" /> Endossos Cívicos</span>
+                                    {contribution.boostCount > 0 && (
+                                        <Badge variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-100 font-bold ml-auto px-2 border-0">
+                                            <Zap className="w-3 h-3 mr-1 fill-orange-500 text-transparent" /> {contribution.boostCount} Boosts (-{contribution.boostCount * 50} XP)
+                                        </Badge>
+                                    )}
+                                </h4>
+
+                                {contribution.impactMetrics && Object.keys(contribution.impactMetrics).length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                        {Object.entries(contribution.impactMetrics as Record<string, number>).map(([tag, count]) => (
+                                            <Badge key={tag} variant="outline" className="bg-white text-orange-900 border-orange-200 shadow-sm text-xs py-1">
+                                                <span className="font-bold mr-1.5">{count}x</span> {tag}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-orange-700 opacity-80 mt-1">
+                                        Nenhuma métrica específica selecionada, porém possui {contribution.endorsementCount} apoio(s) válidos.
+                                    </p>
+                                )}
+                            </div>
+                        )}
 
                         {/* AI Analysis (Optional) */}
                         {contribution.aiAnalysis && (

@@ -3,9 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
+import { Avatar, AvatarFallback } from '../ui/avatar';
 import {
-    User, Mail, Phone, Calendar, Shield, MapPin,
+    Calendar, MapPin,
     Trophy, Star, History
 } from 'lucide-react';
 import { collection, query, where, getDocs, orderBy } from 'firebase/firestore';
@@ -75,14 +75,7 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, open, onClose
         return date.toDate ? date.toDate().toLocaleDateString('pt-BR') : new Date(date).toLocaleDateString('pt-BR');
     };
 
-    const getInitials = (name: string) => {
-        return name
-            .split(' ')
-            .map((n) => n[0])
-            .join('')
-            .toUpperCase()
-            .substring(0, 2);
-    };
+
 
     // Calculate mock points based on contributions for now (Gamification Tab)
     // Calculate Active XP matching the App logic (gamification.ts)
@@ -139,11 +132,10 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, open, onClose
                 <DialogHeader className="p-6 pb-2">
                     <DialogTitle className="flex items-center gap-3 text-2xl">
                         <Avatar className="h-12 w-12 border-2 border-blue-100">
-                            <AvatarImage src={user.photoURL} />
-                            <AvatarFallback>{getInitials(user.displayName || 'User')}</AvatarFallback>
+                            <AvatarFallback>#</AvatarFallback>
                         </Avatar>
                         <div>
-                            {user.displayName}
+                            Cidadão #{user.id.substring(0, 8)}
                             <div className="flex gap-2 mt-1">
                                 <Badge variant="outline" className="text-xs font-normal">ID: {user.id}</Badge>
                                 <Badge className={user.status === 'blocked' ? 'bg-red-500' : 'bg-green-500'}>
@@ -157,101 +149,61 @@ const UserProfileModal: React.FC<UserProfileModalProps> = ({ user, open, onClose
                     </DialogTitle>
                 </DialogHeader>
 
-                <Tabs defaultValue="details" className="flex-1 flex flex-col overflow-hidden">
+                <Tabs defaultValue="history" className="flex-1 flex flex-col overflow-hidden">
                     <div className="px-6 border-b">
                         <TabsList className="w-full justify-start h-12 bg-transparent p-0">
-                            <TabsTrigger value="details" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full px-4">
-                                Dados Pessoais
+                            <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full px-4">
+                                Prontuário ({contributions.length})
                             </TabsTrigger>
                             <TabsTrigger value="gamification" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full px-4">
                                 Gamificação
                             </TabsTrigger>
-                            <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none bg-transparent h-full px-4">
-                                Prontuário ({contributions.length})
-                            </TabsTrigger>
                         </TabsList>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto bg-gray-50/50 p-6">
-                        <TabsContent value="details" className="mt-0 space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <Card>
-                                    <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><User className="w-4 h-4" /> Informações Básicas</CardTitle></CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-gray-500">Email:</span>
-                                            <span className="col-span-2 font-medium flex items-center gap-2"><Mail className="w-3 h-3" /> {user.email}</span>
-
-                                            <span className="text-gray-500">CPF:</span>
-                                            <span className="col-span-2 font-medium">{user.cpf || 'Não informado'}</span>
-
-                                            <span className="text-gray-500">Telefone:</span>
-                                            <span className="col-span-2 font-medium flex items-center gap-2"><Phone className="w-3 h-3" /> {user.phoneNumber || 'Não informado'}</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                <Card>
-                                    <CardHeader><CardTitle className="text-sm font-medium flex items-center gap-2"><Shield className="w-4 h-4" /> Acesso e Segurança</CardTitle></CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <div className="grid grid-cols-3 gap-2 text-sm">
-                                            <span className="text-gray-500">Cargo:</span>
-                                            <span className="col-span-2"><Badge variant="secondary">{user.role}</Badge></span>
-
-                                            <span className="text-gray-500">Cadastro:</span>
-                                            <span className="col-span-2 font-medium flex items-center gap-2"><Calendar className="w-3 h-3" /> {formatDate(user.createdAt)}</span>
-
-                                            <span className="text-gray-500">Último Login:</span>
-                                            <span className="col-span-2 font-medium">{formatDate(user.lastLoginAt)}</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </TabsContent>
-
-                        <TabsContent value="gamification" className="mt-0 space-y-6">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /> Conquistas e Nível</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex flex-wrap gap-2 mb-6">
-                                        {user.badges?.map(badgeId => {
-                                            const rank = USER_RANKS.find(r => r.id === badgeId);
-                                            return (
-                                                <div key={badgeId} className="flex items-center gap-2 bg-white border px-3 py-2 rounded-lg shadow-sm">
-                                                    <span className="text-2xl">{rank?.emoji || '🏅'}</span>
-                                                    <div>
-                                                        <p className="font-bold text-sm">{rank?.name || badgeId}</p>
-                                                        <p className="text-xs text-gray-500">{rank?.description || 'Conquista desbloqueada'}</p>
-                                                    </div>
+                    <div className="flex-1 overflow-y-auto bg-gray-50/50 p-6">                        <TabsContent value="gamification" className="mt-0 space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" /> Conquistas e Nível</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-wrap gap-2 mb-6">
+                                    {user.badges?.map(badgeId => {
+                                        const rank = USER_RANKS.find(r => r.id === badgeId);
+                                        return (
+                                            <div key={badgeId} className="flex items-center gap-2 bg-white border px-3 py-2 rounded-lg shadow-sm">
+                                                <span className="text-2xl">{rank?.emoji || '🏅'}</span>
+                                                <div>
+                                                    <p className="font-bold text-sm">{rank?.name || badgeId}</p>
+                                                    <p className="text-xs text-gray-500">{rank?.description || 'Conquista desbloqueada'}</p>
                                                 </div>
-                                            );
-                                        })}
-                                        {(!user.badges || user.badges.length === 0) && (
-                                            <p className="text-gray-500 text-sm">Nenhuma conquista desbloqueada ainda.</p>
-                                        )}
-                                    </div>
+                                            </div>
+                                        );
+                                    })}
+                                    {(!user.badges || user.badges.length === 0) && (
+                                        <p className="text-gray-500 text-sm">Nenhuma conquista desbloqueada ainda.</p>
+                                    )}
+                                </div>
 
-                                    <div className="border-t pt-4">
-                                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                                            <History className="w-4 h-4" /> Extrato de Pontos
-                                        </h4>
-                                        <div className="space-y-2">
-                                            {pointsHistory.map((item, idx) => (
-                                                <div key={idx} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
-                                                    <span>{item.action}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs text-gray-400">{item.date}</span>
-                                                        <Badge variant="secondary" className="text-green-700 bg-green-100">+{item.points}</Badge>
-                                                    </div>
+                                <div className="border-t pt-4">
+                                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                                        <History className="w-4 h-4" /> Extrato de Pontos
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {pointsHistory.map((item, idx) => (
+                                            <div key={idx} className="flex justify-between items-center text-sm p-2 bg-gray-50 rounded">
+                                                <span>{item.action}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-400">{item.date}</span>
+                                                    <Badge variant="secondary" className="text-green-700 bg-green-100">+{item.points}</Badge>
                                                 </div>
-                                            ))}
-                                        </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
                         <TabsContent value="history" className="mt-0">
                             {loadingContribs ? (

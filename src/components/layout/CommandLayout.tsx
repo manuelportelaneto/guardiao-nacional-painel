@@ -116,6 +116,7 @@ const CommandLayout: React.FC<CommandLayoutProps> = ({ children }) => {
         { label: 'Cidades', icon: Building2, path: '/admin/cities', roles: ['super_admin', 'admin'] },
         { label: 'Comunicação', icon: MessageSquare, path: '/admin/communication', roles: ['super_admin', 'admin'] },
         { label: 'Logs do Sistema', icon: Shield, path: '/admin/logs', roles: ['super_admin'] },
+        { label: 'Firewall & Ameaças', icon: ShieldAlert, path: '/admin/security-logs', roles: ['super_admin'] },
         { label: 'Falhas / Crash', icon: ShieldAlert, path: '/admin/crash-reports', roles: ['super_admin'] },
         { label: 'Automação', icon: Zap, path: '/admin/automations', roles: ['super_admin', 'admin'] },
         { label: 'Monetização', icon: DollarSign, path: '/admin/monetization', roles: ['super_admin'] },

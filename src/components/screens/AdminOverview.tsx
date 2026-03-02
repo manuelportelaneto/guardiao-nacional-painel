@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { db } from '../../firebaseConfig';
-import { collection, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import {
     AreaChart, Area,
     BarChart, Bar,
@@ -13,7 +13,7 @@ import {
 import {
     CircleCheck, TriangleAlert, FileText, Users as UsersIcon,
     Building2, ThumbsUp, Clock, TrendingUp, Activity,
-    Calendar as CalendarIcon, Star, RefreshCw
+    Calendar as CalendarIcon, RefreshCw, Sword, Shield, Zap
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -77,13 +77,27 @@ const AdminOverview: React.FC = () => {
     const [regionFilter, setRegionFilter] = useState('all');
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
+    // ── Graal Stats ──────────────────────────────────────────────────────────
+    const [graalReports, setGraalReports] = useState<any[]>([]);
+    const [graalKnightCount, setGraalKnightCount] = useState(0);
+
     useEffect(() => {
         const unsubContribs = onSnapshot(collection(db, 'contributions'), (snap) => {
             const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
             setAllContributions(all);
         });
-        const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => setUserCount(snap.size));
-        return () => { unsubContribs(); unsubUsers(); };
+        const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
+            setUserCount(snap.size);
+            // Count users with knight badge
+            const knights = snap.docs.filter(d => d.data().badges?.includes('cavaleiro-do-graal'));
+            setGraalKnightCount(knights.length);
+        });
+        // Graal reports listener — last 20 graals
+        const graalQ = query(collection(db, 'graal_reports'), orderBy('processedAt', 'desc'), limit(20));
+        const unsubGraal = onSnapshot(graalQ, (snap) => {
+            setGraalReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+        return () => { unsubContribs(); unsubUsers(); unsubGraal(); };
     }, []);
 
     // Filtered contributions
@@ -121,11 +135,9 @@ const AdminOverview: React.FC = () => {
     const totalLikes = contribs.reduce((a, c) => a + (c.likes || 0), 0);
     const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
-    // Rating stats
-    const rated = contribs.filter(c => c.rating && c.rating > 0);
-    const avgRating = rated.length > 0
-        ? (rated.reduce((a, c) => a + (c.rating || 0), 0) / rated.length).toFixed(1)
-        : '—';
+    // Rating stats (Substituted by Endorsements and Boosts)
+    const totalEndorsements = contribs.reduce((a, c) => a + (c.endorsementCount || 0), 0);
+    const totalBoosts = contribs.reduce((a, c) => a + (c.boostCount || 0), 0);
 
     // ─── Chart data ──────────────────────────────────────────────────────────
     // Last 14 days timeline
@@ -395,44 +407,42 @@ const AdminOverview: React.FC = () => {
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-5 pt-2">
-                            {[
-                                {
-                                    label: 'Avaliação Média',
-                                    value: avgRating,
-                                    sub: `${rated.length} avaliações`,
-                                    icon: Star,
-                                    color: 'text-yellow-500',
-                                    bar: rated.length > 0 ? Math.round((parseFloat(avgRating as string) / 5) * 100) : 0,
-                                    barColor: 'bg-yellow-400'
-                                },
-                                {
-                                    label: 'Taxa de Resolução',
-                                    value: `${total > 0 ? Math.round((resolved / total) * 100) : 0}%`,
-                                    sub: `${resolved} resolvidas de ${total}`,
-                                    icon: CircleCheck,
-                                    color: 'text-green-500',
-                                    bar: total > 0 ? Math.round((resolved / total) * 100) : 0,
-                                    barColor: 'bg-green-400'
-                                },
-                                {
-                                    label: 'Taxa de Rejeição',
-                                    value: `${total > 0 ? Math.round((rejected / total) * 100) : 0}%`,
-                                    sub: `${rejected} rejeitadas de ${total}`,
-                                    icon: TriangleAlert,
-                                    color: 'text-red-500',
-                                    bar: total > 0 ? Math.round((rejected / total) * 100) : 0,
-                                    barColor: 'bg-red-400'
-                                },
-                                {
-                                    label: 'Engajamento',
-                                    value: totalLikes,
-                                    sub: `${Math.round(totalLikes / Math.max(total, 1) * 10) / 10} curtidas/contrib.`,
-                                    icon: ThumbsUp,
-                                    color: 'text-pink-500',
-                                    bar: Math.min(100, totalLikes),
-                                    barColor: 'bg-pink-400'
-                                },
-                            ].map(({ label, value, sub, icon: Icon, color, bar, barColor }) => (
+                            {[{
+                                label: 'Endossos Cívicos',
+                                value: totalEndorsements,
+                                sub: `Apoiadores independentes`,
+                                icon: Activity,
+                                color: 'text-yellow-500',
+                                bar: Math.min(100, totalEndorsements),
+                                barColor: 'bg-yellow-400'
+                            },
+                            {
+                                label: 'Taxa de Resolução',
+                                value: `${total > 0 ? Math.round((resolved / total) * 100) : 0}%`,
+                                sub: `${resolved} resolvidas de ${total}`,
+                                icon: CircleCheck,
+                                color: 'text-green-500',
+                                bar: total > 0 ? Math.round((resolved / total) * 100) : 0,
+                                barColor: 'bg-green-400'
+                            },
+                            {
+                                label: 'Taxa de Rejeição',
+                                value: `${total > 0 ? Math.round((rejected / total) * 100) : 0}%`,
+                                sub: `${rejected} rejeitadas de ${total}`,
+                                icon: TriangleAlert,
+                                color: 'text-red-500',
+                                bar: total > 0 ? Math.round((rejected / total) * 100) : 0,
+                                barColor: 'bg-red-400'
+                            },
+                            {
+                                label: 'Impulsos (Boosts XP)',
+                                value: totalBoosts,
+                                sub: `Comunidade gastou XP para agir`,
+                                icon: Zap,
+                                color: 'text-pink-500',
+                                bar: Math.min(100, totalBoosts * 10),
+                                barColor: 'bg-pink-400'
+                            }].map(({ label, value, sub, icon: Icon, color, bar, barColor }) => (
                                 <div key={label}>
                                     <div className="flex items-center justify-between mb-1.5">
                                         <div className="flex items-center gap-2">
@@ -453,6 +463,113 @@ const AdminOverview: React.FC = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* ─── Seção Graal ──────────────────────────────────────────────────── */}
+            {(() => {
+                const graalTotal = graalReports.length;
+                const graalContributions = graalReports.reduce((a: number, r: any) => a + (r.processedCount || 0), 0);
+                const recentGraal = graalReports[0];
+                const isEmergency = recentGraal && (() => {
+                    const t = recentGraal.processedAt?.toDate ? recentGraal.processedAt.toDate() : new Date(recentGraal.processedAt || 0);
+                    return (Date.now() - t.getTime()) < 6 * 60 * 60 * 1000; // 6 hours
+                })();
+
+                return (
+                    <div className="space-y-4">
+                        {/* Emergency Banner */}
+                        {isEmergency && (
+                            <div className="bg-red-600 rounded-xl p-4 flex items-center gap-3 animate-pulse shadow-lg shadow-red-200">
+                                <Zap className="w-6 h-6 text-white shrink-0" />
+                                <div className="flex-1">
+                                    <p className="text-white font-bold text-sm">🚨 Graal Recebido — Estado de Emergência Possível</p>
+                                    <p className="text-red-100 text-xs mt-0.5">
+                                        Um arquivo Graal chegou nas últimas 6 horas. Verifique as contribuições imediatamente.
+                                    </p>
+                                </div>
+                                <Badge className="bg-white text-red-600 border-0 shrink-0">URGENTE</Badge>
+                            </div>
+                        )}
+
+                        {/* Graal Header */}
+                        <div className="flex items-center gap-2">
+                            <Sword className="w-5 h-5 text-amber-500" />
+                            <h2 className="text-lg font-bold text-gray-900">Rede Graal</h2>
+                            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs ml-2">
+                                {graalTotal} graals processados
+                            </Badge>
+                        </div>
+
+                        {/* Graal KPIs */}
+                        <div className="grid gap-4 sm:grid-cols-3">
+                            <StatCard
+                                title="Graals Recebidos"
+                                value={graalTotal}
+                                icon={Shield}
+                                description="Total de arquivos processados"
+                                gradient="bg-gradient-to-br from-amber-500 to-amber-700"
+                                iconBg="bg-amber-400/30"
+                            />
+                            <StatCard
+                                title="Contribuições via Graal"
+                                value={graalContributions}
+                                icon={FileText}
+                                description="Registros importados offline"
+                                gradient="bg-gradient-to-br from-slate-600 to-slate-800"
+                                iconBg="bg-slate-400/30"
+                            />
+                            <StatCard
+                                title="Cavaleiros do Graal"
+                                value={graalKnightCount}
+                                icon={Sword}
+                                description="Usuários portadores ativos"
+                                gradient="bg-gradient-to-br from-rose-500 to-rose-700"
+                                iconBg="bg-rose-400/30"
+                            />
+                        </div>
+
+                        {/* Recent Graals list */}
+                        {graalReports.length > 0 && (
+                            <Card className="shadow-sm border-gray-200">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                                        <Sword className="w-4 h-4 text-amber-500" />
+                                        Graals Recentes
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="divide-y divide-gray-50">
+                                        {graalReports.slice(0, 5).map((r: any) => {
+                                            const processedAt = r.processedAt?.toDate
+                                                ? r.processedAt.toDate()
+                                                : new Date(r.processedAt || 0);
+                                            return (
+                                                <div key={r.id} className="flex items-center justify-between py-2.5">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center">
+                                                            <Sword className="w-4 h-4 text-amber-500" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-semibold text-gray-800">
+                                                                {r.processedCount || 0} contribuições
+                                                            </p>
+                                                            <p className="text-xs text-gray-400">
+                                                                {r.transporters?.length || 0} cavaleiro(s) · {format(processedAt, "dd/MM 'às' HH:mm", { locale: ptBR })}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-100 bg-emerald-50">
+                                                        +{r.processedCount || 0}
+                                                    </Badge>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                );
+            })()}
         </div>
     );
 };

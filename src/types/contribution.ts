@@ -22,6 +22,15 @@ export interface Contribution {
     riskLevel?: number; // 1-5
     likes?: number;
     shares?: number;
+
+    // Civic Endorsement System
+    impactMetrics?: Record<string, number>;
+    endorsementCount?: number;
+    boostCount?: number;
+    relevanceSum?: number;
+    relevanceCount?: number;
+    relevanceScore?: number;
+
     // Novos campos para Resposta e Avaliação
     reply?: string;
     replyDate?: Timestamp;

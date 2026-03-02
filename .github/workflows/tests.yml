@@ -32,7 +32,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --force
+        run: npm install --force
 
       - name: Run ESLint
         run: npm run lint
@@ -77,7 +77,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci --force
+        run: npm install --force
 
       - name: Build (skip TypeScript check)
         run: npx vite build

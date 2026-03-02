@@ -32,7 +32,7 @@ const AdminUsers: React.FC = () => {
     const [users, setUsers] = useState<UserManagement[]>([]);
     const [loading, setLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
-    const [searchType, setSearchType] = useState<'email' | 'name' | 'cpf' | 'id'>('email');
+    const [searchType, setSearchType] = useState<'id'>('id');
     const [searchTerm, setSearchTerm] = useState('');
     const [cityFilter, setCityFilter] = useState('');
 
@@ -173,7 +173,8 @@ const AdminUsers: React.FC = () => {
                 return;
             }
             let results: UserManagement[] = [];
-            if (searchType === 'id' && term) {
+            if (term) {
+                // By ID only
                 const docRef = doc(db, 'users', term);
                 const docSnap = await getDoc(docRef);
                 if (docSnap.exists()) {
@@ -181,41 +182,26 @@ const AdminUsers: React.FC = () => {
                     const user = {
                         id: docSnap.id,
                         ...data,
-                        displayName: data.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Usuário sem Nome',
-                        phoneNumber: data.phone || data.phoneNumber || null
+                        displayName: `Cidadão #${docSnap.id.substring(0, 8)}`,
                     } as UserManagement;
                     if (!city || (user.city && user.city.toLowerCase().includes(city.toLowerCase()))) {
                         results = [user];
                     }
                 }
-            } else {
-                let q;
-                if (term) {
-                    const field = searchType === 'cpf' ? 'cpf' : searchType === 'name' ? 'displayName' : 'email';
-                    q = query(collection(db, 'users'), where(field, '>=', term), where(field, '<=', term + '\uf8ff'), limit(50));
-                } else if (city) {
-                    q = query(collection(db, 'users'), where('city', '>=', city), where('city', '<=', city + '\uf8ff'), limit(50));
-                }
-                if (q) {
-                    const querySnapshot = await getDocs(q);
-                    const usersData = querySnapshot.docs.map(doc => {
-                        const data = doc.data();
-                        return {
-                            id: doc.id,
-                            ...data,
-                            displayName: data.displayName || `${data.firstName || ''} ${data.lastName || ''}`.trim() || 'Usuário sem Nome',
-                            phoneNumber: data.phone || data.phoneNumber || null
-                        };
-                    }) as UserManagement[];
-                    results = usersData.filter(u => {
-                        let match = true;
-                        if (term && city) {
-                            match = match && (!!u.city && u.city.toLowerCase().includes(city.toLowerCase()));
-                        }
-                        return match;
-                    });
-                }
+            } else if (city) {
+                // By City only
+                const q = query(collection(db, 'users'), where('city', '>=', city), where('city', '<=', city + '\uf8ff'), limit(50));
+                const querySnapshot = await getDocs(q);
+                results = querySnapshot.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data,
+                        displayName: `Cidadão #${doc.id.substring(0, 8)}`,
+                    };
+                }) as UserManagement[];
             }
+
             setHasMore(false);
             setUsers(results);
         } catch (error) {
@@ -241,15 +227,15 @@ const AdminUsers: React.FC = () => {
 
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4">
                 <div className="flex flex-wrap gap-2">
-                    {(['email', 'name', 'cpf', 'id'] as const).map((type) => (
+                    {(['id'] as const).map((type) => (
                         <Button
                             key={type}
                             variant={searchType === type ? 'default' : 'outline'}
                             size="sm"
-                            onClick={() => setSearchType(type)}
+                            onClick={() => setSearchType(type as any)}
                             className="capitalize"
                         >
-                            {type === 'id' ? 'ID' : type}
+                            ID Exato
                         </Button>
                     ))}
                 </div>
@@ -257,7 +243,7 @@ const AdminUsers: React.FC = () => {
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                         <Input
-                            placeholder={`Buscar por ${searchType === 'cpf' ? 'CPF' : searchType === 'name' ? 'nome' : searchType === 'id' ? 'ID exato' : 'e-mail'}...`}
+                            placeholder="Buscar por ID Exato do Cidadão..."
                             className="pl-10 h-11"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -299,7 +285,7 @@ const AdminUsers: React.FC = () => {
                                 <div className="flex justify-between items-start">
                                     <div className="flex flex-col">
                                         <CardTitle className="text-lg font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
-                                            {user.displayName || (user as any).name || user.email.split('@')[0]}
+                                            Cidadão #{user.id.substring(0, 8)}
                                         </CardTitle>
                                         <span className="text-xs font-mono text-gray-500 mt-0.5">ID: {user.id.substring(0, 8)}...</span>
                                     </div>

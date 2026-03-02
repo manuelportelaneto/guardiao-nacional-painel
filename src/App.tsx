@@ -30,6 +30,7 @@ const AdminMonetization = lazy(() => import('./components/screens/AdminMonetizat
 const WarRoom = lazy(() => import('./components/screens/WarRoom'));
 const ActionEngine = lazy(() => import('./components/screens/ActionEngine'));
 const AiFeedbackScreen = lazy(() => import('./components/screens/AiFeedbackScreen'));
+const AdminSecurityLogs = lazy(() => import('./components/screens/AdminSecurityLogs'));
 const AdminCrashReports = lazy(() => import('./components/screens/AdminCrashReports'));
 const GraalIngest = lazy(() => import('./components/screens/GraalIngest').then(m => ({ default: m.GraalIngest })));
 
@@ -145,6 +146,9 @@ function App() {
                             } />
                             <Route path="reports" element={
                                 <Suspense fallback={<PageLoader />}><ReportsScreen /></Suspense>
+                            } />
+                            <Route path="security-logs" element={
+                                <Suspense fallback={<PageLoader />}><AdminSecurityLogs /></Suspense>
                             } />
                             <Route path="crash-reports" element={
                                 <Suspense fallback={<PageLoader />}><AdminCrashReports /></Suspense>
