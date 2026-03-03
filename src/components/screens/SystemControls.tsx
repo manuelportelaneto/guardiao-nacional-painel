@@ -6,26 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Switch } from '../ui/switch';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '../ui/dialog';
 import { toast } from 'sonner';
-import { Settings, Shield, Zap, Database, TriangleAlert, CircleCheck, RefreshCw, Globe } from 'lucide-react';
+import { Shield, Zap, Database, TriangleAlert, CircleCheck, RefreshCw, Globe } from 'lucide-react';
 import { Progress } from '../ui/progress';
 
 interface SystemSettings {
     showAds: boolean;
     maintenanceMode: boolean;
     enableGamification: boolean;
-    autoPublish: boolean;
-    enableAiImageAnalysis: boolean;
-    enableAiTextAnalysis: boolean;
-    notifyOnApproval: boolean;
-    notifyOnRejection: boolean;
     overseasAccessEnabled: boolean;
-    // Message Templates
-    welcomeMessage?: string;
-    approvedMessage?: string;
-    rejectedMessage?: string;
-    resolvedMessage?: string;
+    overseasAccessUserId?: string;
 }
 
 interface BackupStatus {
@@ -38,23 +30,13 @@ interface BackupStatus {
 
 import { loggingService } from '../../services/loggingService';
 import { useAuth } from '../../context/AuthContext';
-import { Textarea } from '../ui/textarea';
-import { Badge } from '../ui/badge';
 
 const DEFAULT_SETTINGS: SystemSettings = {
     showAds: false,
     maintenanceMode: false,
     enableGamification: true,
-    autoPublish: false,
-    enableAiImageAnalysis: true,
-    enableAiTextAnalysis: true,
-    notifyOnApproval: true,
-    notifyOnRejection: true,
     overseasAccessEnabled: false,
-    welcomeMessage: "Bem-vindo ao Guardião Nacional! Estamos felizes em tê-lo conosco.",
-    approvedMessage: "Sua contribuição '{title}' foi publicada e registrada no Guardião Nacional. Os dados enviados serão analisados e, após a aprovação, sua contribuição aparecerá no mapa. Obrigado por contribuir!",
-    rejectedMessage: "Sua contribuição '{title}' não pôde ser aprovada. Verifique nossas diretrizes.",
-    resolvedMessage: "Ótima notícia! A contribuição '{title}' foi marcada como resolvida."
+    overseasAccessUserId: "", // NEW FIELD FOR PASSPORT
 };
 
 const SystemControls: React.FC = () => {
@@ -63,10 +45,7 @@ const SystemControls: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [backupStatus, setBackupStatus] = useState<BackupStatus | null>(null);
     const [loadingBackup, setLoadingBackup] = useState(false);
-    const [aiAnalysisRunning, setAiAnalysisRunning] = useState(false);
-    const [aiAnalysisResult, setAiAnalysisResult] = useState<{ processed: number; autoApproved: number; rejected: number; message: string } | null>(null);
-    // Custom confirmation dialogs (replaces window.confirm)
-    const [showAiConfirmDialog, setShowAiConfirmDialog] = useState(false);
+    // Custom confirmation dialogs
     const [showBackupConfirmDialog, setShowBackupConfirmDialog] = useState(false);
 
     useEffect(() => {
@@ -132,8 +111,14 @@ const SystemControls: React.FC = () => {
         }
     };
 
-    const handleToggle = async (key: keyof SystemSettings) => {
-        const newValue = !settings[key];
+    const handleToggle = async (key: keyof SystemSettings | string, exactValue?: any) => {
+        let newValue: any;
+
+        if (exactValue !== undefined) {
+            newValue = exactValue;
+        } else {
+            newValue = !settings[key as keyof SystemSettings];
+        }
 
         // Optimistic update
         setSettings(prev => ({ ...prev, [key]: newValue }));
@@ -141,11 +126,15 @@ const SystemControls: React.FC = () => {
         try {
             const settingsRef = doc(db, 'settings', 'global');
             await setDoc(settingsRef, { [key]: newValue }, { merge: true });
-            toast.success(`Configuração "${key}" atualizada!`);
+
+            // Only show toast for boolean toggles to avoid spam on text fields
+            if (typeof newValue === 'boolean') {
+                toast.success(`Configuração "${key}" atualizada!`);
+            }
 
             if (currentUser) {
-                loggingService.logAudit('SETTINGS_UPDATE', currentUser.uid, key, {
-                    oldValue: !newValue,
+                loggingService.logAudit('SETTINGS_UPDATE', currentUser.uid, key as string, {
+                    oldValue: typeof newValue === 'boolean' ? !newValue : null,
                     newValue: newValue
                 });
             }
@@ -153,62 +142,14 @@ const SystemControls: React.FC = () => {
         } catch (error) {
             console.error("Error updating setting:", error);
             toast.error("Erro ao salvar alteração.");
-            // Rollback
-            setSettings(prev => ({ ...prev, [key]: !newValue }));
+            // Rollback if boolean
+            if (typeof newValue === 'boolean') {
+                setSettings(prev => ({ ...prev, [key]: !newValue }));
+            }
         }
     };
 
-    // Extracted: runs the AI retroactive analysis (called from confirmation dialog)
-    const runAiAnalysis = async () => {
-        setShowAiConfirmDialog(false);
-        setAiAnalysisRunning(true);
-        setAiAnalysisResult(null);
-        const toastId = toast.loading('Analisando contribuições com IA...');
-        try {
-            if (!currentUser) throw new Error('Usuário não autenticado');
-            const idToken = await currentUser.getIdToken(true);
 
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 120_000);
-
-            const response = await fetch(CLOUD_FUNCTIONS.runRetroactiveAnalysis, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${idToken}`
-                },
-                body: JSON.stringify({ data: { limit: 50 } }),
-                signal: controller.signal
-            });
-
-            clearTimeout(timeout);
-
-            if (!response.ok) {
-                const errorData = await response.json().catch(() => ({})) as { error?: string };
-                throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
-            }
-
-            const result = await response.json() as { data?: { processed: number; autoApproved: number; rejected: number; message: string } };
-            toast.dismiss(toastId);
-            toast.success(result.data?.message || 'Análise concluída!');
-            if (result.data) setAiAnalysisResult(result.data);
-
-            if (currentUser) {
-                loggingService.logAudit('AI_RETROACTIVE_ANALYSIS', currentUser.uid, 'multiple', { result: result.data });
-            }
-        } catch (e: unknown) {
-            toast.dismiss(toastId);
-            const err = e as { name?: string; message?: string };
-            if (err.name === 'AbortError') {
-                toast.error('Tempo limite excedido (2 min). A análise pode ainda estar rodando no servidor.');
-            } else {
-                toast.error('Erro: ' + (err.message || 'Falha desconhecida'));
-            }
-            console.error('AI Analysis Failed:', e);
-        } finally {
-            setAiAnalysisRunning(false);
-        }
-    };
 
     // Extracted: runs a manual backup (called from confirmation dialog)
     const handleManualBackup = async () => {
@@ -249,31 +190,7 @@ const SystemControls: React.FC = () => {
                 </div>
 
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {/* Ads Control */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Publicidade</CardTitle>
-                            <Settings className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center space-x-4 mt-4">
-                                <Switch
-                                    id="showAds"
-                                    checked={settings.showAds}
-                                    onCheckedChange={() => handleToggle('showAds')}
-                                />
-                                <div className="flex-1 space-y-1">
-                                    <Label htmlFor="showAds" className="text-sm font-medium leading-none">
-                                        Exibir Anúncios
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Ativa banners e interstitials no app.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
+                    {/* Ads Control Temporarily Removed to avoid duplication - now managed solely in Monetization */}
                     {/* Maintenance Mode */}
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -346,221 +263,24 @@ const SystemControls: React.FC = () => {
                                     </p>
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Messaging Campaigns */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Campanhas</CardTitle>
-                            <TriangleAlert className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center space-x-4 mt-4">
-                                <Switch
-                                    id="notifyOnApproval"
-                                    checked={settings.notifyOnApproval}
-                                    onCheckedChange={() => handleToggle('notifyOnApproval')}
-                                />
-                                <div className="flex-1 space-y-1">
-                                    <Label htmlFor="notifyOnApproval" className="text-sm font-medium leading-none">
-                                        Notificar Aprovação
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Envia email ao aprovar contribuição.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center space-x-4">
-                                <Switch
-                                    id="notifyOnRejection"
-                                    checked={settings.notifyOnRejection}
-                                    onCheckedChange={() => handleToggle('notifyOnRejection')}
-                                />
-                                <div className="flex-1 space-y-1">
-                                    <Label htmlFor="notifyOnRejection" className="text-sm font-medium leading-none">
-                                        Notificar Rejeição
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Envia email ao rejeitar contribuição.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Notification Templates */}
-                    <Card className="md:col-span-2 lg:col-span-3">
-                        <CardHeader>
-                            <CardTitle className="text-sm font-medium flex items-center gap-2">
-                                <Settings className="h-4 w-4" />
-                                Modelos de Notificação
-                            </CardTitle>
-                            <p className="text-xs text-muted-foreground">
-                                Configure as mensagens automáticas enviadas aos usuários. Use <strong>{'{title}'}</strong>, <strong>{'{authorName}'}</strong> e <strong>{'{status}'}</strong> como variáveis.
-                            </p>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="welcomeMessage">Mensagem de Boas-vindas</Label>
-                                    <Textarea
-                                        id="welcomeMessage"
-                                        value={settings.welcomeMessage || ''}
-                                        onChange={(e) => setSettings(prev => ({ ...prev, welcomeMessage: e.target.value }))}
-                                        onBlur={() => handleToggle('welcomeMessage' as keyof SystemSettings)}
-                                        placeholder="Mensagem enviada ao cadastrar..."
-                                        className="min-h-[80px]"
+                            {settings.overseasAccessEnabled && (
+                                <div className="mt-4 p-3 bg-gray-50 border rounded space-y-2 animate-in fade-in slide-in-from-top-1">
+                                    <Label htmlFor="overseasAccessUserId" className="text-xs font-semibold text-gray-700">ID do Usuário (Passaporte Temporário)</Label>
+                                    <Input
+                                        id="overseasAccessUserId"
+                                        placeholder="Ex: uVpXyZh2... (UID do Firebase)"
+                                        value={settings.overseasAccessUserId || ''}
+                                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSettings(prev => ({ ...prev, overseasAccessUserId: e.target.value }))}
+                                        onBlur={() => handleToggle('overseasAccessUserId')}
+                                        className="text-sm font-mono h-8"
                                     />
+                                    <p className="text-[10px] text-gray-500">Este UID terá os bloqueios de geolocalização ignorados no painel e no app.</p>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="approvedMessage">Contribuição Aprovada</Label>
-                                    <Textarea
-                                        id="approvedMessage"
-                                        value={settings.approvedMessage || ''}
-                                        onChange={(e) => setSettings(prev => ({ ...prev, approvedMessage: e.target.value }))}
-                                        onBlur={() => handleToggle('approvedMessage' as keyof SystemSettings)}
-                                        placeholder="Mensagem ao aprovar..."
-                                        className="min-h-[80px]"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="rejectedMessage">Contribuição Rejeitada</Label>
-                                    <Textarea
-                                        id="rejectedMessage"
-                                        value={settings.rejectedMessage || ''}
-                                        onChange={(e) => setSettings(prev => ({ ...prev, rejectedMessage: e.target.value }))}
-                                        onBlur={() => handleToggle('rejectedMessage' as keyof SystemSettings)}
-                                        placeholder="Mensagem ao rejeitar..."
-                                        className="min-h-[80px]"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="resolvedMessage">Contribuição Resolvida (Manual)</Label>
-                                    <Textarea
-                                        id="resolvedMessage"
-                                        value={settings.resolvedMessage || ''}
-                                        onChange={(e) => setSettings(prev => ({ ...prev, resolvedMessage: e.target.value }))}
-                                        onBlur={() => handleToggle('resolvedMessage' as keyof SystemSettings)}
-                                        placeholder="Mensagem ao marcar como resolvido..."
-                                        className="min-h-[80px]"
-                                    />
-                                </div>
-                            </div>
+                            )}
                         </CardContent>
                     </Card>
 
-                    {/* Auto-Publish */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Moderação</CardTitle>
-                            <Shield className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center space-x-4 mt-4">
-                                <Switch
-                                    id="autoPublish"
-                                    checked={settings.autoPublish}
-                                    onCheckedChange={() => handleToggle('autoPublish')}
-                                />
-                                <div className="flex-1 space-y-1">
-                                    <Label htmlFor="autoPublish" className="text-sm font-medium leading-none">
-                                        Auto-Publicação
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Aprova automaticamente contribuições de baixo risco.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
 
-                    {/* AI Controls */}
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Inteligência Artificial</CardTitle>
-                            <Zap className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex items-center space-x-4 mt-4">
-                                <Switch
-                                    id="enableAiImage"
-                                    checked={settings.enableAiImageAnalysis}
-                                    onCheckedChange={() => handleToggle('enableAiImageAnalysis')}
-                                />
-                                <div className="flex-1 space-y-1">
-                                    <Label htmlFor="enableAiImage" className="text-sm font-medium leading-none">
-                                        Análise de Imagens
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Google Cloud Vision (SafeSearch)
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center space-x-4">
-                                <Switch
-                                    id="enableAiText"
-                                    checked={settings.enableAiTextAnalysis}
-                                    onCheckedChange={() => handleToggle('enableAiTextAnalysis')}
-                                />
-                                <div className="flex-1 space-y-1">
-                                    <Label htmlFor="enableAiText" className="text-sm font-medium leading-none">
-                                        Moderação de Texto
-                                    </Label>
-                                    <p className="text-xs text-muted-foreground">
-                                        Google Cloud Natural Language
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="pt-3 space-y-3">
-                                {/* AI Status Badge */}
-                                <div className="flex items-center justify-between text-xs">
-                                    <span className="text-muted-foreground">Status da IA</span>
-                                    <Badge
-                                        variant="outline"
-                                        className={`${settings.enableAiTextAnalysis || settings.enableAiImageAnalysis
-                                            ? 'border-green-300 text-green-700 bg-green-50'
-                                            : 'border-red-300 text-red-700 bg-red-50'
-                                            }`}
-                                    >
-                                        {settings.enableAiTextAnalysis || settings.enableAiImageAnalysis
-                                            ? '✓ Ativa (Gemini 1.5 Flash)'
-                                            : '✗ Desativada'
-                                        }
-                                    </Badge>
-                                </div>
-
-                                <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    className="w-full"
-                                    disabled={aiAnalysisRunning}
-                                    onClick={() => setShowAiConfirmDialog(true)}
-                                >
-                                    {aiAnalysisRunning
-                                        ? <><RefreshCw className="mr-2 h-4 w-4 animate-spin" />Analisando...</>
-                                        : <><Zap className="mr-2 h-4 w-4" />Forçar Análise em "Em Análise"</>
-                                    }
-                                </Button>
-
-                                {/* Result box */}
-                                {aiAnalysisResult && (
-                                    <div className="bg-green-50 border border-green-200 rounded p-3 text-xs space-y-1">
-                                        <p className="font-semibold text-green-800">✓ Análise Concluída</p>
-                                        <p className="text-green-700">{aiAnalysisResult.message}</p>
-                                        <div className="flex flex-col gap-1 pt-1">
-                                            <span className="text-slate-600">Processados: <strong>{aiAnalysisResult.processed}</strong></span>
-                                            <span className="text-green-700">Aprovados: <strong>{aiAnalysisResult.autoApproved}</strong></span>
-                                            <span className="text-red-700">Rejeitados: <strong>{aiAnalysisResult.rejected}</strong></span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
 
                     {/* Backup Status Card */}
                     <Card className="md:col-span-2">
@@ -640,32 +360,7 @@ const SystemControls: React.FC = () => {
                 </div>
             </div>
 
-            {/* ===== AI Analysis Confirmation Dialog ===== */}
-            <Dialog open={showAiConfirmDialog} onOpenChange={setShowAiConfirmDialog}>
-                <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-amber-500" />
-                            Forçar Análise com IA
-                        </DialogTitle>
-                        <DialogDescription>
-                            Isso irá reprocessar até <strong>50 contribuições</strong> no status
-                            "Em Análise" usando o <strong>Gemini 1.5 Flash</strong>.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-2 text-sm text-muted-foreground space-y-2">
-                        <p>• Contribuições aprovadas (risco ≤ 2) serão <strong>auto-publicadas</strong> se Auto-Publicação estiver ativa.</p>
-                        <p>• Contribuições com conteúdo impróprio serão <strong>rejeitadas</strong> automaticamente.</p>
-                        <p>• A operação pode levar até <strong>2 minutos</strong>.</p>
-                    </div>
-                    <DialogFooter className="gap-2">
-                        <Button variant="outline" onClick={() => setShowAiConfirmDialog(false)}>Cancelar</Button>
-                        <Button onClick={runAiAnalysis}>
-                            <Zap className="w-4 h-4 mr-2" /> Confirmar Análise
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+
 
             {/* ===== Backup Confirmation Dialog ===== */}
             <Dialog open={showBackupConfirmDialog} onOpenChange={setShowBackupConfirmDialog}>

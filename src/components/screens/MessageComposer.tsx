@@ -262,6 +262,25 @@ const MessageComposer: React.FC = () => {
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
+                                    <Label className="text-xs font-semibold uppercase text-gray-500">Faixa Etária</Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="number"
+                                            placeholder="Min"
+                                            value={targetAudience.minAge}
+                                            onChange={(e) => setTargetAudience(prev => ({ ...prev, minAge: e.target.value }))}
+                                            className="text-xs"
+                                        />
+                                        <Input
+                                            type="number"
+                                            placeholder="Máx"
+                                            value={targetAudience.maxAge}
+                                            onChange={(e) => setTargetAudience(prev => ({ ...prev, maxAge: e.target.value }))}
+                                            className="text-xs"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
                                     <Label className="text-xs font-semibold uppercase text-gray-500">Gênero</Label>
                                     <Select
                                         value={targetAudience.gender}

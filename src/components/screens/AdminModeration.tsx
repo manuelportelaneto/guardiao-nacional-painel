@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../../firebaseConfig';
+import { CLOUD_FUNCTIONS } from '../../config';
 import {
     collection,
     query,
@@ -21,10 +22,14 @@ import {
     User,
     Loader2,
     RefreshCw,
+    Settings,
+    Shield,
+    Zap,
+    Play
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Label } from '../ui/label';
-import { Card, CardContent, CardHeader } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 // Select imports removed as they are unused
@@ -47,6 +52,21 @@ import type { Contribution } from '../../types/contribution';
 import { notificationService } from '../../services/notificationService';
 import { loggingService } from '../../services/loggingService';
 import { automationService } from '../../services/automationService';
+import { Switch } from '../ui/switch';
+
+interface SystemSettings {
+    autoPublish: boolean;
+    aiImageAnalysis: boolean;
+    aiTextAnalysis: boolean;
+    aiAnalysisLevel: 'low' | 'medium' | 'high';
+}
+
+const DEFAULT_SETTINGS: SystemSettings = {
+    autoPublish: false,
+    aiImageAnalysis: true,
+    aiTextAnalysis: true,
+    aiAnalysisLevel: 'medium'
+};
 
 interface Report {
     id: string;
@@ -112,6 +132,55 @@ const AdminModeration: React.FC = () => {
 
     const [activeTab, setActiveTab] = useState('reports');
     const [collapsedFilters, setCollapsedFilters] = useState(true);
+    const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
+    const [runningAnalysis, setRunningAnalysis] = useState(false);
+
+    useEffect(() => {
+        const settingsRef = doc(db, 'settings', 'global');
+        const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() } as SystemSettings);
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleToggle = async (key: keyof SystemSettings, exactValue?: any) => {
+        let newValue = exactValue !== undefined ? exactValue : !settings[key as keyof SystemSettings];
+        setSettings((prev: SystemSettings) => ({ ...prev, [key]: newValue }));
+        try {
+            await setDoc(doc(db, 'settings', 'global'), { [key]: newValue }, { merge: true });
+            if (typeof newValue === 'boolean') toast.success(`Configuração atualizada!`);
+            if (currentUser) loggingService.logAudit('SETTINGS_UPDATE', currentUser.uid, key, { newValue });
+        } catch (error) {
+            toast.error("Erro ao salvar.");
+            if (typeof newValue === 'boolean') setSettings((prev: SystemSettings) => ({ ...prev, [key]: !newValue }));
+        }
+    };
+
+    const runRetroactiveAI = async () => {
+        setRunningAnalysis(true);
+        toast.info("Iniciando análise retroativa...");
+        try {
+            if (!currentUser) throw new Error('Usuário não autenticado');
+            const idToken = await currentUser.getIdToken(true);
+
+            const response = await fetch(CLOUD_FUNCTIONS.runRetroactiveAnalysis, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${idToken}`
+                },
+                body: JSON.stringify({ data: { limit: 50 } })
+            });
+            if (response.ok) toast.success("Análise em andamento. Verifique em instantes.");
+            else toast.error("Erro ao chamar função de IA.");
+        } catch (e) {
+            toast.error("Erro de conexão ou autenticação.");
+        } finally {
+            setRunningAnalysis(false);
+        }
+    };
 
     // Helper: Mask User Data
     const getDisplayUser = (id: string, name?: string) => {
@@ -563,6 +632,10 @@ const AdminModeration: React.FC = () => {
                         <TabsTrigger value="trash" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap">
                             Lixo ({trashList.length})
                         </TabsTrigger>
+                        <TabsTrigger value="config" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap gap-2">
+                            <Settings className="w-4 h-4" />
+                            Configurações
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -587,7 +660,6 @@ const AdminModeration: React.FC = () => {
                     </TabsContent>
                 ))}
 
-                {/* Reports Tab Special Case */}
                 <TabsContent value="reports" className="mt-6">
                     <div className="grid gap-4 md:grid-cols-3">
                         {reports.map((report) => (
@@ -604,6 +676,96 @@ const AdminModeration: React.FC = () => {
                             </Card>
                         ))}
                         {reports.length === 0 && <div className="col-span-3 text-center py-12 text-gray-500 border border-dashed rounded">Sem denúncias.</div>}
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="config" className="mt-6 space-y-6">
+                    <div className="grid gap-6 md:grid-cols-2">
+                        {/* Moderation Controls */}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Moderação Automática</CardTitle>
+                                <Shield className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent className="space-y-4 pt-4">
+                                <div className="flex items-center space-x-4">
+                                    <Switch
+                                        id="autoPublish"
+                                        checked={settings.autoPublish}
+                                        onCheckedChange={() => handleToggle('autoPublish')}
+                                    />
+                                    <div className="flex-1 space-y-1">
+                                        <Label htmlFor="autoPublish" className="text-sm font-medium leading-none">
+                                            Auto-Publicar
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Publicar automaticamente novas contribuições sem análise humana.
+                                        </p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Artificial Intelligence */}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">Inteligência Artificial</CardTitle>
+                                <Zap className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent className="space-y-6 pt-4 text-xs">
+                                <div className="flex items-center space-x-4 mt-2">
+                                    <Switch
+                                        id="aiImageAnalysis"
+                                        checked={settings.aiImageAnalysis}
+                                        onCheckedChange={() => handleToggle('aiImageAnalysis')}
+                                    />
+                                    <div className="flex-1 space-y-1">
+                                        <Label htmlFor="aiImageAnalysis" className="text-sm font-medium leading-none">
+                                            Análise de Imagem (IA)
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Detectar automaticamente nudes, violência e armas em fotos.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-4">
+                                    <Switch
+                                        id="aiTextAnalysis"
+                                        checked={settings.aiTextAnalysis}
+                                        onCheckedChange={() => handleToggle('aiTextAnalysis')}
+                                    />
+                                    <div className="flex-1 space-y-1">
+                                        <Label htmlFor="aiTextAnalysis" className="text-sm font-medium leading-none">
+                                            Filtro de Conteúdo (NLP)
+                                        </Label>
+                                        <p className="text-xs text-muted-foreground">
+                                            Bloquear palavras de baixo calão e discurso de ódio.
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="pt-4 border-t border-dashed">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="space-y-0.5">
+                                            <Label className="text-sm font-semibold">Integridade do banco</Label>
+                                            <p className="text-[10px] text-muted-foreground">Analisar itens antigos com regras atuais</p>
+                                        </div>
+                                        <Button
+                                            size="sm"
+                                            onClick={runRetroactiveAI}
+                                            disabled={runningAnalysis}
+                                            className="h-8 gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 border-none shadow-md hover:shadow-lg hover:from-indigo-700 hover:to-purple-700 text-white transition-all flex items-center justify-center p-0 w-8 md:w-auto md:px-3"
+                                        >
+                                            {runningAnalysis ? (
+                                                <RefreshCw className="h-4 w-4 animate-spin" />
+                                            ) : (
+                                                <Play className="h-4 w-4 fill-current" />
+                                            )}
+                                            <span className="hidden md:inline">Iniciar Varredura IA</span>
+                                        </Button>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
                 </TabsContent>
 
