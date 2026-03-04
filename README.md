@@ -45,6 +45,8 @@ graph TD
 
 ### Controle do Sistema
 - **Notificações em Massa (Emergency)**: Interface do Message Composer com Switch nativa geradora de pacotes tipo "Emergência" para CEPs e cidadãos afetados.
+- **Mensageria Multicanal**: Envio de e-mails profissionais via Brevo, push notifications e SMS com segmentação geográfica avançada.
+- **Listas Manuais**: Envio exclusivo para emails/SMS inseridos manualmente com modo exclusivo (ignora filtros do app).
 - **Webhooks**: Integração com sistemas externos (CRM, ERPs Municipais).
 - **Security Rules 2.0**: Controle granular de acesso por nível de cidade e função.
 - **Insights Preditivos**: Alertas automáticos de "Hotspots" e tendências de problemas.
@@ -53,6 +55,13 @@ graph TD
 - **Dashboard Estratégico**: Visão nacional com métricas de aprovação, resolução e tendências temporais.
 - **Otimização de Heatmap**: Novo motor de renderização no IntelligenceMap com limite de 2000 pontos e ajuste dinâmico de intensidade para hotspots.
 
+### Monetização & Anúncios
+- **Painel de Monetização**: Configuração centralizada de AdMob (mobile) e AdSense (desktop).
+- **Livro dos Guardiões**: CRUD de usuários isentos de anúncios (UID/Email, motivo, prazo em dias).
+- **Cidades Assinantes**: Gestão de prefeituras parceiras com isenção geográfica e prazos configuráveis.
+- **Controle Municipal**: Override de anúncios por cidade com toggle individual.
+- **Relatórios de Receita**: Histórico de extratos de monetização por plataforma.
+
 ## 🛠️ Stack Tecnológico
 
 | Camada | Tecnologia |
@@ -60,7 +69,8 @@ graph TD
 | **Frontend** | React 19, Vite 5, TypeScript |
 | **Estilização** | Tailwind CSS v4, Shadcn/UI |
 | **Gráficos** | Recharts, React Force Graph |
-| **Backend** | Firebase (Auth, Firestore, Hosting) |
+| **Backend** | Firebase (Auth, Firestore, Hosting, Functions) |
+| **Email** | Brevo (Sendinblue) via firestore-send-email Extension |
 | **Testes** | Playwright (E2E), Vitest (Unit) |
 
 ## 📦 Instalação
@@ -94,11 +104,13 @@ npm run test:security
 npm run test:e2e
 ```
 
-## 🔄 Últimas Atualizações (Fevereiro 2026)
+## 🔄 Últimas Atualizações (Março 2026)
 
-- **Dashboard**: Melhorias no `SystemControls`, `AdminOverview`, e componentes visuais do painel.
-- **Segurança**: Refinamentos para acesso e controles administrativos.
-- **Inteligência & Analytics**: Widgets atualizados (`InsightsWidget`) para exibir tendências preditivas.
+- **Mensageria**: Integração Brevo com envio de e-mails profissionais e listas manuais com modo exclusivo.
+- **Livro dos Guardiões**: Aba completa para gestão de isenção de anúncios por UID/Email com prazo.
+- **Cidades Assinantes**: Aba de gestão de prefeituras parceiras com prazos e status.
+- **Monetização**: Painel com 4 abas (Configurações, Guardiões, Cidades, Extratos).
+- **Segmentação**: Filtros geográficos avançados no Message Composer (estados, cidades, bairros, CEP).
 
 ---
 **Desenvolvido por Cloud Matrix**
