@@ -3,7 +3,7 @@ import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestor
 import { db } from '../../firebaseConfig';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Smartphone, Bell, Mail, MessageSquare, ExternalLink, RefreshCw } from 'lucide-react';
+import { Smartphone, Bell, Mail, MessageSquare, ExternalLink, RefreshCw, Eye } from 'lucide-react';
 import { Button } from '../ui/button';
 
 interface MessageLog {
@@ -115,11 +115,14 @@ const MessageHistory: React.FC = () => {
                                     <div className="flex items-center gap-3 text-xs text-gray-500">
                                         {msg.stats && (
                                             <>
-                                                <span className="flex items-center gap-1">
+                                                <span className="flex items-center gap-1" title="Mensagens enviadas p/ FCM">
                                                     <Smartphone className="w-3 h-3" /> {msg.stats.sent}/{msg.stats.totalTarget || 0}
                                                 </span>
-                                                <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-1.5 rounded">
-                                                    <ExternalLink className="w-3 h-3" /> {msg.stats.clicked || 0} clicks
+                                                <span className="flex items-center gap-1 text-emerald-600 bg-emerald-50 px-1.5 rounded" title="Visualizações (Aberturas)">
+                                                    <Eye className="w-3 h-3" /> {msg.stats.viewed || 0}
+                                                </span>
+                                                <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-1.5 rounded" title="Anotações / Cliques">
+                                                    <ExternalLink className="w-3 h-3" /> {msg.stats.clicked || 0}
                                                 </span>
                                             </>
                                         )}
