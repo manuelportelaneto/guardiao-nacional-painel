@@ -3,7 +3,7 @@ import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestor
 import { db } from '../../firebaseConfig';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
-import { Smartphone, Bell, Mail, MessageSquare, ExternalLink, RefreshCw, Eye } from 'lucide-react';
+import { Smartphone, Bell, Mail, MessageSquare, ExternalLink, RefreshCw, Eye, ClipboardList } from 'lucide-react';
 import { Button } from '../ui/button';
 
 interface MessageLog {
@@ -24,6 +24,10 @@ interface MessageLog {
         clicked: number;
         totalTarget?: number;
     };
+    poll?: {
+        totalVotes: number;
+    };
+    plainText?: string;
     createdAt: any;
 }
 
@@ -59,6 +63,13 @@ const MessageHistory: React.FC = () => {
         return timestamp.toDate ? timestamp.toDate().toLocaleString('pt-BR') : new Date(timestamp).toLocaleString('pt-BR');
     };
 
+    const stripHtml = (html: string) => {
+        if (!html) return '';
+        const tmp = document.createElement("DIV");
+        tmp.innerHTML = html;
+        return tmp.textContent || tmp.innerText || "";
+    };
+
     return (
         <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -77,7 +88,7 @@ const MessageHistory: React.FC = () => {
 
                     {messages.map((msg) => {
                         const title = msg.content?.title || msg.title || 'Sem título';
-                        const body = msg.content?.body || msg.body || '';
+                        const body = msg.plainText || stripHtml(msg.content?.body || msg.body || '');
 
                         return (
                             <div key={msg.id} className="flex flex-col space-y-3 p-4 border rounded-lg hover:bg-gray-50/50 transition-all">
@@ -124,6 +135,11 @@ const MessageHistory: React.FC = () => {
                                                 <span className="flex items-center gap-1 text-blue-600 bg-blue-50 px-1.5 rounded" title="Anotações / Cliques">
                                                     <ExternalLink className="w-3 h-3" /> {msg.stats.clicked || 0}
                                                 </span>
+                                                {msg.poll && (
+                                                    <span className="flex items-center gap-1 text-indigo-600 bg-indigo-50 px-1.5 rounded" title="Votos na Pesquisa">
+                                                        <ClipboardList className="w-3 h-3" /> {msg.poll.totalVotes || 0}
+                                                    </span>
+                                                )}
                                             </>
                                         )}
                                     </div>
