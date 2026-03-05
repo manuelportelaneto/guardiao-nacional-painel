@@ -1,6 +1,6 @@
 
-import React, { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, useMap, useMapEvents, Marker, Popup } from 'react-leaflet';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { MapContainer, useMap, useMapEvents, Marker, Popup } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 
@@ -9,14 +9,24 @@ import L from 'leaflet';
 import 'leaflet.heat';
 
 import { intelligenceService, type HeatmapPoint, type IntelligenceFilters, type MapBounds } from '../../services/intelligenceService';
+import { fetchWeather, type WeatherData } from '../../services/externalDataService';
+import {
+    aggregateCityStats, computeIndices, findOpportunityZones, detectAnomalies,
+    type GuardianIndices, type OpportunityZone, type AnomalyResult
+} from '../../services/guardianIndexService';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Card, CardContent } from '../ui/card';
 import { Badge } from '../ui/badge';
+import { Input } from '../ui/input';
+import { Slider } from '../ui/slider';
 import { toast } from 'sonner';
 import {
     Loader2, RefreshCw, Layers, Map as MapIcon,
-    Calendar as CalendarIcon, TriangleAlert, TrendingUp, MapPin, ChartBarBig
+    Calendar as CalendarIcon, TriangleAlert, TrendingUp, TrendingDown,
+    MapPin, ChartBarBig, Moon, Sun, Search,
+    Play, Pause, Award, Target, Building2, Lightbulb,
+    ThermometerSun, Droplets, Wind, AlertCircle, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
@@ -35,6 +45,7 @@ const DefaultIcon = L.icon({
 });
 L.Marker.prototype.options.icon = DefaultIcon;
 
+// ─── Map Icons ──────────────────────────────────────────────────────────────
 const createRiskIcon = (color: string, size: number = 14) => L.divIcon({
     className: '',
     html: `<div style="background:${color};width:${size}px;height:${size}px;border-radius:50%;border:2.5px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.35);"></div>`,
@@ -46,17 +57,40 @@ const HighRiskIcon = createRiskIcon('#ef4444', 16);
 const MediumRiskIcon = createRiskIcon('#f97316', 13);
 const LowRiskIcon = createRiskIcon('#3b82f6', 11);
 
-// Heatmap Layer
+// Category icons
+const CATEGORY_COLORS: Record<string, string> = {
+    'Infraestrutura': '#f97316',
+    'Segurança': '#ef4444',
+    'Saúde': '#10b981',
+    'Trânsito': '#6366f1',
+    'Meio Ambiente': '#22c55e',
+    'Iluminação': '#eab308',
+    'Saneamento': '#0ea5e9',
+    'Educação': '#8b5cf6',
+};
+
+const createCategoryIcon = (category: string) => {
+    const color = CATEGORY_COLORS[category] || '#6b7280';
+    return L.divIcon({
+        className: '',
+        html: `<div style="background:${color};width:13px;height:13px;border-radius:3px;border:2px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.3);transform:rotate(45deg);"></div>`,
+        iconSize: [13, 13],
+        iconAnchor: [6, 6]
+    });
+};
+
+// ─── Tile Layers ────────────────────────────────────────────────────────────
+const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
+const TILE_DARK = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+
+// ─── Heatmap Layer ──────────────────────────────────────────────────────────
 const HeatmapLayer = ({ points }: { points: HeatmapPoint[] }) => {
     const map = useMap();
     useEffect(() => {
         if (!points.length) return;
         const heatPoints = points.map(p => [p.lat, p.lng, p.intensity] as [number, number, number]);
         const heat = (L as any).heatLayer(heatPoints, {
-            radius: 20,
-            blur: 15,
-            maxZoom: 15,
-            max: 0.5, // Lower max makes high density areas pop more easily
+            radius: 20, blur: 15, maxZoom: 15, max: 0.5,
             gradient: { 0.2: '#60a5fa', 0.4: '#34d399', 0.6: '#fbbf24', 0.8: '#f97316', 1.0: '#ef4444' }
         });
         heat.addTo(map);
@@ -65,6 +99,7 @@ const HeatmapLayer = ({ points }: { points: HeatmapPoint[] }) => {
     return null;
 };
 
+// ─── Bounds Tracker ─────────────────────────────────────────────────────────
 const BoundsTracker = ({ onBoundsChange }: { onBoundsChange: (b: MapBounds) => void }) => {
     useMapEvents({
         moveend: (e) => {
@@ -75,19 +110,56 @@ const BoundsTracker = ({ onBoundsChange }: { onBoundsChange: (b: MapBounds) => v
     return null;
 };
 
-// KPI card used in the sidebar panel
-const KpiCard = ({ label, value, color, icon: Icon }: { label: string; value: number | string; color: string; icon: React.ElementType }) => (
+// ─── Tile Switcher ──────────────────────────────────────────────────────────
+const TileSwitcher = ({ isDark }: { isDark: boolean }) => {
+    const map = useMap();
+    const layerRef = useRef<L.TileLayer | null>(null);
+    useEffect(() => {
+        if (layerRef.current) map.removeLayer(layerRef.current);
+        layerRef.current = L.tileLayer(isDark ? TILE_DARK : TILE_LIGHT, {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        }).addTo(map);
+    }, [isDark, map]);
+    return null;
+};
+
+// ─── KPI Card ───────────────────────────────────────────────────────────────
+const KpiCard = ({ label, value, color, icon: Icon, trend }: {
+    label: string; value: number | string; color: string; icon: React.ElementType; trend?: number;
+}) => (
     <div className={`rounded-xl p-3 flex items-center gap-3 border ${color}`}>
         <div className="p-2 rounded-lg bg-white/60">
             <Icon className="w-4 h-4" />
         </div>
-        <div>
+        <div className="flex-1">
             <p className="text-xl font-bold leading-none">{value}</p>
             <p className="text-xs opacity-70 mt-0.5">{label}</p>
         </div>
+        {trend !== undefined && trend !== 0 && (
+            <div className={`text-xs font-bold flex items-center ${trend > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                {trend > 0 ? <TrendingUp className="w-3 h-3 mr-0.5" /> : <TrendingDown className="w-3 h-3 mr-0.5" />}
+                {Math.abs(trend)}%
+            </div>
+        )}
     </div>
 );
 
+// ─── Index Badge ────────────────────────────────────────────────────────────
+const IndexBadge = ({ label, value, sublabel, color }: {
+    label: string; value: number | string; sublabel: string; color: string;
+}) => (
+    <div className={`rounded-xl p-2.5 border ${color}`}>
+        <div className="flex justify-between items-center">
+            <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">{label}</span>
+            <span className="text-sm font-black">{value}</span>
+        </div>
+        <p className="text-[10px] opacity-50 mt-0.5">{sublabel}</p>
+    </div>
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
 const IntelligenceMap: React.FC = () => {
     const [viewMode, setViewMode] = useState<'heatmap' | 'clusters'>('clusters');
     const [heatmapPoints, setHeatmapPoints] = useState<HeatmapPoint[]>([]);
@@ -96,6 +168,24 @@ const IntelligenceMap: React.FC = () => {
     const [currentBounds, setCurrentBounds] = useState<MapBounds | undefined>(undefined);
     const boundsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [showPanel, setShowPanel] = useState(true);
+
+    // Visual options
+    const [isDark, setIsDark] = useState(false);
+    const [colorBy, setColorBy] = useState<'risk' | 'category'>('risk');
+
+    // Timeline
+    const [timelineMonth, setTimelineMonth] = useState(11); // 0-11, current = 11
+    const [isPlaying, setIsPlaying] = useState(false);
+    const playRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    // Search
+    const [searchQuery, setSearchQuery] = useState('');
+
+    // Weather
+    const [weather, setWeather] = useState<WeatherData | null>(null);
+
+    // Sidebar sections
+    const [expandedSection, setExpandedSection] = useState<string>('risk');
 
     const [filters, setFilters] = useState<IntelligenceFilters>({
         status: 'all',
@@ -113,17 +203,16 @@ const IntelligenceMap: React.FC = () => {
         setFilters(prev => ({ ...prev, startDate: dateRange.from, endDate: dateRange.to }));
     }, [dateRange]);
 
-    const loadData = async (bounds?: MapBounds) => {
+    // ─── Data Loading ───────────────────────────────────────────────────
+    const loadData = useCallback(async (bounds?: MapBounds) => {
         setLoading(true);
         try {
             if (viewMode === 'heatmap') {
                 const data = await intelligenceService.getHeatmapPoints(filters, bounds);
                 setHeatmapPoints(data);
-                if (data.length > 0) toast.success(`${data.length} pontos carregados`);
             } else {
                 const data = await intelligenceService.getMapData(filters, bounds);
                 setClusterData(data);
-                if (data.length > 0) toast.success(`${data.length} ocorrências`);
             }
         } catch (error) {
             toast.error('Erro ao carregar dados do mapa.');
@@ -131,55 +220,163 @@ const IntelligenceMap: React.FC = () => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [filters, viewMode]);
 
-    const handleBoundsChange = (bounds: MapBounds) => {
+    const handleBoundsChange = useCallback((bounds: MapBounds) => {
         setCurrentBounds(bounds);
         if (boundsDebounceRef.current) clearTimeout(boundsDebounceRef.current);
         boundsDebounceRef.current = setTimeout(() => loadData(bounds), 700);
-    };
+
+        // Fetch weather for map center
+        const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+        const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+        fetchWeather(centerLat, centerLng).then(setWeather);
+    }, [loadData]);
 
     useEffect(() => { loadData(currentBounds); }, [filters, viewMode]);
 
-    // Computed KPIs from cluster data
-    const highRisk = clusterData.filter(p => p.riskLevel >= 4).length;
-    const mediumRisk = clusterData.filter(p => p.riskLevel === 3).length;
-    const lowRisk = clusterData.filter(p => p.riskLevel <= 2).length;
-    const resolved = clusterData.filter(p => p.status === 'Resolvido').length;
+    // ─── Timeline Player ────────────────────────────────────────────────
+    useEffect(() => {
+        if (isPlaying) {
+            playRef.current = setInterval(() => {
+                setTimelineMonth(prev => {
+                    if (prev >= 11) { setIsPlaying(false); return 11; }
+                    return prev + 1;
+                });
+            }, 800);
+        }
+        return () => { if (playRef.current) clearInterval(playRef.current); };
+    }, [isPlaying]);
+
+    const timelineFilteredData = useMemo(() => {
+        if (timelineMonth === 11) return clusterData;
+        const now = new Date();
+        const targetDate = new Date(now.getFullYear(), now.getMonth() - (11 - timelineMonth), 1);
+        const endOfMonth = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 0);
+        return clusterData.filter(p => {
+            const d = p.createdAt?.toDate ? p.createdAt.toDate() : new Date(p.createdAt);
+            return d <= endOfMonth;
+        });
+    }, [clusterData, timelineMonth]);
+
+    // ─── Search Filter ──────────────────────────────────────────────────
+    const searchFilteredData = useMemo(() => {
+        if (!searchQuery.trim()) return timelineFilteredData;
+        const q = searchQuery.toLowerCase();
+        return timelineFilteredData.filter(p =>
+            (p.neighborhood || '').toLowerCase().includes(q) ||
+            (p.cep || '').includes(q) ||
+            (p.city || '').toLowerCase().includes(q) ||
+            (p.address || '').toLowerCase().includes(q)
+        );
+    }, [timelineFilteredData, searchQuery]);
+
+    // ─── Computed KPIs ──────────────────────────────────────────────────
+    const displayData = searchFilteredData;
+    const highRisk = displayData.filter(p => p.riskLevel >= 4).length;
+    const mediumRisk = displayData.filter(p => p.riskLevel === 3).length;
+    const lowRisk = displayData.filter(p => p.riskLevel <= 2).length;
+    const resolved = displayData.filter(p => p.status === 'Resolvido' || p.status === 'Concluído').length;
 
     // Top categories
-    const categoryMap: Record<string, number> = {};
-    clusterData.forEach(p => { categoryMap[p.category] = (categoryMap[p.category] || 0) + 1; });
-    const topCategories = Object.entries(categoryMap)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3);
+    const topCategories = useMemo(() => {
+        const catMap: Record<string, number> = {};
+        displayData.forEach(p => { catMap[p.category] = (catMap[p.category] || 0) + 1; });
+        return Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+    }, [displayData]);
+
+    // ─── City Analytics ─────────────────────────────────────────────────
+    const cityStats = useMemo(() => aggregateCityStats(displayData), [displayData]);
+
+    const topCities = useMemo(() =>
+        [...cityStats].sort((a, b) => b.pending - a.pending).slice(0, 5),
+        [cityStats]
+    );
+
+    const cityResolutionRates = useMemo(() =>
+        [...cityStats]
+            .filter(s => s.total >= 2)
+            .map(s => ({ ...s, rate: s.total > 0 ? (s.resolved / s.total) * 100 : 0 }))
+            .sort((a, b) => a.rate - b.rate)
+            .slice(0, 5),
+        [cityStats]
+    );
+
+    // ─── Guardian Indices ───────────────────────────────────────────────
+    const globalIndices = useMemo<GuardianIndices>(() => {
+        const totalApproved = displayData.filter(p => p.status === 'Aprovado' || p.status === 'Resolvido').length;
+        const totalResolved = resolved;
+        const totalInfra = displayData.filter(p => (p.category || '').toLowerCase().includes('infra')).length;
+        return computeIndices({
+            city: 'Global', state: '', total: displayData.length,
+            approved: totalApproved, resolved: totalResolved, pending: displayData.length - totalResolved,
+            highRisk, infrastructure: totalInfra, avgRisk: 0,
+        });
+    }, [displayData, resolved, highRisk]);
+
+    // ─── Anomalies ──────────────────────────────────────────────────────
+    const anomalies = useMemo<AnomalyResult[]>(() => detectAnomalies(cityStats), [cityStats]);
+
+    // ─── Opportunity Zones ──────────────────────────────────────────────
+    const opportunities = useMemo<OpportunityZone[]>(() => findOpportunityZones(cityStats), [cityStats]);
+
+    // ─── Timeline Label ─────────────────────────────────────────────────
+    const timelineLabel = useMemo(() => {
+        const now = new Date();
+        const d = new Date(now.getFullYear(), now.getMonth() - (11 - timelineMonth), 1);
+        const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        return `${months[d.getMonth()]}/${d.getFullYear()}`;
+    }, [timelineMonth]);
+
+    // ─── Sidebar Toggle ─────────────────────────────────────────────────
+    const toggleSection = (id: string) => setExpandedSection(expandedSection === id ? '' : id);
+
+    const SectionHeader = ({ id, title, icon: SIcon, count }: { id: string; title: string; icon: React.ElementType; count?: number }) => (
+        <button
+            onClick={() => toggleSection(id)}
+            className="w-full flex items-center justify-between py-1.5 px-1 text-xs font-bold text-gray-500 uppercase tracking-wider hover:text-gray-700 transition-colors"
+        >
+            <span className="flex items-center gap-1.5"><SIcon className="w-3.5 h-3.5" /> {title} {count !== undefined && <Badge variant="secondary" className="text-[9px] px-1 py-0">{count}</Badge>}</span>
+            {expandedSection === id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </button>
+    );
 
     return (
-        <div className="flex flex-col gap-3 h-[calc(100vh-120px)]">
+        <div className="flex flex-col gap-2 h-[calc(100vh-120px)]">
 
-            {/* ─── Toolbar ─────────────────────────────────────────────────────────── */}
-            <div className="flex flex-wrap items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-3 shadow-sm">
+            {/* ─── Toolbar ────────────────────────────────────────────────── */}
+            <div className="flex flex-wrap items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
                 {/* View toggle */}
                 <div className="flex bg-gray-100 p-0.5 rounded-lg">
                     <button
                         onClick={() => setViewMode('clusters')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'clusters' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1 transition-all ${viewMode === 'clusters' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500'}`}
                     >
-                        <MapIcon size={13} /> Clusters
+                        <MapIcon size={12} /> Clusters
                     </button>
                     <button
                         onClick={() => setViewMode('heatmap')}
-                        className={`px-3 py-1.5 text-xs font-semibold rounded-md flex items-center gap-1.5 transition-all ${viewMode === 'heatmap' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1 transition-all ${viewMode === 'heatmap' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-500'}`}
                     >
-                        <Layers size={13} /> Mapa de Calor
+                        <Layers size={12} /> Calor
                     </button>
                 </div>
 
                 <div className="h-5 w-px bg-gray-200" />
 
+                {/* Color toggle (clusters only) */}
+                {viewMode === 'clusters' && (
+                    <button
+                        onClick={() => setColorBy(colorBy === 'risk' ? 'category' : 'risk')}
+                        className="px-2.5 py-1 text-xs font-medium rounded-lg border bg-white hover:bg-gray-50 transition-all"
+                    >
+                        {colorBy === 'risk' ? '🔴 Risco' : '🏷️ Categoria'}
+                    </button>
+                )}
+
                 {/* Category filter */}
                 <Select value={filters.category} onValueChange={(v) => setFilters(prev => ({ ...prev, category: v }))}>
-                    <SelectTrigger className="h-8 text-xs w-[130px]">
+                    <SelectTrigger className="h-7 text-xs w-[120px]">
                         <SelectValue placeholder="Categoria" />
                     </SelectTrigger>
                     <SelectContent>
@@ -189,27 +386,40 @@ const IntelligenceMap: React.FC = () => {
                         <SelectItem value="Saúde">Saúde</SelectItem>
                         <SelectItem value="Trânsito">Trânsito</SelectItem>
                         <SelectItem value="Meio Ambiente">Meio Ambiente</SelectItem>
+                        <SelectItem value="Iluminação">Iluminação</SelectItem>
+                        <SelectItem value="Saneamento">Saneamento</SelectItem>
                     </SelectContent>
                 </Select>
 
                 {/* Status filter */}
                 <Select value={filters.status} onValueChange={(v) => setFilters(prev => ({ ...prev, status: v }))}>
-                    <SelectTrigger className="h-8 text-xs w-[120px]">
+                    <SelectTrigger className="h-7 text-xs w-[110px]">
                         <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">Todos status</SelectItem>
+                        <SelectItem value="all">Todos</SelectItem>
                         <SelectItem value="Em Análise">Em Análise</SelectItem>
                         <SelectItem value="Aprovado">Aprovado</SelectItem>
                         <SelectItem value="Resolvido">Resolvido</SelectItem>
                     </SelectContent>
                 </Select>
 
+                {/* Search */}
+                <div className="relative">
+                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
+                    <Input
+                        placeholder="Bairro, CEP..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="pl-7 h-7 text-xs w-[130px]"
+                    />
+                </div>
+
                 {/* Date range */}
                 <Popover>
                     <PopoverTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 text-xs font-normal">
-                            <CalendarIcon className="mr-1.5 h-3 w-3" />
+                        <Button variant="outline" size="sm" className="h-7 text-xs font-normal">
+                            <CalendarIcon className="mr-1 h-3 w-3" />
                             {dateRange.from ? (
                                 dateRange.to
                                     ? `${format(dateRange.from, 'dd/MM')} – ${format(dateRange.to, 'dd/MM')}`
@@ -230,61 +440,241 @@ const IntelligenceMap: React.FC = () => {
                     </PopoverContent>
                 </Popover>
 
-                <div className="ml-auto flex items-center gap-2">
+                <div className="ml-auto flex items-center gap-1">
+                    {/* Dark mode */}
                     <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={() => setShowPanel(p => !p)}
+                        variant="ghost" size="sm" className="h-7 w-7 p-0"
+                        onClick={() => setIsDark(!isDark)}
+                        title={isDark ? 'Modo Claro' : 'Modo Dark'}
                     >
-                        <ChartBarBig size={14} className="mr-1" />
-                        {showPanel ? 'Ocultar KPIs' : 'KPIs'}
+                        {isDark ? <Sun size={14} /> : <Moon size={14} />}
                     </Button>
-                    <Button variant="outline" size="sm" className="h-8" onClick={() => loadData(currentBounds)} disabled={loading}>
+
+                    {/* Panel toggle */}
+                    <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowPanel(p => !p)}>
+                        <ChartBarBig size={13} className="mr-1" />
+                        {showPanel ? 'Ocultar' : 'Painel'}
+                    </Button>
+
+                    {/* Refresh */}
+                    <Button variant="outline" size="sm" className="h-7 w-7 p-0" onClick={() => loadData(currentBounds)} disabled={loading}>
                         {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
                     </Button>
                 </div>
             </div>
 
-            {/* ─── Main Area ───────────────────────────────────────────────────────── */}
-            <div className="flex gap-3 flex-1 min-h-0">
+            {/* ─── Timeline Slider ────────────────────────────────────────── */}
+            <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
+                <button
+                    onClick={() => { setIsPlaying(!isPlaying); if (!isPlaying) setTimelineMonth(0); }}
+                    className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 transition-colors flex-shrink-0"
+                >
+                    {isPlaying ? <Pause size={12} /> : <Play size={12} className="ml-0.5" />}
+                </button>
+                <div className="flex-1">
+                    <Slider
+                        value={[timelineMonth]}
+                        onValueChange={([v]) => setTimelineMonth(v)}
+                        max={11}
+                        step={1}
+                        className="w-full"
+                    />
+                </div>
+                <span className="text-xs font-mono font-bold text-gray-600 w-[70px] text-right">{timelineLabel}</span>
+                <Badge variant="secondary" className="text-[10px]">{displayData.length} pts</Badge>
+            </div>
+
+            {/* ─── Main Area ─────────────────────────────────────────────── */}
+            <div className="flex gap-2 flex-1 min-h-0">
 
                 {/* KPI Sidebar */}
-                {showPanel && viewMode === 'clusters' && (
-                    <div className="w-52 shrink-0 flex flex-col gap-2 overflow-y-auto">
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1">Distribuição de Risco</p>
-                        <KpiCard label="Alto Risco" value={highRisk} color="bg-red-50 border-red-200 text-red-700" icon={TriangleAlert} />
-                        <KpiCard label="Médio Risco" value={mediumRisk} color="bg-orange-50 border-orange-200 text-orange-700" icon={TriangleAlert} />
-                        <KpiCard label="Baixo Risco" value={lowRisk} color="bg-blue-50 border-blue-200 text-blue-700" icon={MapPin} />
-                        <KpiCard label="Resolvidos" value={resolved} color="bg-green-50 border-green-200 text-green-700" icon={TrendingUp} />
+                {showPanel && (
+                    <div className="w-56 shrink-0 flex flex-col gap-1 overflow-y-auto pr-1 scrollbar-thin">
 
-                        {topCategories.length > 0 && (
-                            <>
-                                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1 mt-2">Top Categorias</p>
+                        {/* Weather */}
+                        {weather && (
+                            <div className="rounded-xl p-2.5 bg-gradient-to-br from-sky-50 to-blue-50 border border-sky-200 mb-1">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-lg">{weather.weatherIcon}</span>
+                                    <span className="text-xl font-black text-sky-800">{weather.temperature}°C</span>
+                                </div>
+                                <p className="text-[10px] text-sky-600 mt-0.5">{weather.weatherLabel}</p>
+                                <div className="flex gap-3 mt-1.5 text-[9px] text-sky-500">
+                                    <span className="flex items-center gap-0.5"><Droplets className="w-2.5 h-2.5" /> {weather.humidity}%</span>
+                                    <span className="flex items-center gap-0.5"><Wind className="w-2.5 h-2.5" /> {weather.windSpeed} km/h</span>
+                                    {weather.precipitation > 0 && (
+                                        <span className="flex items-center gap-0.5"><ThermometerSun className="w-2.5 h-2.5" /> {weather.precipitation}mm</span>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Risk Distribution */}
+                        <SectionHeader id="risk" title="Risco" icon={TriangleAlert} />
+                        {expandedSection === 'risk' && (
+                            <div className="space-y-1.5">
+                                <KpiCard label="Alto Risco" value={highRisk} color="bg-red-50 border-red-200 text-red-700" icon={TriangleAlert} />
+                                <KpiCard label="Médio Risco" value={mediumRisk} color="bg-orange-50 border-orange-200 text-orange-700" icon={TriangleAlert} />
+                                <KpiCard label="Baixo Risco" value={lowRisk} color="bg-blue-50 border-blue-200 text-blue-700" icon={MapPin} />
+                                <KpiCard label="Resolvidos" value={resolved} color="bg-green-50 border-green-200 text-green-700" icon={TrendingUp} />
+                            </div>
+                        )}
+
+                        {/* Top Categories */}
+                        <SectionHeader id="categories" title="Categorias" icon={ChartBarBig} count={topCategories.length} />
+                        {expandedSection === 'categories' && topCategories.length > 0 && (
+                            <div className="space-y-1">
                                 {topCategories.map(([cat, count]) => (
-                                    <div key={cat} className="bg-white border border-gray-200 rounded-xl px-3 py-2 flex justify-between items-center">
-                                        <span className="text-xs font-medium truncate text-gray-700">{cat}</span>
-                                        <Badge variant="secondary" className="text-xs ml-1 shrink-0">{count}</Badge>
+                                    <div key={cat} className="bg-white border rounded-lg px-2.5 py-1.5 flex justify-between items-center">
+                                        <span className="text-[11px] font-medium truncate text-gray-700 flex items-center gap-1.5">
+                                            <div className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLORS[cat] || '#6b7280' }} />
+                                            {cat}
+                                        </span>
+                                        <Badge variant="secondary" className="text-[10px] px-1">{count}</Badge>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+
+                        {/* Top 5 Critical Cities */}
+                        <SectionHeader id="cities" title="Cidades Críticas" icon={Building2} count={topCities.length} />
+                        {expandedSection === 'cities' && topCities.length > 0 && (
+                            <div className="space-y-1">
+                                {topCities.map((city, i) => (
+                                    <div key={city.city} className="bg-white border rounded-lg px-2.5 py-1.5">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[11px] font-semibold text-gray-700 truncate flex-1">
+                                                <span className="text-gray-400 mr-1">#{i + 1}</span> {city.city}
+                                            </span>
+                                            <span className="text-xs font-bold text-red-600">{city.pending}</span>
+                                        </div>
+                                        <div className="w-full bg-gray-100 h-1 rounded-full mt-1">
+                                            <div
+                                                className="h-1 rounded-full bg-red-400"
+                                                style={{ width: `${Math.min(100, (city.pending / (topCities[0]?.pending || 1)) * 100)}%` }}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Resolution Rate */}
+                        <SectionHeader id="resolution" title="Taxa Resolução" icon={Target} count={cityResolutionRates.length} />
+                        {expandedSection === 'resolution' && cityResolutionRates.length > 0 && (
+                            <div className="space-y-1">
+                                {cityResolutionRates.map(city => {
+                                    const rateColor = city.rate >= 70 ? 'bg-green-400' : city.rate >= 40 ? 'bg-yellow-400' : 'bg-red-400';
+                                    return (
+                                        <div key={city.city} className="bg-white border rounded-lg px-2.5 py-1.5">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[11px] font-medium text-gray-700 truncate">{city.city}</span>
+                                                <span className={`text-[10px] font-bold ${city.rate >= 70 ? 'text-green-600' : city.rate >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                                    {city.rate.toFixed(0)}%
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-gray-100 h-1 rounded-full mt-1">
+                                                <div className={`h-1 rounded-full ${rateColor}`} style={{ width: `${city.rate}%` }} />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        {/* Guardian Indices */}
+                        <SectionHeader id="indices" title="Índices Guardião" icon={Award} />
+                        {expandedSection === 'indices' && (
+                            <div className="space-y-1.5">
+                                <IndexBadge
+                                    label="ICA™"
+                                    value={globalIndices.ica}
+                                    sublabel={`Cidadania Ativa • ${globalIndices.icaLabel}`}
+                                    color={globalIndices.ica >= 20 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}
+                                />
+                                <IndexBadge
+                                    label="IRM™"
+                                    value={`${globalIndices.irm}%`}
+                                    sublabel={`Responsividade • ${globalIndices.irmLabel}`}
+                                    color={globalIndices.irm >= 60 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : globalIndices.irm >= 30 ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-red-50 border-red-200 text-red-800'}
+                                />
+                                <IndexBadge
+                                    label="SIU™"
+                                    value={globalIndices.siu}
+                                    sublabel={`Infraestrutura • ${globalIndices.siuLabel}`}
+                                    color={globalIndices.siu >= 60 ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}
+                                />
+                            </div>
+                        )}
+
+                        {/* Anomalies */}
+                        {anomalies.length > 0 && (
+                            <>
+                                <SectionHeader id="anomalies" title="Anomalias" icon={AlertCircle} count={anomalies.length} />
+                                {expandedSection === 'anomalies' && (
+                                    <div className="space-y-1">
+                                        {anomalies.slice(0, 3).map(a => (
+                                            <div key={a.city} className="rounded-lg px-2.5 py-2 bg-red-50 border border-red-200">
+                                                <p className="text-[11px] font-bold text-red-700">{a.city}</p>
+                                                <p className="text-[9px] text-red-500">
+                                                    {a.count} ocorrências (média: {a.mean}, σ: {a.zScore.toFixed(1)})
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </>
                         )}
 
-                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider px-1 mt-2">Legenda</p>
-                        <Card className="border-gray-200">
-                            <CardContent className="p-3 space-y-2">
-                                {[
-                                    { color: 'bg-red-500', label: 'Alto Risco (≥4)' },
-                                    { color: 'bg-orange-500', label: 'Médio Risco (3)' },
-                                    { color: 'bg-blue-500', label: 'Baixo Risco (≤2)' },
-                                ].map(({ color, label }) => (
-                                    <div key={label} className="flex items-center gap-2">
-                                        <div className={`w-3 h-3 rounded-full ${color} border border-white shadow-sm shrink-0`} />
-                                        <span className="text-xs text-gray-600">{label}</span>
+                        {/* Opportunity Zones */}
+                        <SectionHeader id="opportunities" title="Oportunidades" icon={Lightbulb} count={opportunities.length} />
+                        {expandedSection === 'opportunities' && opportunities.length > 0 && (
+                            <div className="space-y-1">
+                                {opportunities.slice(0, 5).map(opp => (
+                                    <div key={opp.city} className="rounded-lg px-2.5 py-2 bg-amber-50 border border-amber-200">
+                                        <div className="flex justify-between items-center">
+                                            <p className="text-[11px] font-bold text-amber-800">{opp.city}</p>
+                                            <Badge className="bg-amber-200 text-amber-900 text-[9px] hover:bg-amber-200">{opp.opportunityScore}x</Badge>
+                                        </div>
+                                        <p className="text-[9px] text-amber-600">
+                                            Demanda: {opp.demandScore} | Atendimento: {opp.supplyScore} | {opp.dominantCategory}
+                                        </p>
                                     </div>
                                 ))}
-                            </CardContent>
-                        </Card>
+                            </div>
+                        )}
+
+                        {/* Legend */}
+                        <SectionHeader id="legend" title="Legenda" icon={MapIcon} />
+                        {expandedSection === 'legend' && (
+                            <Card className="border-gray-200">
+                                <CardContent className="p-2.5 space-y-1.5">
+                                    {colorBy === 'risk' ? (
+                                        <>
+                                            {[
+                                                { color: 'bg-red-500', label: 'Alto Risco (≥4)' },
+                                                { color: 'bg-orange-500', label: 'Médio Risco (3)' },
+                                                { color: 'bg-blue-500', label: 'Baixo Risco (≤2)' },
+                                            ].map(({ color, label }) => (
+                                                <div key={label} className="flex items-center gap-2">
+                                                    <div className={`w-3 h-3 rounded-full ${color} border border-white shadow-sm`} />
+                                                    <span className="text-[10px] text-gray-600">{label}</span>
+                                                </div>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {Object.entries(CATEGORY_COLORS).map(([cat, color]) => (
+                                                <div key={cat} className="flex items-center gap-2">
+                                                    <div className="w-3 h-3 rounded-sm rotate-45 border border-white shadow-sm" style={{ background: color }} />
+                                                    <span className="text-[10px] text-gray-600">{cat}</span>
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
                     </div>
                 )}
 
@@ -305,50 +695,67 @@ const IntelligenceMap: React.FC = () => {
                         style={{ height: '100%', width: '100%' }}
                         zoomControl={false}
                     >
-                        <TileLayer
-                            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                        />
+                        <TileSwitcher isDark={isDark} />
                         <BoundsTracker onBoundsChange={handleBoundsChange} />
 
                         {viewMode === 'heatmap' && <HeatmapLayer points={heatmapPoints} />}
 
                         {viewMode === 'clusters' && (
                             <MarkerClusterGroup chunkedLoading>
-                                {clusterData.map((point) => (
-                                    <Marker
-                                        key={point.id}
-                                        position={[point.location.latitude, point.location.longitude]}
-                                        icon={
-                                            point.riskLevel >= 4 ? HighRiskIcon
-                                                : point.riskLevel === 3 ? MediumRiskIcon
-                                                    : LowRiskIcon
-                                        }
-                                    >
-                                        <Popup>
-                                            <div className="p-1 min-w-[200px] max-w-[250px]">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${point.riskLevel >= 4 ? 'bg-red-100 text-red-700'
-                                                        : point.riskLevel === 3 ? 'bg-orange-100 text-orange-700'
-                                                            : 'bg-blue-100 text-blue-700'
-                                                        }`}>
-                                                        Risco {point.riskLevel}
-                                                    </span>
-                                                    <span className={`text-[10px] px-2 py-0.5 rounded-full ${point.status === 'Resolvido' ? 'bg-green-100 text-green-700'
-                                                        : 'bg-yellow-100 text-yellow-700'
-                                                        }`}>
-                                                        {point.status}
-                                                    </span>
+                                {displayData.map((point) => {
+                                    const markerIcon = colorBy === 'risk'
+                                        ? (point.riskLevel >= 4 ? HighRiskIcon : point.riskLevel === 3 ? MediumRiskIcon : LowRiskIcon)
+                                        : createCategoryIcon(point.category);
+
+                                    return (
+                                        <Marker
+                                            key={point.id}
+                                            position={[point.location?.latitude || point.latitude, point.location?.longitude || point.longitude]}
+                                            icon={markerIcon}
+                                        >
+                                            <Popup>
+                                                <div className="p-1 min-w-[220px] max-w-[280px]">
+                                                    {/* Image */}
+                                                    {point.imageUrl && (
+                                                        <img
+                                                            src={point.imageUrl}
+                                                            alt="Contribuição"
+                                                            className="w-full h-28 object-cover rounded-lg mb-2"
+                                                            loading="lazy"
+                                                        />
+                                                    )}
+                                                    <div className="flex items-center justify-between mb-1.5">
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${point.riskLevel >= 4 ? 'bg-red-100 text-red-700'
+                                                            : point.riskLevel === 3 ? 'bg-orange-100 text-orange-700'
+                                                                : 'bg-blue-100 text-blue-700'
+                                                            }`}>
+                                                            Risco {point.riskLevel}
+                                                        </span>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${point.status === 'Resolvido' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                                                            }`}>
+                                                            {point.status}
+                                                        </span>
+                                                    </div>
+                                                    <h3 className="font-bold text-sm mb-0.5 leading-tight">{point.title || point.category}</h3>
+                                                    <p className="text-xs text-gray-600 leading-snug">{point.description?.substring(0, 120)}{point.description?.length > 120 ? '…' : ''}</p>
+
+                                                    {/* Extra details */}
+                                                    <div className="mt-2 pt-2 border-t border-gray-100 space-y-1">
+                                                        {point.neighborhood && (
+                                                            <p className="text-[10px] text-gray-500">📍 {point.neighborhood}{point.city ? `, ${point.city}` : ''}</p>
+                                                        )}
+                                                        {point.supportCount > 0 && (
+                                                            <p className="text-[10px] text-gray-500">👍 {point.supportCount} apoios</p>
+                                                        )}
+                                                        <p className="text-[10px] text-gray-400">
+                                                            {point.createdAt?.toDate ? format(point.createdAt.toDate(), "dd/MM/yy HH:mm", { locale: ptBR }) : ''}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <h3 className="font-bold text-sm mb-1 leading-tight">{point.title || point.category}</h3>
-                                                <p className="text-xs text-gray-600 leading-snug">{point.description?.substring(0, 100)}{point.description?.length > 100 ? '…' : ''}</p>
-                                                <p className="text-[10px] text-gray-400 mt-2">
-                                                    {point.createdAt?.toDate ? format(point.createdAt.toDate(), "dd/MM/yy", { locale: ptBR }) : ''}
-                                                </p>
-                                            </div>
-                                        </Popup>
-                                    </Marker>
-                                ))}
+                                            </Popup>
+                                        </Marker>
+                                    );
+                                })}
                             </MarkerClusterGroup>
                         )}
                     </MapContainer>
@@ -369,9 +776,10 @@ const IntelligenceMap: React.FC = () => {
                     )}
 
                     {/* Count badge */}
-                    {!loading && viewMode === 'clusters' && clusterData.length > 0 && (
+                    {!loading && displayData.length > 0 && (
                         <div className="absolute top-3 left-3 bg-white/95 backdrop-blur rounded-lg border border-gray-200 shadow px-3 py-1.5 text-xs font-semibold text-gray-700 z-[400]">
-                            {clusterData.length} ocorrências
+                            {displayData.length} ocorrências
+                            {searchQuery && <span className="text-gray-400 ml-1">(filtrado)</span>}
                         </div>
                     )}
                 </div>
