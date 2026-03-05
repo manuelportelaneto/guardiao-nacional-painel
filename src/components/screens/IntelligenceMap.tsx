@@ -153,7 +153,9 @@ const ValueBadge = ({ score, label }: { score: number; label: string }) => {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 const IntelligenceMap: React.FC = () => {
-    const [viewMode, setViewMode] = useState<'heatmap' | 'clusters' | 'regions'>('clusters');
+    const [viewMode, setViewMode] = useState<'heatmap' | 'clusters' | 'regions' | 'contributions' | 'weather'>('clusters');
+    const [weatherLayer, setWeatherLayer] = useState<'radar' | 'wind' | 'temp'>('radar');
+    const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: -23.6666, lng: -46.5322 });
     const [heatmapPoints, setHeatmapPoints] = useState<HeatmapPoint[]>([]);
     const [clusterData, setClusterData] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
@@ -207,6 +209,7 @@ const IntelligenceMap: React.FC = () => {
         boundsDebounceRef.current = setTimeout(() => loadData(bounds), 700);
         const centerLat = (bounds.minLat + bounds.maxLat) / 2;
         const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+        setMapCenter({ lat: centerLat, lng: centerLng });
         fetchWeather(centerLat, centerLng).then(setWeather);
     }, [loadData]);
 
@@ -318,12 +321,14 @@ const IntelligenceMap: React.FC = () => {
                 {/* Modo de visualização */}
                 <div className="flex bg-gray-100 p-0.5 rounded-lg">
                     {([
-                        { mode: 'clusters' as const, icon: MapIcon, label: 'Clusters' },
-                        { mode: 'heatmap' as const, icon: Layers, label: 'Calor' },
-                        { mode: 'regions' as const, icon: CircleDot, label: 'Regiões' },
-                    ] as const).map(({ mode, icon: MIcon, label }) => (
+                        { mode: 'clusters' as const, icon: MapIcon, label: 'Clusters', activeColor: 'text-blue-600' },
+                        { mode: 'heatmap' as const, icon: Layers, label: 'Calor', activeColor: 'text-red-600' },
+                        { mode: 'regions' as const, icon: CircleDot, label: 'Regiões', activeColor: 'text-emerald-600' },
+                        { mode: 'contributions' as const, icon: MapPin, label: 'Contribuições', activeColor: 'text-amber-600' },
+                        { mode: 'weather' as const, icon: ThermometerSun, label: 'Radar', activeColor: 'text-sky-600' },
+                    ] as const).map(({ mode, icon: MIcon, label, activeColor }) => (
                         <button key={mode} onClick={() => setViewMode(mode)}
-                            className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1 transition-all ${viewMode === mode ? `bg-white ${mode === 'heatmap' ? 'text-red-600' : mode === 'regions' ? 'text-emerald-600' : 'text-blue-600'} shadow-sm` : 'text-gray-500'
+                            className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center gap-1 transition-all ${viewMode === mode ? `bg-white ${activeColor} shadow-sm` : 'text-gray-500'
                                 }`}>
                             <MIcon size={12} /> {label}
                         </button>
@@ -625,9 +630,9 @@ const IntelligenceMap: React.FC = () => {
                     </div>
                 )}
 
-                {/* Mapa */}
+                {/* Mapa / Radar */}
                 <div className="flex-1 rounded-xl overflow-hidden border border-gray-200 shadow-inner relative min-h-0">
-                    {loading && (
+                    {loading && viewMode !== 'weather' && (
                         <div className="absolute inset-0 z-[500] flex items-center justify-center bg-white/60 backdrop-blur-sm">
                             <div className="flex flex-col items-center gap-2">
                                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -636,145 +641,266 @@ const IntelligenceMap: React.FC = () => {
                         </div>
                     )}
 
-                    <MapContainer center={[-15.7801, -47.9292]} zoom={5} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-                        <TileSwitcher isDark={isDark} />
-                        <BoundsTracker onBoundsChange={handleBoundsChange} />
+                    {/* ─── Weather Radar Mode ───────────────────────────── */}
+                    {viewMode === 'weather' ? (
+                        <div className="w-full h-full flex flex-col">
+                            {/* Weather layer controls */}
+                            <div className="bg-slate-50 border-b border-gray-200 px-3 py-2 flex items-center gap-2 shrink-0 z-10">
+                                {([
+                                    { id: 'radar' as const, icon: '🌧️', label: 'Chuva', color: 'bg-blue-600 text-white border-blue-600' },
+                                    { id: 'wind' as const, icon: '💨', label: 'Ventos', color: 'bg-teal-600 text-white border-teal-600' },
+                                    { id: 'temp' as const, icon: '🌡️', label: 'Temperatura', color: 'bg-orange-500 text-white border-orange-500' },
+                                ] as const).map(({ id, icon: wIcon, label, color }) => (
+                                    <button key={id}
+                                        onClick={() => setWeatherLayer(id)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors flex items-center gap-1.5 ${weatherLayer === id ? color : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-100'
+                                            }`}
+                                    >
+                                        <span>{wIcon}</span> {label}
+                                    </button>
+                                ))}
+                                <span className="ml-auto text-[10px] text-slate-400">Powered by Windy.com</span>
+                            </div>
+                            {/* Windy iframe */}
+                            <div className="flex-1 relative bg-gray-200">
+                                <iframe
+                                    key={`${weatherLayer}-${mapCenter.lat.toFixed(2)}-${mapCenter.lng.toFixed(2)}`}
+                                    src={`https://embed.windy.com/embed.html?type=map&location=coordinates&metricRain=mm&metricTemp=%C2%B0C&metricWind=km%2Fh&zoom=10&marker=true&lang=pt&lat=${mapCenter.lat}&lon=${mapCenter.lng}&overlay=${weatherLayer === 'radar' ? 'rain' : weatherLayer}&detailLat=${mapCenter.lat}&detailLon=${mapCenter.lng}&detail=true`}
+                                    frameBorder="0"
+                                    className="absolute inset-0 w-full h-full"
+                                    style={{ border: 0 }}
+                                    title="Radar Meteorológico"
+                                    allowFullScreen
+                                />
+                            </div>
+                        </div>
+                    ) : (
+                        /* ─── Leaflet Map (all other modes) ───────────── */
+                        <>
+                            <MapContainer center={[-15.7801, -47.9292]} zoom={5} style={{ height: '100%', width: '100%' }} zoomControl={false}>
+                                <TileSwitcher isDark={isDark} />
+                                <BoundsTracker onBoundsChange={handleBoundsChange} />
 
-                        {viewMode === 'heatmap' && <HeatmapLayer points={heatmapPoints} />}
+                                {viewMode === 'heatmap' && <HeatmapLayer points={heatmapPoints} />}
 
-                        {/* Modo Regiões — Círculos proporcionais */}
-                        {viewMode === 'regions' && regionCircles.map(city => {
-                            const rate = city.total > 0 ? (city.resolved / city.total) * 100 : 0;
-                            const fillColor = rate >= 70 ? '#22c55e' : rate >= 40 ? '#eab308' : '#ef4444';
-                            const radius = Math.max(8, Math.min(50, city.total * 3));
-                            return (
-                                <CircleMarker
-                                    key={`${city.city}-${city.state}`}
-                                    center={[city.lat!, city.lng!]}
-                                    radius={radius}
-                                    pathOptions={{
-                                        fillColor, color: fillColor, weight: 2,
-                                        opacity: 0.8, fillOpacity: 0.35,
-                                    }}
-                                >
-                                    <MapTooltip permanent={radius >= 20} direction="center" className="region-tooltip">
-                                        <span className="text-[10px] font-bold">{city.city}</span>
-                                    </MapTooltip>
-                                    <Popup>
-                                        <div className="p-2 min-w-[200px]">
-                                            <h3 className="font-bold text-sm mb-2">{city.city} {city.state && `(${city.state})`}</h3>
-                                            <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                                                <div className="bg-gray-50 rounded p-1.5">
-                                                    <p className="font-bold text-gray-900">{city.total}</p>
-                                                    <p className="text-gray-500">Ocorrências</p>
+                                {/* Modo Regiões — Círculos proporcionais */}
+                                {viewMode === 'regions' && regionCircles.map(city => {
+                                    const rate = city.total > 0 ? (city.resolved / city.total) * 100 : 0;
+                                    const fillColor = rate >= 70 ? '#22c55e' : rate >= 40 ? '#eab308' : '#ef4444';
+                                    const radius = Math.max(8, Math.min(50, city.total * 3));
+                                    return (
+                                        <CircleMarker
+                                            key={`${city.city}-${city.state}`}
+                                            center={[city.lat!, city.lng!]}
+                                            radius={radius}
+                                            pathOptions={{
+                                                fillColor, color: fillColor, weight: 2,
+                                                opacity: 0.8, fillOpacity: 0.35,
+                                            }}
+                                        >
+                                            <MapTooltip permanent={radius >= 20} direction="center" className="region-tooltip">
+                                                <span className="text-[10px] font-bold">{city.city}</span>
+                                            </MapTooltip>
+                                            <Popup>
+                                                <div className="p-2 min-w-[200px]">
+                                                    <h3 className="font-bold text-sm mb-2">{city.city} {city.state && `(${city.state})`}</h3>
+                                                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+                                                        <div className="bg-gray-50 rounded p-1.5">
+                                                            <p className="font-bold text-gray-900">{city.total}</p>
+                                                            <p className="text-gray-500">Ocorrências</p>
+                                                        </div>
+                                                        <div className="bg-gray-50 rounded p-1.5">
+                                                            <p className={`font-bold ${rate >= 70 ? 'text-green-600' : rate >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>{rate.toFixed(0)}%</p>
+                                                            <p className="text-gray-500">Resolução</p>
+                                                        </div>
+                                                        <div className="bg-gray-50 rounded p-1.5">
+                                                            <p className="font-bold text-red-600">{city.highRisk}</p>
+                                                            <p className="text-gray-500">Alto Risco</p>
+                                                        </div>
+                                                        <div className="bg-gray-50 rounded p-1.5">
+                                                            <p className="font-bold text-amber-600">{city.pending}</p>
+                                                            <p className="text-gray-500">Pendentes</p>
+                                                        </div>
+                                                    </div>
+                                                    {/* Mini indices */}
+                                                    <div className="mt-2 pt-2 border-t border-gray-100 space-y-1 text-[9px]">
+                                                        {(() => {
+                                                            const idx = computeIndices(city);
+                                                            return <>
+                                                                <div className="flex justify-between"><span>IRSP (Seg. Pública)</span><span className="font-bold">{idx.irsp}% — {idx.irspLabel}</span></div>
+                                                                <div className="flex justify-between"><span>IRDN (Desastres)</span><span className="font-bold">{idx.irdn}% — {idx.irdnLabel}</span></div>
+                                                                <div className="flex justify-between"><span>IRM (Responsividade)</span><span className="font-bold">{idx.irm}% — {idx.irmLabel}</span></div>
+                                                            </>;
+                                                        })()}
+                                                    </div>
                                                 </div>
-                                                <div className="bg-gray-50 rounded p-1.5">
-                                                    <p className={`font-bold ${rate >= 70 ? 'text-green-600' : rate >= 40 ? 'text-yellow-600' : 'text-red-600'}`}>{rate.toFixed(0)}%</p>
-                                                    <p className="text-gray-500">Resolução</p>
-                                                </div>
-                                                <div className="bg-gray-50 rounded p-1.5">
-                                                    <p className="font-bold text-red-600">{city.highRisk}</p>
-                                                    <p className="text-gray-500">Alto Risco</p>
-                                                </div>
-                                                <div className="bg-gray-50 rounded p-1.5">
-                                                    <p className="font-bold text-amber-600">{city.pending}</p>
-                                                    <p className="text-gray-500">Pendentes</p>
-                                                </div>
-                                            </div>
-                                            {/* Mini indices */}
-                                            <div className="mt-2 pt-2 border-t border-gray-100 space-y-1 text-[9px]">
-                                                {(() => {
-                                                    const idx = computeIndices(city);
-                                                    return <>
-                                                        <div className="flex justify-between"><span>IRSP (Seg. Pública)</span><span className="font-bold">{idx.irsp}% — {idx.irspLabel}</span></div>
-                                                        <div className="flex justify-between"><span>IRDN (Desastres)</span><span className="font-bold">{idx.irdn}% — {idx.irdnLabel}</span></div>
-                                                        <div className="flex justify-between"><span>IRM (Responsividade)</span><span className="font-bold">{idx.irm}% — {idx.irmLabel}</span></div>
-                                                    </>;
-                                                })()}
-                                            </div>
-                                        </div>
-                                    </Popup>
-                                </CircleMarker>
-                            );
-                        })}
+                                            </Popup>
+                                        </CircleMarker>
+                                    );
+                                })}
 
-                        {/* Modo Clusters */}
-                        {viewMode === 'clusters' && (
-                            <MarkerClusterGroup chunkedLoading>
-                                {displayData.map((point) => {
-                                    const markerIcon = colorBy === 'risk'
-                                        ? (point.riskLevel >= 4 ? HighRiskIcon : point.riskLevel === 3 ? MediumRiskIcon : LowRiskIcon)
-                                        : createCategoryIcon(point.category);
+                                {/* Modo Clusters */}
+                                {viewMode === 'clusters' && (
+                                    <MarkerClusterGroup chunkedLoading>
+                                        {displayData.map((point) => {
+                                            const markerIcon = colorBy === 'risk'
+                                                ? (point.riskLevel >= 4 ? HighRiskIcon : point.riskLevel === 3 ? MediumRiskIcon : LowRiskIcon)
+                                                : createCategoryIcon(point.category);
+                                            const val = calculateContributionValue(point);
+                                            return (
+                                                <Marker key={point.id}
+                                                    position={[point.location?.latitude || point.latitude, point.location?.longitude || point.longitude]}
+                                                    icon={markerIcon}>
+                                                    <Popup>
+                                                        <div className="p-1 min-w-[220px] max-w-[280px]">
+                                                            {point.imageUrl && (
+                                                                <img src={point.imageUrl} alt="Contribuição"
+                                                                    className="w-full h-28 object-cover rounded-lg mb-2" loading="lazy" />
+                                                            )}
+                                                            <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${point.riskLevel >= 4 ? 'bg-red-100 text-red-700'
+                                                                    : point.riskLevel === 3 ? 'bg-orange-100 text-orange-700'
+                                                                        : 'bg-blue-100 text-blue-700'}`}>
+                                                                    Risco {point.riskLevel}
+                                                                </span>
+                                                                <span className={`text-[10px] px-2 py-0.5 rounded-full ${point.status === 'Resolvido' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                                    {point.status}
+                                                                </span>
+                                                                <ValueBadge score={val.relevancia} label={val.valorLabel} />
+                                                            </div>
+                                                            <h3 className="font-bold text-sm mb-0.5 leading-tight">{point.title || translateCategory(point.category)}</h3>
+                                                            <p className="text-xs text-gray-600 leading-snug">{point.description?.substring(0, 120)}{point.description?.length > 120 ? '…' : ''}</p>
+
+                                                            {/* Valor e impacto */}
+                                                            <div className="mt-2 pt-2 border-t border-gray-100">
+                                                                <p className="text-[10px] text-gray-600 font-medium">{val.impactoCidadao}</p>
+                                                                <p className="text-[9px] text-gray-400 mt-0.5">{val.fatorRisco}</p>
+                                                            </div>
+
+                                                            {/* Detalhes */}
+                                                            <div className="mt-1.5 pt-1.5 border-t border-gray-100 space-y-0.5">
+                                                                <p className="text-[10px] text-gray-500">
+                                                                    🏷️ {translateCategory(point.category)}
+                                                                </p>
+                                                                {point.neighborhood && (
+                                                                    <p className="text-[10px] text-gray-500">📍 {point.neighborhood}{point.city ? `, ${point.city}` : ''}</p>
+                                                                )}
+                                                                {point.supportCount > 0 && (
+                                                                    <p className="text-[10px] text-gray-500">👍 {point.supportCount} apoios</p>
+                                                                )}
+                                                                <p className="text-[10px] text-gray-400">
+                                                                    {point.createdAt?.toDate ? format(point.createdAt.toDate(), "dd/MM/yy HH:mm", { locale: ptBR }) : ''}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </Popup>
+                                                </Marker>
+                                            );
+                                        })}
+                                    </MarkerClusterGroup>
+                                )}
+
+                                {/* Modo Contribuições — Marcadores individuais por categoria, SEM clustering */}
+                                {viewMode === 'contributions' && displayData.map((point) => {
+                                    const catIcon = createCategoryIcon(point.category);
                                     const val = calculateContributionValue(point);
                                     return (
-                                        <Marker key={point.id}
+                                        <Marker key={`contrib-${point.id}`}
                                             position={[point.location?.latitude || point.latitude, point.location?.longitude || point.longitude]}
-                                            icon={markerIcon}>
+                                            icon={catIcon}>
                                             <Popup>
-                                                <div className="p-1 min-w-[220px] max-w-[280px]">
+                                                <div className="p-1.5 min-w-[240px] max-w-[300px]">
                                                     {point.imageUrl && (
                                                         <img src={point.imageUrl} alt="Contribuição"
-                                                            className="w-full h-28 object-cover rounded-lg mb-2" loading="lazy" />
+                                                            className="w-full h-32 object-cover rounded-lg mb-2 shadow-sm" loading="lazy" />
                                                     )}
-                                                    <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
-                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${point.riskLevel >= 4 ? 'bg-red-100 text-red-700'
-                                                            : point.riskLevel === 3 ? 'bg-orange-100 text-orange-700'
-                                                                : 'bg-blue-100 text-blue-700'}`}>
-                                                            Risco {point.riskLevel}
+                                                    {/* Category + Status badges */}
+                                                    <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                                                        <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{
+                                                            backgroundColor: `${getCategoryColor(point.category)}18`,
+                                                            color: getCategoryColor(point.category),
+                                                            border: `1px solid ${getCategoryColor(point.category)}40`
+                                                        }}>
+                                                            {translateCategory(point.category)}
                                                         </span>
-                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${point.status === 'Resolvido' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${point.status === 'Resolvido' || point.status === 'Concluído'
+                                                                ? 'bg-green-100 text-green-700'
+                                                                : point.status === 'Aprovado'
+                                                                    ? 'bg-blue-100 text-blue-700'
+                                                                    : 'bg-yellow-100 text-yellow-700'
+                                                            }`}>
                                                             {point.status}
                                                         </span>
                                                         <ValueBadge score={val.relevancia} label={val.valorLabel} />
                                                     </div>
-                                                    <h3 className="font-bold text-sm mb-0.5 leading-tight">{point.title || translateCategory(point.category)}</h3>
-                                                    <p className="text-xs text-gray-600 leading-snug">{point.description?.substring(0, 120)}{point.description?.length > 120 ? '…' : ''}</p>
 
-                                                    {/* Valor e impacto */}
-                                                    <div className="mt-2 pt-2 border-t border-gray-100">
-                                                        <p className="text-[10px] text-gray-600 font-medium">{val.impactoCidadao}</p>
-                                                        <p className="text-[9px] text-gray-400 mt-0.5">{val.fatorRisco}</p>
-                                                    </div>
-
-                                                    {/* Detalhes */}
-                                                    <div className="mt-1.5 pt-1.5 border-t border-gray-100 space-y-0.5">
-                                                        <p className="text-[10px] text-gray-500">
-                                                            🏷️ {translateCategory(point.category)}
+                                                    {/* Title & Description */}
+                                                    <h3 className="font-bold text-sm mb-1 leading-tight">
+                                                        {point.title || translateCategory(point.category)}
+                                                    </h3>
+                                                    {point.description && (
+                                                        <p className="text-xs text-gray-600 leading-snug mb-2">
+                                                            {point.description.substring(0, 150)}{point.description.length > 150 ? '…' : ''}
                                                         </p>
+                                                    )}
+
+                                                    {/* Location & Meta */}
+                                                    <div className="pt-2 border-t border-gray-100 space-y-0.5">
                                                         {point.neighborhood && (
                                                             <p className="text-[10px] text-gray-500">📍 {point.neighborhood}{point.city ? `, ${point.city}` : ''}</p>
+                                                        )}
+                                                        {point.address && (
+                                                            <p className="text-[10px] text-gray-400">🗺️ {point.address}</p>
                                                         )}
                                                         {point.supportCount > 0 && (
                                                             <p className="text-[10px] text-gray-500">👍 {point.supportCount} apoios</p>
                                                         )}
                                                         <p className="text-[10px] text-gray-400">
-                                                            {point.createdAt?.toDate ? format(point.createdAt.toDate(), "dd/MM/yy HH:mm", { locale: ptBR }) : ''}
+                                                            📅 {point.createdAt?.toDate ? format(point.createdAt.toDate(), "dd/MM/yy HH:mm", { locale: ptBR }) : ''}
                                                         </p>
+                                                    </div>
+
+                                                    {/* Impact */}
+                                                    <div className="mt-1.5 pt-1.5 border-t border-gray-100">
+                                                        <p className="text-[10px] text-gray-600 font-medium">{val.impactoCidadao}</p>
                                                     </div>
                                                 </div>
                                             </Popup>
                                         </Marker>
                                     );
                                 })}
-                            </MarkerClusterGroup>
-                        )}
-                    </MapContainer>
+                            </MapContainer>
 
-                    {/* Legenda do mapa de calor */}
-                    {viewMode === 'heatmap' && (
-                        <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur p-3 rounded-xl border border-gray-200 shadow-lg text-xs z-[400] space-y-2">
-                            <p className="font-bold text-gray-700">Intensidade</p>
-                            <div className="w-24 h-3 rounded-full" style={{ background: 'linear-gradient(to right, #60a5fa, #34d399, #fbbf24, #f97316, #ef4444)' }} />
-                            <div className="flex justify-between text-[10px] text-gray-500"><span>Baixa</span><span>Alta</span></div>
-                        </div>
-                    )}
+                            {/* Legenda do mapa de calor */}
+                            {viewMode === 'heatmap' && (
+                                <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur p-3 rounded-xl border border-gray-200 shadow-lg text-xs z-[400] space-y-2">
+                                    <p className="font-bold text-gray-700">Intensidade</p>
+                                    <div className="w-24 h-3 rounded-full" style={{ background: 'linear-gradient(to right, #60a5fa, #34d399, #fbbf24, #f97316, #ef4444)' }} />
+                                    <div className="flex justify-between text-[10px] text-gray-500"><span>Baixa</span><span>Alta</span></div>
+                                </div>
+                            )}
 
-                    {/* Contador */}
-                    {!loading && displayData.length > 0 && (
-                        <div className="absolute top-3 left-3 bg-white/95 backdrop-blur rounded-lg border border-gray-200 shadow px-3 py-1.5 text-xs font-semibold text-gray-700 z-[400]">
-                            {displayData.length} ocorrências
-                            {searchQuery && <span className="text-gray-400 ml-1">(filtrado)</span>}
-                        </div>
+                            {/* Legenda do modo contribuições */}
+                            {viewMode === 'contributions' && (
+                                <div className="absolute bottom-4 right-4 bg-white/95 backdrop-blur p-3 rounded-xl border border-gray-200 shadow-lg text-xs z-[400] space-y-1.5">
+                                    <p className="font-bold text-gray-700 mb-1">Categorias</p>
+                                    {ALL_CATEGORIES.slice(0, 8).map(cat => (
+                                        <div key={cat.id} className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-sm rotate-45 border border-white shadow-sm" style={{ background: cat.color }} />
+                                            <span className="text-[10px] text-gray-600">{cat.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Contador */}
+                            {!loading && viewMode !== 'weather' && displayData.length > 0 && (
+                                <div className="absolute top-3 left-3 bg-white/95 backdrop-blur rounded-lg border border-gray-200 shadow px-3 py-1.5 text-xs font-semibold text-gray-700 z-[400]">
+                                    {displayData.length} ocorrências
+                                    {searchQuery && <span className="text-gray-400 ml-1">(filtrado)</span>}
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>
