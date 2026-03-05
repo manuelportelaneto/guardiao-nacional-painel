@@ -1,290 +1,431 @@
-import React from 'react';
-import { toast } from 'sonner';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Badge } from '../ui/badge';
 import {
-    TrendingUp,
-    MousePointer2,
-    Eye,
-    Calendar,
-    ArrowUpRight
+    Megaphone, Heart, GraduationCap, Building2, ShieldCheck, Users,
+    Send, Eye, Clock, CheckCircle2, XCircle, BarChart3,
+    Calendar, Filter, Search, AlertTriangle, Leaf
 } from 'lucide-react';
 import {
-    Line,
-    LineChart,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
-import { Switch } from '../ui/switch';
-import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Badge } from '../ui/badge';
-import { Filter, Download, DollarSign, MapPin } from 'lucide-react';
 
-const mockCampaignData = [
-    { name: 'Semana 1', conversions: 400, clicks: 2400 },
-    { name: 'Semana 2', conversions: 300, clicks: 1398 },
-    { name: 'Semana 3', conversions: 200, clicks: 9800 },
-    { name: 'Semana 4', conversions: 278, clicks: 3908 },
+// ─── Campaign Categories ────────────────────────────────────────────────────
+const CAMPAIGN_CATEGORIES = [
+    { id: 'all', label: 'Todas', icon: <Megaphone className="w-4 h-4" />, color: 'bg-slate-100 text-slate-700' },
+    { id: 'saude', label: 'Saúde', icon: <Heart className="w-4 h-4" />, color: 'bg-rose-100 text-rose-700' },
+    { id: 'educacao', label: 'Educação', icon: <GraduationCap className="w-4 h-4" />, color: 'bg-blue-100 text-blue-700' },
+    { id: 'institucional', label: 'Institucional', icon: <ShieldCheck className="w-4 h-4" />, color: 'bg-emerald-100 text-emerald-700' },
+    { id: 'prefeitura', label: 'Prefeitura', icon: <Building2 className="w-4 h-4" />, color: 'bg-amber-100 text-amber-700' },
+    { id: 'inclusao', label: 'Inclusão Social', icon: <Users className="w-4 h-4" />, color: 'bg-purple-100 text-purple-700' },
+    { id: 'meio_ambiente', label: 'Meio Ambiente', icon: <Leaf className="w-4 h-4" />, color: 'bg-green-100 text-green-700' },
+    { id: 'emergencia', label: 'Emergência', icon: <AlertTriangle className="w-4 h-4" />, color: 'bg-red-100 text-red-700' },
 ];
 
+interface CampaignMessage {
+    id: string;
+    title: string;
+    body: string;
+    type: string;
+    tag: string;
+    status: string;
+    channels: string[];
+    createdAt: Date;
+    sentAt?: Date;
+    stats?: {
+        sent?: number;
+        delivered?: number;
+        opened?: number;
+        clicked?: number;
+    };
+    filters?: {
+        location?: { city?: string; state?: string };
+        manualEmailList?: string[];
+        manualSmsList?: string[];
+        manualListExclusive?: boolean;
+    };
+}
+
 const MarketingScreen: React.FC = () => {
-    const [showAds, setShowAds] = React.useState(false);
-    const [disabledCities, setDisabledCities] = React.useState<string[]>([]);
-    const [newCity, setNewCity] = React.useState('');
-    const [loading, setLoading] = React.useState(true);
+    const [campaigns, setCampaigns] = useState<CampaignMessage[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [selectedCategory, setSelectedCategory] = useState('all');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
 
-    // Extracts State
-    const [extractMonth, setExtractMonth] = React.useState('2026-03');
-    const [extractPlatform, setExtractPlatform] = React.useState('all');
-
-    React.useEffect(() => {
-        const settingsRef = doc(db, 'settings', 'global');
-        const unsub = onSnapshot(settingsRef, (docSnap) => {
-            if (docSnap.exists()) {
-                const data = docSnap.data();
-                setShowAds(data.showAds || false);
-                setDisabledCities(data.adDisabledCities || []);
+    // Load real campaigns from Firestore
+    useEffect(() => {
+        const loadCampaigns = async () => {
+            try {
+                const q = query(
+                    collection(db, 'messages'),
+                    orderBy('createdAt', 'desc'),
+                    limit(100)
+                );
+                const snap = await getDocs(q);
+                const data: CampaignMessage[] = snap.docs.map(doc => {
+                    const d = doc.data();
+                    return {
+                        id: doc.id,
+                        title: d.content?.title || d.title || 'Sem título',
+                        body: d.content?.body || d.body || '',
+                        type: d.type || 'info',
+                        tag: d.tag || 'institucional',
+                        status: d.status || 'draft',
+                        channels: d.channels || [],
+                        createdAt: d.createdAt?.toDate ? d.createdAt.toDate() : new Date(d.createdAt || Date.now()),
+                        sentAt: d.sentAt?.toDate ? d.sentAt.toDate() : undefined,
+                        stats: d.stats || {},
+                        filters: d.filters || {},
+                    };
+                });
+                setCampaigns(data);
+            } catch (err) {
+                console.error('Error loading campaigns:', err);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
-        });
-        return () => unsub();
+        };
+        loadCampaigns();
     }, []);
 
-    const handleSaveSetting = async (key: string, value: any) => {
-        try {
-            await setDoc(doc(db, 'settings', 'global'), { [key]: value }, { merge: true });
-            toast.success('Configuração salva!');
-        } catch (e) {
-            toast.error('Erro ao salvar.');
+    // Filtered campaigns
+    const filtered = useMemo(() => {
+        return campaigns.filter(c => {
+            if (selectedCategory !== 'all' && !c.tag.toLowerCase().includes(selectedCategory)) return false;
+            if (statusFilter !== 'all' && c.status !== statusFilter) return false;
+            if (searchQuery && !c.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+            return true;
+        });
+    }, [campaigns, selectedCategory, statusFilter, searchQuery]);
+
+    // Stats
+    const stats = useMemo(() => {
+        const total = campaigns.length;
+        const sent = campaigns.filter(c => c.status === 'sent').length;
+        const failed = campaigns.filter(c => c.status === 'failed').length;
+        const totalReach = campaigns.reduce((acc, c) => acc + (c.stats?.sent || 0), 0);
+        const emailCount = campaigns.reduce((acc, c) => acc + (c.filters?.manualEmailList?.length || 0), 0);
+        return { total, sent, failed, totalReach, emailCount };
+    }, [campaigns]);
+
+    // Chart data: campaigns by month
+    const chartData = useMemo(() => {
+        const months: Record<string, { name: string; sent: number; failed: number }> = {};
+        campaigns.forEach(c => {
+            const d = c.createdAt;
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const label = `${monthNames[d.getMonth()]}/${String(d.getFullYear()).slice(2)}`;
+            if (!months[key]) months[key] = { name: label, sent: 0, failed: 0 };
+            if (c.status === 'sent') months[key].sent++;
+            else if (c.status === 'failed') months[key].failed++;
+        });
+        return Object.values(months).slice(-6);
+    }, [campaigns]);
+
+    // Chart data: by category
+    const categoryChart = useMemo(() => {
+        const cats: Record<string, number> = {};
+        campaigns.forEach(c => {
+            const tag = c.tag || 'outro';
+            cats[tag] = (cats[tag] || 0) + 1;
+        });
+        return Object.entries(cats).map(([name, value]) => ({ name, value }));
+    }, [campaigns]);
+
+    const getCategoryColor = (tag: string) => {
+        const cat = CAMPAIGN_CATEGORIES.find(c => c.id === tag);
+        return cat?.color || 'bg-slate-100 text-slate-700';
+    };
+
+    const getCategoryIcon = (tag: string) => {
+        const cat = CAMPAIGN_CATEGORIES.find(c => c.id === tag);
+        return cat?.icon || <Megaphone className="w-4 h-4" />;
+    };
+
+    const getStatusBadge = (status: string) => {
+        switch (status) {
+            case 'sent': return <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 gap-1"><CheckCircle2 className="w-3 h-3" /> Enviada</Badge>;
+            case 'failed': return <Badge className="bg-red-100 text-red-800 hover:bg-red-100 gap-1"><XCircle className="w-3 h-3" /> Falhou</Badge>;
+            case 'draft': return <Badge className="bg-gray-100 text-gray-600 hover:bg-gray-100 gap-1"><Clock className="w-3 h-3" /> Rascunho</Badge>;
+            default: return <Badge variant="secondary">{status}</Badge>;
         }
     };
 
-    const addDisabledCity = () => {
-        if (!newCity.trim()) return;
-        const updated = [...new Set([...disabledCities, newCity.trim()])];
-        setDisabledCities(updated);
-        handleSaveSetting('adDisabledCities', updated);
-        setNewCity('');
+    const getChannelBadges = (channels: string[]) => {
+        return channels.map(ch => {
+            switch (ch) {
+                case 'push': return <Badge key={ch} variant="outline" className="text-xs">📱 Push</Badge>;
+                case 'email': return <Badge key={ch} variant="outline" className="text-xs">📧 Email</Badge>;
+                case 'sms': return <Badge key={ch} variant="outline" className="text-xs">💬 SMS</Badge>;
+                default: return <Badge key={ch} variant="outline" className="text-xs">{ch}</Badge>;
+            }
+        });
     };
 
-    const removeDisabledCity = (city: string) => {
-        const updated = disabledCities.filter(c => c !== city);
-        setDisabledCities(updated);
-        handleSaveSetting('adDisabledCities', updated);
-    };
-
-    if (loading) return <div className="p-8 text-center">Carregando...</div>;
+    if (loading) return <div className="p-8 text-center text-gray-500">Carregando campanhas...</div>;
 
     return (
         <div className="space-y-6 pb-12">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Monetização & Marketing</h1>
-                    <p className="text-muted-foreground">Gerencie a veiculação de anúncios e acompanhe o faturamento das campanhas.</p>
-                </div>
-                <div className="flex items-center gap-4 bg-gray-50 border p-2 rounded-lg pr-4">
-                    <div className="flex flex-col items-end">
-                        <Label htmlFor="global-ads" className="text-xs font-bold uppercase text-gray-500">Exibição Global</Label>
-                        <span className="text-[10px] text-gray-400">Ativar/Desativar todos os anúncios</span>
-                    </div>
-                    <Switch
-                        id="global-ads"
-                        checked={showAds}
-                        onCheckedChange={(val) => { setShowAds(val); handleSaveSetting('showAds', val); }}
-                    />
-                </div>
+            {/* Header */}
+            <div>
+                <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+                    <Megaphone className="w-6 h-6 text-blue-500" /> Campanhas Institucionais
+                </h2>
+                <p className="text-sm text-muted-foreground mt-1">
+                    Campanhas de informação ao cidadão, saúde, educação, inclusão social e mensagens de prefeituras.
+                    <span className="text-red-500 font-medium"> Proibido uso para promoção política ou financeira.</span>
+                </p>
             </div>
 
-            {/* Overview Stats */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Faturamento Estimado</CardTitle>
-                        <DollarSign className="h-4 w-4 opacity-70" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">R$ 14.250,00</div>
-                        <p className="text-xs opacity-80 flex items-center">
-                            <ArrowUpRight className="mr-1 h-3 w-3" /> +15% vs mês anterior
-                        </p>
-                    </CardContent>
-                </Card>
+            {/* Stats Row */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                 <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Impressões Totais</CardTitle>
-                        <Eye className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">124.5k</div>
-                        <p className="text-xs text-muted-foreground">Visualizações de anúncios</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">Cliques (CTR)</CardTitle>
-                        <MousePointer2 className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">12.1%</div>
-                        <p className="text-xs text-green-500">Alta performance</p>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">CPM Médio</CardTitle>
-                        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">R$ 4.20</div>
-                        <p className="text-xs text-muted-foreground">Custo por mil impressões</p>
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-
-                {/* 1. Restrição por Cidade */}
-                <Card className="lg:col-span-1 border-amber-100 bg-amber-50/30">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-amber-900">
-                            <MapPin className="w-5 h-5" /> Cidades Sem Anúncios
-                        </CardTitle>
-                        <CardDescription>
-                            Desative anúncios em cidades com parcerias especiais ou assinantes (Ex: Guardião ABC).
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex gap-2">
-                            <Input
-                                placeholder="Nome da Cidade"
-                                value={newCity}
-                                onChange={e => setNewCity(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && addDisabledCity()}
-                            />
-                            <Button onClick={addDisabledCity} size="sm">Adicionar</Button>
+                    <CardContent className="p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                            <BarChart3 className="w-5 h-5 text-blue-600" />
                         </div>
-                        <div className="flex flex-wrap gap-2 pt-2">
-                            {disabledCities.length === 0 ? (
-                                <p className="text-xs text-muted-foreground italic">Nenhuma cidade restringida.</p>
-                            ) : (
-                                disabledCities.map(city => (
-                                    <Badge key={city} variant="secondary" className="pl-3 pr-1 py-1 gap-1">
-                                        {city}
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-4 w-4 p-0 hover:bg-transparent text-gray-400 hover:text-red-500"
-                                            onClick={() => removeDisabledCity(city)}
-                                        >
-                                            ×
-                                        </Button>
-                                    </Badge>
-                                ))
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* 2. Performance Chart */}
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle>Performance das Plataformas</CardTitle>
-                    </CardHeader>
-                    <CardContent className="h-[250px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={mockCampaignData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                <XAxis dataKey="name" />
-                                <YAxis />
-                                <Tooltip />
-                                <Line type="monotone" dataKey="clicks" stroke="#3b82f6" strokeWidth={2} name="Cliques" />
-                                <Line type="monotone" dataKey="conversions" stroke="#10b981" strokeWidth={2} name="Conversões" />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-
-                {/* 3. Extratos das Campanhas (NEW) */}
-                <Card className="lg:col-span-3">
-                    <CardHeader className="flex flex-row items-center justify-between">
                         <div>
-                            <CardTitle>Extratos de Campanhas</CardTitle>
-                            <CardDescription>Acompanhe os rendimentos por plataforma e mês.</CardDescription>
+                            <p className="text-2xl font-bold">{stats.total}</p>
+                            <p className="text-xs text-gray-500">Total de Campanhas</p>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <Select value={extractMonth} onValueChange={setExtractMonth}>
-                                <SelectTrigger className="w-[140px]">
-                                    <Calendar className="w-4 h-4 mr-2" />
-                                    <SelectValue placeholder="Mês" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="2026-03">Março 2026</SelectItem>
-                                    <SelectItem value="2026-02">Fevereiro 2026</SelectItem>
-                                    <SelectItem value="2026-01">Janeiro 2026</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select value={extractPlatform} onValueChange={setExtractPlatform}>
-                                <SelectTrigger className="w-[140px]">
-                                    <Filter className="w-4 h-4 mr-2" />
-                                    <SelectValue placeholder="Plataforma" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">Todas</SelectItem>
-                                    <SelectItem value="meta">Meta Ads</SelectItem>
-                                    <SelectItem value="google">Google Ads</SelectItem>
-                                    <SelectItem value="local">Local Direct</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button variant="outline" size="sm">
-                                <Download className="w-4 h-4 mr-2" /> Exportar
-                            </Button>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                         </div>
-                    </CardHeader>
-                    <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Campanha / Plataforma</TableHead>
-                                    <TableHead>Mês</TableHead>
-                                    <TableHead>Impressões</TableHead>
-                                    <TableHead>Cliques</TableHead>
-                                    <TableHead>Investimento</TableHead>
-                                    <TableHead>Receita</TableHead>
-                                    <TableHead className="text-right">ROI</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {[
-                                    { name: 'Segurança Verão', platform: 'Meta Ads', month: 'Mar/26', imp: '150k', clk: '12k', spend: 'R$ 2.400', rev: 'R$ 9.800', roi: '4.08x' },
-                                    { name: 'Guardiaonacional.com Banners', platform: 'Google Ads', month: 'Mar/26', imp: '450k', clk: '2.5k', spend: 'R$ 1.200', rev: 'R$ 3.100', roi: '2.58x' },
-                                    { name: 'Patrocínio Local - Prefeituras', platform: 'Local Direct', month: 'Mar/26', imp: '50k', clk: 'N/A', spend: 'R$ 0', rev: 'R$ 4.500', roi: 'Inf.' },
-                                ].map((row, i) => (
-                                    <TableRow key={i}>
-                                        <TableCell>
-                                            <div className="font-medium">{row.name}</div>
-                                            <div className="text-[10px] text-muted-foreground uppercase">{row.platform}</div>
-                                        </TableCell>
-                                        <TableCell>{row.month}</TableCell>
-                                        <TableCell>{row.imp}</TableCell>
-                                        <TableCell>{row.clk}</TableCell>
-                                        <TableCell className="text-gray-500">{row.spend}</TableCell>
-                                        <TableCell className="font-bold text-green-600">{row.rev}</TableCell>
-                                        <TableCell className="text-right font-medium">{row.roi}</TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
+                        <div>
+                            <p className="text-2xl font-bold">{stats.sent}</p>
+                            <p className="text-xs text-gray-500">Enviadas</p>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
+                            <XCircle className="w-5 h-5 text-red-600" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold">{stats.failed}</p>
+                            <p className="text-xs text-gray-500">Falhas</p>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                            <Send className="w-5 h-5 text-purple-600" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold">{stats.totalReach}</p>
+                            <p className="text-xs text-gray-500">Alcance Total</p>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="p-4 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                            <Eye className="w-5 h-5 text-indigo-600" />
+                        </div>
+                        <div>
+                            <p className="text-2xl font-bold">{stats.emailCount}</p>
+                            <p className="text-xs text-gray-500">E-mails Enviados</p>
+                        </div>
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Charts Row */}
+            <div className="grid gap-6 md:grid-cols-2">
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Campanhas por Mês</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[200px]">
+                        {chartData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                    <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
+                                    <Tooltip />
+                                    <Bar dataKey="sent" fill="#10b981" name="Enviadas" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="failed" fill="#ef4444" name="Falhas" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                                Nenhuma campanha para exibir gráfico.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm">Distribuição por Categoria</CardTitle>
+                    </CardHeader>
+                    <CardContent className="h-[200px]">
+                        {categoryChart.length > 0 ? (
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={categoryChart} layout="vertical">
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                                    <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 10 }} />
+                                    <Tooltip />
+                                    <Bar dataKey="value" fill="#3b82f6" name="Campanhas" radius={[0, 4, 4, 0]}>
+                                        {categoryChart.map((_, index) => (
+                                            <Cell key={index} fill={['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'][index % 7]} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex items-center justify-center h-full text-gray-400 text-sm">
+                                Nenhuma campanha para exibir distribuição.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Filters */}
+            <div className="flex flex-wrap gap-3 items-center">
+                <div className="flex gap-1 flex-wrap">
+                    {CAMPAIGN_CATEGORIES.map(cat => (
+                        <button
+                            key={cat.id}
+                            onClick={() => setSelectedCategory(cat.id)}
+                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${selectedCategory === cat.id
+                                ? 'bg-blue-600 text-white shadow-md'
+                                : `${cat.color} hover:opacity-80`
+                                }`}
+                        >
+                            {cat.icon} {cat.label}
+                        </button>
+                    ))}
+                </div>
+                <div className="flex gap-2 ml-auto">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                            placeholder="Buscar campanha..."
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            className="pl-9 w-[200px]"
+                        />
+                    </div>
+                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                        <SelectTrigger className="w-[130px]">
+                            <Filter className="w-4 h-4 mr-1" />
+                            <SelectValue placeholder="Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Todos</SelectItem>
+                            <SelectItem value="sent">Enviadas</SelectItem>
+                            <SelectItem value="failed">Falhas</SelectItem>
+                            <SelectItem value="draft">Rascunho</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            {/* Campaigns List */}
+            <div className="space-y-3">
+                {filtered.length === 0 ? (
+                    <div className="text-center py-16 bg-white rounded-lg border border-dashed">
+                        <Megaphone className="h-10 w-10 mx-auto text-gray-300 mb-2" />
+                        <h3 className="text-lg font-medium text-gray-900">
+                            {campaigns.length === 0 ? 'Nenhuma campanha enviada' : 'Nenhuma campanha encontrada com os filtros atuais'}
+                        </h3>
+                        <p className="text-gray-500 text-sm mt-1">
+                            {campaigns.length === 0
+                                ? 'Use a aba "Nova Mensagem" para criar sua primeira campanha institucional.'
+                                : 'Tente alterar os filtros de categoria ou status.'}
+                        </p>
+                    </div>
+                ) : (
+                    filtered.map(campaign => (
+                        <Card key={campaign.id} className="hover:shadow-md transition-shadow">
+                            <CardContent className="p-4">
+                                <div className="flex items-start gap-4">
+                                    {/* Category Icon */}
+                                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${getCategoryColor(campaign.tag)}`}>
+                                        {getCategoryIcon(campaign.tag)}
+                                    </div>
+
+                                    {/* Content */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h3 className="font-semibold text-sm truncate">{campaign.title}</h3>
+                                            {getStatusBadge(campaign.status)}
+                                            {campaign.type === 'emergency' && (
+                                                <Badge className="bg-red-600 text-white hover:bg-red-600">🚨 Emergência</Badge>
+                                            )}
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1 line-clamp-2">
+                                            {campaign.body.replace(/<[^>]*>/g, '').substring(0, 120)}
+                                            {campaign.body.length > 120 ? '...' : ''}
+                                        </p>
+                                        <div className="flex items-center gap-3 mt-2 flex-wrap">
+                                            <span className="text-xs text-gray-400 flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {campaign.createdAt.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+                                            </span>
+                                            <div className="flex gap-1">
+                                                {getChannelBadges(campaign.channels)}
+                                            </div>
+                                            {campaign.filters?.location?.city && (
+                                                <Badge variant="outline" className="text-xs gap-1">
+                                                    📍 {campaign.filters.location.city}
+                                                </Badge>
+                                            )}
+                                            {campaign.filters?.manualListExclusive && (
+                                                <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700">
+                                                    Lista Externa
+                                                </Badge>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Stats */}
+                                    <div className="text-right flex-shrink-0 hidden sm:block">
+                                        {campaign.stats?.sent && campaign.stats.sent > 0 ? (
+                                            <div>
+                                                <p className="text-lg font-bold text-gray-900">{campaign.stats.sent}</p>
+                                                <p className="text-xs text-gray-400">alcançados</p>
+                                            </div>
+                                        ) : (
+                                            <p className="text-xs text-gray-400">—</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ))
+                )}
+            </div>
+
+            {/* Compliance Notice */}
+            <Card className="bg-slate-50 border-slate-200">
+                <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                        <ShieldCheck className="w-5 h-5 text-slate-500 flex-shrink-0 mt-0.5" />
+                        <div className="text-xs text-slate-600 space-y-1">
+                            <p className="font-semibold text-slate-700">Política de Uso — Campanhas Institucionais</p>
+                            <p>Este módulo é exclusivo para comunicações de <strong>informação pública</strong>, <strong>campanhas de saúde</strong>, <strong>educação</strong>, <strong>inclusão social</strong> e <strong>alertas de emergência</strong>.</p>
+                            <p className="text-red-600">⛔ É terminantemente proibido o uso para promoção política, campanha eleitoral, publicidade financeira ou qualquer forma de propaganda com fins lucrativos.</p>
+                            <p>Para anúncios comerciais e monetização, utilize exclusivamente a seção <strong>Monetização</strong> do painel.</p>
+                        </div>
+                    </div>
+                </CardContent>
+            </Card>
         </div>
     );
 };

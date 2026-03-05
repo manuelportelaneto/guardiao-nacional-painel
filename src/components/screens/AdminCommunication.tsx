@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { MessageSquare, TrendingUp, History, Send, Settings as SettingsIcon, TriangleAlert } from 'lucide-react';
+import { Megaphone, History, Send, Settings as SettingsIcon, TriangleAlert, MessageSquare } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { useAuth } from '../../context/AuthContext';
@@ -64,7 +64,7 @@ const AdminCommunication: React.FC = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight">Comunicação e Engajamento</h1>
-                <p className="text-muted-foreground">Central de mensagens, notificações push e campanhas de marketing.</p>
+                <p className="text-muted-foreground">Central de mensagens, notificações push e campanhas institucionais ao cidadão.</p>
             </div>
 
             <Tabs value={activeTab} className="w-full" onValueChange={setActiveTab}>
@@ -78,8 +78,8 @@ const AdminCommunication: React.FC = () => {
                         Histórico
                     </TabsTrigger>
                     <TabsTrigger value="marketing" className="gap-2">
-                        <TrendingUp className="w-4 h-4" />
-                        Marketing (Banners)
+                        <Megaphone className="w-4 h-4" />
+                        Campanhas
                     </TabsTrigger>
                     <TabsTrigger value="config" className="gap-2">
                         <SettingsIcon className="w-4 h-4" />
