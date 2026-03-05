@@ -2,10 +2,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Plus, Trash2, Save, Zap, Cloud, Settings2, BarChart3,
-    Play, Pause, Activity, Clock, Database, Mail, Bell, Shield,
+    Database, Mail, Bell, Shield,
     Globe, GitBranch, Webhook, RefreshCw, ChevronRight,
-    AlertTriangle, CheckCircle2, XCircle, Eye, Server, Cpu,
-    MapPin, BrainCircuit, FileText, Users, Layers
+    AlertTriangle, CheckCircle2, Eye, Server, Cpu,
+    MapPin, BrainCircuit, Users, Layers
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -31,7 +31,7 @@ import {
 } from "../ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { toast } from 'sonner';
-import { collection, getDocs, query, orderBy, limit, where, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 
 import { automationService } from '../../services/automationService';
@@ -491,11 +491,9 @@ const AdminAutomations: React.FC = () => {
             // Emails count
             const mailSnap = await getDocs(query(collection(db, 'mail'), limit(100)));
 
-            // Contributions count
-            const contribSnap = await getDocs(query(collection(db, 'contributions'), limit(1)));
-            // We can't count all easily, use metadata if available
+            // Contributions count from system settings
             const settingsDoc = await getDoc(doc(db, 'settings', 'system'));
-            const totalContribs = settingsDoc.exists() ? (settingsDoc.data().totalContributions || msgSnap.size) : 0;
+            const totalContribs = settingsDoc.exists() ? (settingsDoc.data().totalContributions || 0) : 0;
 
             // Exempt users
             const exemptSnap = await getDocs(collection(db, 'ad_exempt_users'));
@@ -654,8 +652,8 @@ const AdminAutomations: React.FC = () => {
                                 key={cat}
                                 onClick={() => setSelectedCategory(cat)}
                                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${selectedCategory === cat
-                                        ? 'bg-blue-600 text-white shadow-md'
-                                        : 'bg-white text-gray-600 border hover:bg-gray-50'
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : 'bg-white text-gray-600 border hover:bg-gray-50'
                                     }`}
                             >
                                 {cat === 'all' ? `Todas (${CLOUD_FUNCTIONS.length})` : cat}
