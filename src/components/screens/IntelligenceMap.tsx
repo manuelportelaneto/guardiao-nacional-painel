@@ -824,10 +824,10 @@ const IntelligenceMap: React.FC = () => {
                                                             {translateCategory(point.category)}
                                                         </span>
                                                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${point.status === 'Resolvido' || point.status === 'Concluído'
-                                                                ? 'bg-green-100 text-green-700'
-                                                                : point.status === 'Aprovado'
-                                                                    ? 'bg-blue-100 text-blue-700'
-                                                                    : 'bg-yellow-100 text-yellow-700'
+                                                            ? 'bg-green-100 text-green-700'
+                                                            : point.status === 'Aprovado'
+                                                                ? 'bg-blue-100 text-blue-700'
+                                                                : 'bg-yellow-100 text-yellow-700'
                                                             }`}>
                                                             {point.status}
                                                         </span>
@@ -894,7 +894,7 @@ const IntelligenceMap: React.FC = () => {
                             )}
 
                             {/* Contador */}
-                            {!loading && viewMode !== 'weather' && displayData.length > 0 && (
+                            {!loading && displayData.length > 0 && (
                                 <div className="absolute top-3 left-3 bg-white/95 backdrop-blur rounded-lg border border-gray-200 shadow px-3 py-1.5 text-xs font-semibold text-gray-700 z-[400]">
                                     {displayData.length} ocorrências
                                     {searchQuery && <span className="text-gray-400 ml-1">(filtrado)</span>}

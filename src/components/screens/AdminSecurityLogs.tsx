@@ -148,7 +148,7 @@ const AdminSecurityLogs: React.FC = () => {
                                         <td className="py-3 px-4 text-xs text-gray-500 break-words max-w-sm">
                                             {log.userAgent && <div className="truncate text-gray-400 mb-1" title={log.userAgent}>{log.userAgent}</div>}
                                             <span className="text-rose-400/80">{log.details}</span>
-                                            {log.userId && <div className="text-purple-400/70 mt-1 flex items-center gap-1"><Search className="w-3 h-3" /> Tracker UID: {log.userId}</div>}
+                                            {log.userId && <div className="text-emerald-400/70 mt-1 flex items-center gap-1"><Search className="w-3 h-3" /> Tracker UID: {log.userId}</div>}
                                         </td>
                                     </tr>
                                 ))

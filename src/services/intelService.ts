@@ -128,3 +128,20 @@ export const getV2Analysis = async (targetId: string, dimension: string, limit =
     if (error) return [];
     return data || [];
 }
+
+export const getV2Signals = async (limit = 20) => {
+    const { data, error } = await supabase
+        .from('war_room_actions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+    if (error) return [];
+    return data.map((a: any) => ({
+        id: a.id,
+        timestamp: new Date(a.created_at).toLocaleTimeString('pt-BR'),
+        type: a.actor_type === 'OSINT' ? 'OSINT' : (a.actor_type === 'SIGINT' ? 'SIGINT' : 'HUMINT'),
+        content: a.action_title,
+        importance: a.impact_level || 'MEDIUM'
+    }));
+}

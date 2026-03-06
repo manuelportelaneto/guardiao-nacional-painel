@@ -18,6 +18,9 @@ interface SystemSettings {
     enableGamification: boolean;
     overseasAccessEnabled: boolean;
     overseasAccessUserId?: string;
+    messageViewTrackingEnabled: boolean;
+    contributionLifetimeDays: number;
+    mapLoadRadiusKm: number;
 }
 
 interface BackupStatus {
@@ -36,7 +39,10 @@ const DEFAULT_SETTINGS: SystemSettings = {
     maintenanceMode: false,
     enableGamification: true,
     overseasAccessEnabled: false,
-    overseasAccessUserId: "", // NEW FIELD FOR PASSPORT
+    overseasAccessUserId: "",
+    messageViewTrackingEnabled: true,
+    contributionLifetimeDays: 15,
+    mapLoadRadiusKm: 50,
 };
 
 const SystemControls: React.FC = () => {
@@ -277,6 +283,86 @@ const SystemControls: React.FC = () => {
                                     <p className="text-[10px] text-gray-500">Este UID terá os bloqueios de geolocalização ignorados no painel e no app.</p>
                                 </div>
                             )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Scalability & Cost Controls */}
+                    <Card className="md:col-span-2">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium flex items-center gap-2">
+                                <Zap className="h-4 w-4 text-orange-500" />
+                                Escalabilidade e Otimização de Custos
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6 pt-4">
+                            {/* Message View Tracking */}
+                            <div className="flex items-center justify-between space-x-4">
+                                <div className="space-y-1">
+                                    <Label htmlFor="messageViewTrackingEnabled" className="text-sm font-medium leading-none">
+                                        Contagem de Visualização de Mensagens
+                                    </Label>
+                                    <p className="text-xs text-muted-foreground">
+                                        Quando ativado, incrementa `stats.viewed` em cada leitura. Desative para economizar escritas no Firestore.
+                                    </p>
+                                </div>
+                                <Switch
+                                    id="messageViewTrackingEnabled"
+                                    checked={settings.messageViewTrackingEnabled}
+                                    onCheckedChange={() => handleToggle('messageViewTrackingEnabled')}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2 border-t">
+                                {/* Contribution Lifetime */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="contributionLifetimeDays" className="text-sm font-medium">
+                                        Vida Útil das Contribuições (Dias)
+                                    </Label>
+                                    <div className="flex items-center gap-4">
+                                        <Input
+                                            id="contributionLifetimeDays"
+                                            type="number"
+                                            min={7}
+                                            max={90}
+                                            value={settings.contributionLifetimeDays}
+                                            onChange={(e) => setSettings(prev => ({ ...prev, contributionLifetimeDays: parseInt(e.target.value) || 7 }))}
+                                            onBlur={() => {
+                                                const val = Math.max(7, Math.min(90, settings.contributionLifetimeDays));
+                                                handleToggle('contributionLifetimeDays', val);
+                                            }}
+                                            className="w-24"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Tempo que uma ocorrência aparece no mapa (Min: 7, Max: 90).
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Map Load Radius */}
+                                <div className="space-y-2">
+                                    <Label htmlFor="mapLoadRadiusKm" className="text-sm font-medium">
+                                        Raio de Carregamento do Mapa (Km)
+                                    </Label>
+                                    <div className="flex items-center gap-4">
+                                        <Input
+                                            id="mapLoadRadiusKm"
+                                            type="number"
+                                            min={1}
+                                            max={500}
+                                            value={settings.mapLoadRadiusKm}
+                                            onChange={(e) => setSettings(prev => ({ ...prev, mapLoadRadiusKm: parseInt(e.target.value) || 1 }))}
+                                            onBlur={() => {
+                                                const val = Math.max(1, Math.min(500, settings.mapLoadRadiusKm));
+                                                handleToggle('mapLoadRadiusKm', val);
+                                            }}
+                                            className="w-24"
+                                        />
+                                        <p className="text-xs text-muted-foreground">
+                                            Raio a partir do centro do mapa para carregar pontos.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
 

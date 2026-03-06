@@ -316,9 +316,9 @@ const CityDetailsPage: React.FC = () => {
                             <p className="text-sm font-semibold uppercase text-green-900">Área</p>
                             <p className="text-3xl font-bold text-gray-900">{demographics?.area?.toLocaleString('pt-BR') || '0'} km²</p>
                         </div>
-                        <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 flex flex-col justify-center items-center text-center">
-                            <Scaling className="w-5 h-5 text-purple-800 mb-2" />
-                            <p className="text-sm font-semibold uppercase text-purple-900">Densidade</p>
+                        <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100 flex flex-col justify-center items-center text-center">
+                            <Scaling className="w-5 h-5 text-emerald-800 mb-2" />
+                            <p className="text-sm font-semibold uppercase text-emerald-900">Densidade</p>
                             <p className="text-3xl font-bold text-gray-900">{demographics?.density || '0'} hab/km²</p>
                         </div>
                     </div>

@@ -232,8 +232,8 @@ const CityDetailsModal: React.FC<CityDetailsModalProps> = ({ city, open, onClose
                                                 <p className="text-2xl font-bold text-gray-900">{demographics.area?.toLocaleString('pt-BR')} km²</p>
                                             </div>
 
-                                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
-                                                <div className="flex items-center gap-2 text-purple-800 mb-1">
+                                            <div className="bg-emerald-50 p-4 rounded-lg border border-emerald-100">
+                                                <div className="flex items-center gap-2 text-emerald-800 mb-1">
                                                     <Scaling className="w-4 h-4" />
                                                     <p className="text-sm font-semibold uppercase">Densidade</p>
                                                 </div>

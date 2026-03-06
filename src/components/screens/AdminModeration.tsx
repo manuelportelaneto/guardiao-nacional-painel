@@ -753,7 +753,7 @@ const AdminModeration: React.FC = () => {
                                             size="sm"
                                             onClick={runRetroactiveAI}
                                             disabled={runningAnalysis}
-                                            className="h-8 gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 border-none shadow-md hover:shadow-lg hover:from-indigo-700 hover:to-purple-700 text-white transition-all flex items-center justify-center p-0 w-8 md:w-auto md:px-3"
+                                            className="h-8 gap-2 bg-gradient-to-r from-indigo-600 to-emerald-600 border-none shadow-md hover:shadow-lg hover:from-indigo-700 hover:to-emerald-700 text-white transition-all flex items-center justify-center p-0 w-8 md:w-auto md:px-3"
                                         >
                                             {runningAnalysis ? (
                                                 <RefreshCw className="h-4 w-4 animate-spin" />

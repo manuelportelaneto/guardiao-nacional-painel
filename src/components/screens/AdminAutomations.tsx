@@ -410,7 +410,7 @@ function StatusBadge({ status }: { status: 'active' | 'warning' | 'inactive' }) 
 function TypeBadge({ type }: { type: string }) {
     const styles: Record<string, string> = {
         trigger: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-        http: 'bg-purple-100 text-purple-800 hover:bg-purple-100',
+        http: 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100',
         scheduled: 'bg-orange-100 text-orange-800 hover:bg-orange-100',
         callable: 'bg-cyan-100 text-cyan-800 hover:bg-cyan-100'
     };
@@ -940,7 +940,7 @@ const AdminAutomations: React.FC = () => {
                                                 <td className="p-3">
                                                     <Badge className={
                                                         rule.write.includes('Admin') ? 'bg-red-100 text-red-800 hover:bg-red-100' :
-                                                            rule.write.includes('Functions') ? 'bg-purple-100 text-purple-800 hover:bg-purple-100' :
+                                                            rule.write.includes('Functions') ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-100' :
                                                                 'bg-blue-100 text-blue-800 hover:bg-blue-100'
                                                     }>
                                                         {rule.write}

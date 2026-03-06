@@ -1,14 +1,12 @@
-
 import React, { useEffect, useState } from 'react';
-import { getLatestIntelReport, getV2DailyReport, getActiveTargets } from '../../services/intelService';
+import { getLatestIntelReport, getV2DailyReport, getActiveTargets, getProfile, getV2Signals } from '../../services/intelService';
 import type { IntelReport, IntelTarget } from '../../services/intelService';
 import IntelGraph from '../intel/IntelGraph';
 import { IntelSkeleton } from '../intel/IntelSkeleton';
-import { Target, ShieldAlert, TrendingUp, Users, Flame, ChevronDown } from 'lucide-react';
-
-
+import { Shield, Radio, Activity, Globe, Map, Target, Terminal, ChevronDown, AlertCircle, Users } from 'lucide-react';
+import IntelStream from '../intel/IntelStream';
+import ThreatGauge from '../intel/ThreatGauge';
 import ProfileModal from '../intel/ProfileModal';
-import { getProfile } from '../../services/intelService';
 
 const WarRoom: React.FC = () => {
     const [intelReport, setIntelReport] = useState<IntelReport | null>(null);
@@ -20,6 +18,7 @@ const WarRoom: React.FC = () => {
     const [selectedProfile, setSelectedProfile] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [loadingProfile, setLoadingProfile] = useState(false);
+    const [signals, setSignals] = useState<any[]>([]);
 
     useEffect(() => {
         const init = async () => {
@@ -94,10 +93,20 @@ const WarRoom: React.FC = () => {
             // 3. Fallback to V1
             const v1Data = await getLatestIntelReport();
             setIntelReport(v1Data);
+            // 4. Fetch Operational Signals
+            const operationalSignals = await getV2Signals(15);
+            setSignals(operationalSignals);
+
             setLoading(false);
         };
 
+        const interval = setInterval(async () => {
+            const freshSignals = await getV2Signals(15);
+            setSignals(freshSignals);
+        }, 30000); // Pulse every 30s
+
         init();
+        return () => clearInterval(interval);
     }, [selectedTargetId]); // Re-run when target changes
 
     const handleNodeClick = async (node: any) => {
@@ -158,157 +167,168 @@ const WarRoom: React.FC = () => {
     // Safety check if intelReport is null but loading is false (should be caught above)
     if (!intelReport) return null;
 
-    const riskColor = intelReport.risk_score > 70 ? 'text-red-500' : 'text-yellow-500';
     const graphData = intelReport.report_json?.risk?.knowledge_graph;
-    const sentiment = intelReport.report_json?.sentiment; // V2 might have { sentiments: [], avgSentiment } structure, check adaptor logic
-    // V2 Adapter fix: V2 dashboard_json has { risks, sentiments, avgSentiment, maxRisk } top level usually, 
-    // but our adaptor passed dashboard_json directly. We might need to ensure structure matches UI expectation.
-    // For MVP, assuming dashboard_json structure aligns or is flexible. 
-    // Actually, V2 Generator produces { risks, sentiments, avgSentiment, maxRisk }.
-    // UI expects report_json.sentiment to be an object { temperature, ... } OR report_json to be { sentiment: {...} }
-    // We should patch this in the adaptor logic above or update UI. 
-    // Let's assume V1 structure for now to keep diff small.
+    const sentiment = intelReport.report_json?.sentiment;
+
+    const getThreatLevel = (score: number) => {
+        if (score > 80) return { label: 'CRITICAL', color: 'text-red-500' };
+        if (score > 50) return { label: 'HIGH', color: 'text-orange-500' };
+        if (score > 25) return { label: 'MODERATE', color: 'text-yellow-500' };
+        return { label: 'LOW', color: 'text-blue-500' };
+    };
+
+    const threat = getThreatLevel(intelReport.risk_score);
 
     return (
-        <div className="min-h-screen bg-gray-900 text-gray-100 p-6">
-            <header className="mb-8 flex justify-between items-center border-b border-gray-700 pb-4">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-2">
-                        <ShieldAlert className="w-8 h-8 text-blue-500" /> Sala de Guerra
-                        {targets.length > 0 && (
-                            <div className="relative inline-block ml-4 group">
-                                <select
-                                    className="appearance-none bg-gray-800 text-lg font-medium py-1 px-3 pr-8 rounded border border-gray-700 focus:outline-none focus:border-blue-500 cursor-pointer"
-                                    value={selectedTargetId || ""}
-                                    onChange={(e) => setSelectedTargetId(e.target.value)}
-                                >
-                                    {targets.map(t => (
-                                        <option key={t.id} value={t.id}>{t.name}</option>
-                                    ))}
-                                </select>
-                                <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
-                            </div>
-                        )}
-                    </h1>
-                    <p className="text-sm text-gray-400 mt-1">Sistema de Inteligência Integrado • Última atualização: {new Date(intelReport.created_at).toLocaleString()}</p>
-                </div>
-                <div className="text-right">
-                    <div className="text-sm uppercase tracking-widest text-gray-500">Nível de Risco Político</div>
-                    <div className={`text-4xl font-black ${riskColor}`}>{intelReport.risk_score}/100</div>
-                </div>
-            </header>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                {/* Main Graph Area */}
-                <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
-                        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">🕸️ Rede de Conexões (Ao Vivo)</h2>
-                        {graphData ? (
-                            <IntelGraph
-                                data={graphData}
-                                onNodeClick={handleNodeClick}
-                                cooldownTicks={100}
-                                onEngineStop={() => { }} // User can zoom manually, or we add ref logic later
-                            />
-                        ) : <p>Grafo indisponível.</p>}
+        <div className="min-h-screen bg-[#0d1117] text-gray-300 p-4 font-mono selection:bg-emerald-500/30">
+            {/* TOP BAR - High Density Telemetry */}
+            <header className="flex items-center justify-between border-b border-gray-800 pb-3 mb-6">
+                <div className="flex items-center gap-4">
+                    <div className="bg-emerald-500/10 p-2 border border-emerald-500/20 rounded">
+                        <Shield className="w-5 h-5 text-emerald-500" />
                     </div>
-
-                    <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                        <h3 className="text-lg font-bold mb-3">🔮 Projeção de Cenários (IA)</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="p-4 bg-green-900/20 border border-green-800 rounded-lg">
-                                <strong className="text-green-400 block mb-2">Melhor Caso</strong>
-                                <p className="text-sm text-gray-300">{intelReport.report_json.risk.scenarios?.best_case || 'N/A'}</p>
-                            </div>
-                            <div className="p-4 bg-red-900/20 border border-red-800 rounded-lg">
-                                <strong className="text-red-400 block mb-2">Pior Caso</strong>
-                                <p className="text-sm text-gray-300">{intelReport.report_json.risk.scenarios?.worst_case || 'N/A'}</p>
-                            </div>
+                    <div>
+                        <h1 className="text-sm font-bold tracking-[0.3em] uppercase text-gray-400">Strategic Intelligence Command Center</h1>
+                        <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                            <span className="flex items-center gap-1"><Radio className="w-3 h-3 text-emerald-500" /> LINK: ESTABLISHED</span>
+                            <span className="flex items-center gap-1"><Activity className="w-3 h-3 text-blue-500" /> STATUS: OPERATIONAL</span>
+                            <span className="hidden sm:inline opacity-50">• {new Date().toISOString()} •</span>
                         </div>
                     </div>
+                </div>
 
-                    {/* Strategic Pitch Card */}
-                    {intelReport.report_json?.strategic_pitch && (
-                        <div className="bg-gradient-to-r from-emerald-900/40 to-teal-900/40 p-6 rounded-xl border border-emerald-700/50 relative overflow-hidden">
-                            <h3 className="text-lg font-bold mb-3 flex items-center gap-2 text-emerald-400">
-                                <Target className="w-5 h-5" /> Solução Estratégica (Guardião Nacional)
-                            </h3>
-                            <p className="text-gray-200 text-lg leading-relaxed font-light italic">
-                                "{intelReport.report_json.strategic_pitch}"
-                            </p>
+                <div className="flex gap-4">
+                    <div className="text-right">
+                        <div className="text-[9px] text-gray-500 uppercase tracking-tighter">Current Threat Level</div>
+                        <div className={`text-xl font-black ${threat.color}`}>{threat.label} // {intelReport.risk_score}</div>
+                    </div>
+                    {targets.length > 0 && (
+                        <div className="relative">
+                            <select
+                                className="appearance-none bg-[#161b22] border border-gray-800 text-[11px] py-2 pl-3 pr-8 rounded focus:outline-none focus:border-emerald-500/50 cursor-pointer text-emerald-500 font-bold"
+                                value={selectedTargetId || ""}
+                                onChange={(e) => setSelectedTargetId(e.target.value)}
+                            >
+                                {targets.map(t => (
+                                    <option key={t.id} value={t.id}>{t.name.toUpperCase()}</option>
+                                ))}
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-600 pointer-events-none" />
                         </div>
                     )}
                 </div>
+            </header>
 
-                {/* Right Sidebar */}
-                <div className="space-y-6">
-                    {/* Alerts */}
-                    <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                        <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-yellow-500">
-                            <ShieldAlert className="w-5 h-5" /> Alertas Críticos
-                        </h3>
-                        <ul className="space-y-3">
-                            {intelReport.report_json.risk?.critical_alerts?.map((alert: string, idx: number) => (
-                                <li key={idx} className="bg-yellow-900/20 p-3 rounded border-l-4 border-yellow-500 text-sm">
-                                    {alert}
-                                </li>
-                            ))}
-                        </ul>
+            <div className="grid grid-cols-12 gap-4">
+                {/* LEFT PANEL - Strategic Telemetry */}
+                <div className="col-span-12 lg:col-span-3 space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        <ThreatGauge value={intelReport.risk_score} label="POL / RISK" subLabel="Threatcon" />
+                        <ThreatGauge value={sentiment?.temperature || 50} label="SOC / SENT" subLabel="Thermometer" />
                     </div>
 
-                    {/* Opportunity */}
-                    <div className="bg-gradient-to-br from-blue-900 to-indigo-900 p-6 rounded-xl border border-blue-700 shadow-lg">
-                        <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-white">
-                            <TrendingUp className="w-5 h-5" /> Oportunidade Alpha
-                        </h3>
-                        <div className="text-xl font-bold text-yellow-300 mb-2">{intelReport.top_opportunity_title}</div>
-                        <p className="text-sm text-blue-100 italic">"{intelReport.top_opportunity_reasoning}"</p>
-                    </div>
-
-                    {/* Risk Summary */}
-                    <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                        <h3 className="text-sm uppercase text-gray-400 font-bold mb-2">Resumo Executivo</h3>
-                        <p className="text-sm text-gray-300 leading-relaxed">
+                    <div className="bg-[#161b22] border border-gray-800 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
+                            <Terminal className="w-4 h-4 text-emerald-500" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Institutional Briefing</span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 leading-relaxed max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
                             {intelReport.risk_summary}
                         </p>
                     </div>
 
-                    {/* Social Thermometer Widget */}
-                    {sentiment && (
-                        <div className="bg-gray-800 p-6 rounded-xl border border-gray-700">
-                            <h3 className="text-lg font-bold mb-4 flex items-center gap-2 text-orange-500">
-                                <Flame className="w-5 h-5" /> Termômetro Social
-                            </h3>
+                    <div className="bg-[#161b22] border border-gray-800 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
+                            <Map className="w-4 h-4 text-blue-500" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Operational Zones</span>
+                        </div>
+                        <div className="space-y-2">
+                            {sentiment?.trending_topics?.slice(0, 5).map((topic: string, i: number) => (
+                                <div key={i} className="flex justify-between items-center text-[10px]">
+                                    <span className="text-gray-500 flex items-center gap-1"><div className="w-1 h-1 bg-blue-500 rounded-full" /> {topic}</span>
+                                    <span className="text-blue-500/50">SEC-ALPHA</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
 
-                            <div className="flex items-end gap-3 mb-4">
-                                <div className="text-4xl font-black text-white">
-                                    {sentiment.temperature}°C
+                {/* CENTER - Net Analysis & Real-time Flow */}
+                <div className="col-span-12 lg:col-span-6 space-y-4">
+                    <div className="bg-[#161b22] border border-gray-800 rounded-lg overflow-hidden relative group">
+                        <div className="absolute top-3 left-3 z-10 flex items-center gap-2 bg-[#0d1117]/80 backdrop-blur-sm p-2 border border-gray-800 rounded text-[9px] font-bold text-gray-400">
+                            <Globe className="w-3 h-3 text-emerald-500" /> RELATIONSHIP LINK MAPPING [NODE:EXTRACTOR]
+                        </div>
+                        <div className="h-[450px]">
+                            {graphData ? (
+                                <IntelGraph
+                                    data={graphData}
+                                    onNodeClick={handleNodeClick}
+                                    cooldownTicks={100}
+                                />
+                            ) : (
+                                <div className="h-full flex items-center justify-center text-gray-700 bg-[radial-gradient(#1f2937_1px,transparent_1px)] [background-size:20px_20px]">
+                                    Establishing Graph Connection...
                                 </div>
-                                <div className="text-sm text-gray-400 mb-2">
-                                    {sentiment.dominant_emotion}
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-emerald-950/20 to-[#0d1117] border border-emerald-900/30 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2 text-emerald-500">
+                            <Target className="w-4 h-4" />
+                            <span className="text-[11px] font-bold uppercase tracking-[0.2em]">Strategic Asset Extraction</span>
+                        </div>
+                        <div className="text-md font-bold text-gray-100 mb-1">{intelReport.top_opportunity_title || 'N/A'}</div>
+                        <p className="text-[11px] text-gray-500 italic leading-relaxed">
+                            "{intelReport.top_opportunity_reasoning || 'No immediate assets identified.'}"
+                        </p>
+                    </div>
+                </div>
+
+                {/* RIGHT PANEL - Sitrep & Intel Flow */}
+                <div className="col-span-12 lg:col-span-3 space-y-4">
+                    <div className="h-[300px]">
+                        <IntelStream signals={signals} />
+                    </div>
+
+                    <div className="bg-[#161b22] border border-gray-800 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
+                            <AlertCircle className="w-4 h-4 text-orange-500" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Active SITREP Alerts</span>
+                        </div>
+                        <div className="space-y-3">
+                            {intelReport.report_json.risk?.critical_alerts?.map((alert: string, idx: number) => (
+                                <div key={idx} className="bg-orange-950/10 border-l-2 border-orange-500/50 p-2 text-[10px] text-gray-400 leading-tight">
+                                    <span className="text-orange-500/70 font-bold block mb-1">EVENT_{idx + 10}</span>
+                                    {alert}
                                 </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="bg-[#161b22] border border-gray-800 p-4 rounded-lg">
+                        <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2 text-blue-500">
+                            <Radio className="w-4 h-4" />
+                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Projection Matrix</span>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="text-[9px] text-gray-500 mb-1 flex justify-between">
+                                <span>OPTIMISTIC PATH</span>
+                                <span className="text-emerald-500 font-bold">STABLE</span>
                             </div>
-
-                            <div className="w-full bg-gray-700 rounded-full h-2.5 mb-4">
-                                <div
-                                    className={`h-2.5 rounded-full ${sentiment.temperature > 80 ? 'bg-red-600' : sentiment.temperature > 50 ? 'bg-orange-500' : 'bg-blue-500'}`}
-                                    style={{ width: `${sentiment.temperature}%` }}
-                                ></div>
+                            <div className="bg-emerald-950/20 p-2 rounded border border-emerald-900/30 text-[9px] text-emerald-400/80 italic">
+                                "{intelReport.report_json.risk.scenarios?.best_case?.substring(0, 100) || 'N/A'}..."
                             </div>
-
-                            <div className="space-y-2">
-                                <p className="text-sm text-gray-300 italic">"{sentiment.summary}"</p>
-                                <div className="flex flex-wrap gap-2 mt-2">
-                                    {sentiment.trending_topics.map((tag: string, i: number) => (
-                                        <span key={i} className="text-xs bg-gray-900 border border-gray-600 px-2 py-1 rounded text-gray-400">
-                                            {tag}
-                                        </span>
-                                    ))}
-                                </div>
+                            <div className="text-[9px] text-gray-500 mt-2 mb-1 flex justify-between">
+                                <span>ADVERSARIAL PATH</span>
+                                <span className="text-red-500 font-bold">VOLATILE</span>
+                            </div>
+                            <div className="bg-red-950/20 p-2 rounded border border-red-900/30 text-[9px] text-red-400/80 italic">
+                                "{intelReport.report_json.risk.scenarios?.worst_case?.substring(0, 100) || 'N/A'}..."
                             </div>
                         </div>
-                    )}
+                    </div>
                 </div>
             </div>
 

@@ -582,13 +582,13 @@ const AdminMonetization: React.FC = () => {
                     </div>
 
                     {/* Controle Municipal / Por Cidade */}
-                    <Card className="shadow-sm border-purple-100">
+                    <Card className="shadow-sm border-emerald-100">
                         <CardHeader>
                             <CardTitle className="text-lg flex items-center gap-2">
-                                <Building2 className="h-5 w-5 text-purple-500" />
+                                <Building2 className="h-5 w-5 text-emerald-500" />
                                 Controle Municipal de Anúncios
                                 {activeCitiesCount > 0 && (
-                                    <Badge className="bg-purple-600 ml-2">{activeCitiesCount} ativas</Badge>
+                                    <Badge className="bg-emerald-600 ml-2">{activeCitiesCount} ativas</Badge>
                                 )}
                             </CardTitle>
                             <CardDescription>

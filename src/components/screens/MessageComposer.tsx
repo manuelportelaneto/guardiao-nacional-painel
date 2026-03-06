@@ -19,7 +19,7 @@ import 'react-quill-new/dist/quill.snow.css';
 const QUILL_MODULES = {
     toolbar: [
         ['bold', 'italic', 'underline'],
-        [{ 'color': ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ffffff', '#6b7280'] }],
+        [{ 'color': ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#10b981', '#ffffff', '#6b7280'] }],
         [{ 'list': 'ordered' }, { 'list': 'bullet' }],
         ['link'],
         ['clean']
@@ -425,7 +425,7 @@ const MessageComposer: React.FC = () => {
                                     ✊ Change.org
                                 </div>
                                 <div
-                                    className={`border p-3 rounded-lg text-center cursor-pointer transition-colors text-sm ${petitionPlatform === 'avaaz' ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-400' : 'hover:bg-gray-50'}`}
+                                    className={`border p-3 rounded-lg text-center cursor-pointer transition-colors text-sm ${petitionPlatform === 'avaaz' ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400' : 'hover:bg-gray-50'}`}
                                     onClick={() => setPetitionPlatform('avaaz')}
                                 >
                                     🌍 Avaaz

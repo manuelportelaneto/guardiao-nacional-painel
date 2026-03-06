@@ -21,7 +21,7 @@ const CAMPAIGN_CATEGORIES = [
     { id: 'educacao', label: 'Educação', icon: <GraduationCap className="w-4 h-4" />, color: 'bg-blue-100 text-blue-700' },
     { id: 'institucional', label: 'Institucional', icon: <ShieldCheck className="w-4 h-4" />, color: 'bg-emerald-100 text-emerald-700' },
     { id: 'prefeitura', label: 'Prefeitura', icon: <Building2 className="w-4 h-4" />, color: 'bg-amber-100 text-amber-700' },
-    { id: 'inclusao', label: 'Inclusão Social', icon: <Users className="w-4 h-4" />, color: 'bg-purple-100 text-purple-700' },
+    { id: 'inclusao', label: 'Inclusão Social', icon: <Users className="w-4 h-4" />, color: 'bg-emerald-100 text-emerald-700' },
     { id: 'meio_ambiente', label: 'Meio Ambiente', icon: <Leaf className="w-4 h-4" />, color: 'bg-green-100 text-green-700' },
     { id: 'emergencia', label: 'Emergência', icon: <AlertTriangle className="w-4 h-4" />, color: 'bg-red-100 text-red-700' },
 ];
@@ -220,8 +220,8 @@ const MarketingScreen: React.FC = () => {
                 </Card>
                 <Card>
                     <CardContent className="p-4 flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                            <Send className="w-5 h-5 text-purple-600" />
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                            <Send className="w-5 h-5 text-emerald-600" />
                         </div>
                         <div>
                             <p className="text-2xl font-bold">{stats.totalReach}</p>
@@ -281,7 +281,7 @@ const MarketingScreen: React.FC = () => {
                                     <Tooltip />
                                     <Bar dataKey="value" fill="#3b82f6" name="Campanhas" radius={[0, 4, 4, 0]}>
                                         {categoryChart.map((_, index) => (
-                                            <Cell key={index} fill={['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#84cc16'][index % 7]} />
+                                            <Cell key={index} fill={['#3b82f6', '#10b981', '#f59e0b', '#10b981', '#ef4444', '#06b6d4', '#84cc16'][index % 7]} />
                                         ))}
                                     </Bar>
                                 </BarChart>

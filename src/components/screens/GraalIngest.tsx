@@ -81,9 +81,9 @@ export const GraalIngest = () => {
                 <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center space-y-4">
 
                     <div className={`w-20 h-20 rounded-full flex items-center justify-center transition-colors ${fileStatus === 'idle' ? 'bg-violet-100 text-violet-600' :
-                            fileStatus === 'processing' || fileStatus === 'reading' ? 'bg-amber-100 text-amber-600 animate-pulse' :
-                                fileStatus === 'success' ? 'bg-emerald-100 text-emerald-600' :
-                                    'bg-red-100 text-red-600'
+                        fileStatus === 'processing' || fileStatus === 'reading' ? 'bg-amber-100 text-amber-600 animate-pulse' :
+                            fileStatus === 'success' ? 'bg-emerald-100 text-emerald-600' :
+                                'bg-red-100 text-red-600'
                         }`}>
                         {fileStatus === 'idle' ? <UploadCloud className="w-10 h-10" /> :
                             fileStatus === 'processing' || fileStatus === 'reading' ? <FileJson className="w-10 h-10" /> :
@@ -112,6 +112,7 @@ export const GraalIngest = () => {
                                 className="hidden"
                                 ref={fileInputRef}
                                 onChange={handleFileChange}
+                                aria-label="Upload de Arquivo Graal"
                             />
                             <button
                                 onClick={() => fileInputRef.current?.click()}

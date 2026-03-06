@@ -40,7 +40,7 @@ const IntelGraph: React.FC<{
                 ...e,
                 val,
                 color: e.type === 'PERSON' ? '#3b82f6' :
-                    e.type === 'ORGANIZATION' ? '#8b5cf6' :
+                    e.type === 'ORGANIZATION' ? '#10b981' :
                         e.type === 'EVENT' ? '#f97316' : '#10b981'
             };
         });

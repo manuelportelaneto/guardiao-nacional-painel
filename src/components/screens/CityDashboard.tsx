@@ -291,7 +291,7 @@ const CityDashboard: React.FC = () => {
                     value={stats?.total || 0}
                     icon={<FileText className="h-4 w-4 text-white" />}
                     description="Histórico completo"
-                    color="bg-purple-600"
+                    color="bg-emerald-600"
                     isLoading={isLoading}
                 />
             </div>

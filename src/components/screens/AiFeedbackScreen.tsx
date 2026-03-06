@@ -101,7 +101,7 @@ const AiFeedbackScreen: React.FC = () => {
         <div className="space-y-6">
             <div>
                 <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-                    <Brain className="w-8 h-8 text-purple-600" />
+                    <Brain className="w-8 h-8 text-emerald-600" />
                     Auditoria de IA
                 </h1>
                 <p className="text-muted-foreground mt-1">
@@ -111,7 +111,7 @@ const AiFeedbackScreen: React.FC = () => {
 
             {loading ? (
                 <div className="flex items-center justify-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+                    <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
                 </div>
             ) : contributions.length === 0 ? (
                 <div className="text-center py-20 text-muted-foreground">

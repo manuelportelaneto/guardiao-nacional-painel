@@ -83,7 +83,7 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose, profile, l
                                     </section>
 
                                     <section>
-                                        <h3 className="flex items-center gap-2 text-purple-400 font-bold mb-3 uppercase text-sm tracking-widest border-b border-purple-900/30 pb-1">
+                                        <h3 className="flex items-center gap-2 text-emerald-400 font-bold mb-3 uppercase text-sm tracking-widest border-b border-emerald-900/30 pb-1">
                                             <GraduationCap className="w-4 h-4" /> Formação
                                         </h3>
                                         <p className="text-gray-300 text-sm leading-relaxed">

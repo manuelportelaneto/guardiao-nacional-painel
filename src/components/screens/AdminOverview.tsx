@@ -162,7 +162,7 @@ const AdminOverview: React.FC = () => {
     });
     const statusColors: Record<string, string> = {
         'Aprovado': '#10b981', 'Em Análise': '#3b82f6',
-        'Rejeitado': '#ef4444', 'Resolvido': '#8b5cf6', 'Lixo': '#6b7280'
+        'Rejeitado': '#ef4444', 'Resolvido': '#10b981', 'Lixo': '#6b7280'
     };
     const statusData = Object.entries(statusMap).map(([name, value]) => ({
         name, value, fill: statusColors[name] || '#94a3b8'
@@ -180,7 +180,7 @@ const AdminOverview: React.FC = () => {
     const catData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 6)
         .map(([name, value]) => ({ name, value }));
 
-    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#10b981', '#06b6d4'];
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -278,7 +278,7 @@ const AdminOverview: React.FC = () => {
                 {[
                     { label: 'Em Análise', value: underReview, icon: Clock, bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' },
                     { label: 'Aprovadas', value: approved, icon: CircleCheck, bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-100' },
-                    { label: 'Resolvidas', value: resolved, icon: Activity, bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100' },
+                    { label: 'Resolvidas', value: resolved, icon: Activity, bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' },
                     { label: 'Curtidas Totais', value: totalLikes, icon: ThumbsUp, bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-100' },
                 ].map(({ label, value, icon: Icon, bg, text, border }) => (
                     <Card key={label} className={`border ${border} ${bg} shadow-sm`}>

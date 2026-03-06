@@ -46,11 +46,11 @@ export const ALL_CATEGORIES: { id: string; name: string; color: string }[] = [
     { id: 'security', name: 'Segurança', color: '#ef4444' },
     { id: 'transport', name: 'Transporte', color: '#3b82f6' },
     { id: 'environment', name: 'Meio Ambiente', color: '#22c55e' },
-    { id: 'services', name: 'Serviços Públicos', color: '#a855f7' },
+    { id: 'services', name: 'Serviços Públicos', color: '#34d399' },
     { id: 'leisure', name: 'Lazer', color: '#ec4899' },
     { id: 'health', name: 'Saúde', color: '#10b981' },
     { id: 'accessibility', name: 'Acessibilidade', color: '#0ea5e9' },
-    { id: 'culture', name: 'Cultura', color: '#8b5cf6' },
+    { id: 'culture', name: 'Cultura', color: '#10b981' },
     { id: 'social', name: 'Solidariedade', color: '#f43f5e' },
 ];
 
