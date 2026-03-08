@@ -71,4 +71,5 @@ stages:
         downloadPath: '$(System.ArtifactsDirectory)'
     - script: |
         npm install firebase-tools
+        npx firebase target:apply --project procuradoria-cidada-72130 hosting painel guardiao-painel-admin
         npx firebase deploy --only hosting:painel --project procuradoria-cidada-72130 --token $(FIREBASE_TOKEN) --non-interactive
