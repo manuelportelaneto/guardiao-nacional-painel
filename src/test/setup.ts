@@ -82,6 +82,55 @@ vi.mock('firebase/storage', () => ({
     getDownloadURL: vi.fn(),
 }));
 
+// Mock global fetch for Geocoding API and IP fetching
+global.fetch = vi.fn().mockImplementation((url: string) => {
+    if (url.includes('maps.googleapis.com')) {
+        return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({
+                status: 'OK',
+                results: [{ formatted_address: 'Endereço Mock via Fetch' }]
+            }),
+        });
+    }
+    if (url.includes('ipapi.co') || url.includes('api.ipify.org')) {
+        return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ ip: '127.0.0.1' }),
+        });
+    }
+    return Promise.reject(new Error('Fetch not mocked for this URL'));
+});
+
+// Mock Google Maps API
+global.google = {
+    maps: {
+        LatLng: vi.fn((lat, lng) => ({ lat: () => lat, lng: () => lng })),
+        LatLngBounds: vi.fn(() => ({
+            extend: vi.fn(),
+            getCenter: vi.fn(() => ({ lat: () => 0, lng: () => 0 })),
+        })),
+        places: {
+            AutocompleteService: vi.fn(() => ({
+                getPlacePredictions: vi.fn(),
+            })),
+            PlacesService: vi.fn(() => ({
+                getDetails: vi.fn(),
+            })),
+        },
+        Geocoder: vi.fn(() => ({
+            geocode: vi.fn((request, callback) => {
+                callback([{ formatted_address: 'Endereço Mock' }], 'OK');
+            }),
+        })),
+        GeocoderStatus: {
+            OK: 'OK',
+        },
+    },
+} as any;
+
 // Mock React Router
 vi.mock('react-router-dom', async () => {
     const actual = await vi.importActual('react-router-dom');
@@ -89,6 +138,7 @@ vi.mock('react-router-dom', async () => {
         ...actual,
         useNavigate: () => vi.fn(),
         useParams: () => ({}),
-        useLocation: () => ({ pathname: '/' }),
+        useLocation: () => ({ pathname: '/', state: {} }),
+        useBlocker: () => ({ state: 'unblocked', proceed: vi.fn(), reset: vi.fn() }),
     };
 });

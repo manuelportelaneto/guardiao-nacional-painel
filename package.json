@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:dev": "vite build --mode development",
+    "build:prod": "vite build --mode production",
+    "deploy:dev": "npm run build:dev && firebase use dev && firebase deploy",
+    "deploy:prod": "npm run build:prod && firebase use prod && firebase deploy",
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",

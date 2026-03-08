@@ -1,6 +1,8 @@
 {
   "projects": {
-    "default": "procuradoria-cidada-72130"
+    "default": "guardiao-nacional-dev",
+    "dev": "guardiao-nacional-dev",
+    "prod": "procuradoria-cidada-72130"
   },
   "targets": {
     "procuradoria-cidada-72130": {

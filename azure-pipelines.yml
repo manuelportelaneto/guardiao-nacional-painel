@@ -1,0 +1,74 @@
+trigger:
+- main
+- develop
+
+pool:
+  name: 'Default'
+
+variables:
+- group: guardiao-secrets
+
+stages:
+- stage: Test
+  displayName: 'Lint & Test'
+  jobs:
+  - job: RunTests
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '20.x'
+
+    - script: npm install --force
+    - script: npm run lint
+      continueOnError: true
+    - script: npm test -- --run
+      env:
+        VITE_FIREBASE_API_KEY: $(VITE_FIREBASE_API_KEY)
+        VITE_FIREBASE_AUTH_DOMAIN: $(VITE_FIREBASE_AUTH_DOMAIN)
+        VITE_FIREBASE_PROJECT_ID: $(VITE_FIREBASE_PROJECT_ID)
+        VITE_FIREBASE_STORAGE_BUCKET: $(VITE_FIREBASE_STORAGE_BUCKET)
+        VITE_FIREBASE_MESSAGING_SENDER_ID: $(VITE_FIREBASE_MESSAGING_SENDER_ID)
+        VITE_FIREBASE_APP_ID: $(VITE_FIREBASE_APP_ID)
+        VITE_SUPABASE_URL: $(VITE_SUPABASE_URL)
+        VITE_SUPABASE_KEY: $(VITE_SUPABASE_KEY)
+
+- stage: Build
+  displayName: 'Build Panel'
+  dependsOn: Test
+  condition: succeeded()
+  jobs:
+  - job: BuildPanel
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '20.x'
+    - script: npm install --force
+    - script: npm run build:prod
+      env:
+        VITE_FIREBASE_API_KEY: $(VITE_FIREBASE_API_KEY)
+        VITE_FIREBASE_AUTH_DOMAIN: $(VITE_FIREBASE_AUTH_DOMAIN)
+        VITE_FIREBASE_PROJECT_ID: $(VITE_FIREBASE_PROJECT_ID)
+        VITE_FIREBASE_STORAGE_BUCKET: $(VITE_FIREBASE_STORAGE_BUCKET)
+        VITE_FIREBASE_MESSAGING_SENDER_ID: $(VITE_FIREBASE_MESSAGING_SENDER_ID)
+        VITE_FIREBASE_APP_ID: $(VITE_FIREBASE_APP_ID)
+        VITE_SUPABASE_URL: $(VITE_SUPABASE_URL)
+        VITE_SUPABASE_KEY: $(VITE_SUPABASE_KEY)
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'dist'
+        ArtifactName: 'painel-build'
+
+- stage: Deploy
+  displayName: 'Deploy'
+  dependsOn: Build
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - job: DeployProd
+    steps:
+    - task: DownloadBuildArtifacts@0
+      inputs:
+        artifactName: 'painel-build'
+        downloadPath: '$(System.ArtifactsDirectory)'
+    - script: |
+        npm install -g firebase-tools
+        firebase deploy --only hosting:painel --token $(FIREBASE_TOKEN) --non-interactive
