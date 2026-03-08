@@ -71,4 +71,4 @@ stages:
         downloadPath: '$(System.ArtifactsDirectory)'
     - script: |
         npm install firebase-tools
-        npx firebase deploy --only hosting:painel --project prod --token $(FIREBASE_TOKEN) --non-interactive
+        npx firebase deploy --only hosting:painel --project procuradoria-cidada-72130 --token $(FIREBASE_TOKEN) --non-interactive
