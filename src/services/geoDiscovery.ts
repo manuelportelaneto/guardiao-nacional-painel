@@ -1,3 +1,23 @@
+/**
+ * @fileoverview Serviço de Descoberta Geográfica do Painel (`src/services/geoDiscovery.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Implementa a lógica de parseamento de endereços e manutenção da hierarquia territorial
+ * do Firestore no contexto do painel administrativo. É o equivalente ao `hierarchy.ts`
+ * das Cloud Functions, mas rodando no lado cliente do painel.
+ *
+ * 🏛️ POR QUE EXISTE NO PAINEL ALÉM DAS CLOUD FUNCTIONS?
+ * As Cloud Functions processam novas denúncias automaticamente no servidor.
+ * Este serviço no painel é usado para:
+ * - Reconhecer a hierarquia geográfica de denúncias legadas (importadas manualmente)
+ * - Auxiliar o mapa de inteligência a categorizar por região/estado/cidade
+ * - Enriquecer o contexto de denúncias onde city/uf não foram capturados pelo app
+ *
+ * 🗺️ ESTRATÉGIA DE CACHE NO FIRESTORE:
+ * Os resultados de geocodificação por string de endereço são cacheados em
+ * `geocache/{addressHash}` para evitar reprocessamento. Isso economiza recursos
+ * computacionais e garante consistência nos resultados retornados.
+ */
 import { db } from '../firebaseConfig';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 

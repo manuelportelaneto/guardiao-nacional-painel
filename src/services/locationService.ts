@@ -1,3 +1,22 @@
+/**
+ * @fileoverview Serviço de Localidades IBGE (`src/services/locationService.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Integra o painel à API oficial de Localidades do IBGE (Instituto Brasileiro de Geografia e Estatística).
+ * Utilizado primariamente nos formulários administrativos (como cadastro de novos usuários ou
+ * filtros do mapa) para garantir que a seleção de Estado e Município seja padronizada e livre de erros.
+ *
+ * 🏛️ ESTRATÉGIA DE DADOS:
+ * 1. 🇧🇷 ESTADOS (`getStates`):
+ *    Consulta todos os estados brasileiros e ordena por nome para exibição em dropdowns.
+ * 2. 🏙️ MUNICÍPIOS POR UF (`getCitiesByState`):
+ *    Dada a sigla do estado (ex: "SP"), consulta apenas os municípios daquela UF,
+ *    ordenando alfabeticamente. Reduz a carga de dados em memória.
+ *
+ * ⚠️ RESILIÊNCIA (Axios):
+ * Utiliza o `axios` para requisições HTTP com tratamento de erro básico. Como a API
+ * do IBGE é um serviço público gratuito, pode sofrer instabilidades.
+ */
 
 import axios from 'axios';
 

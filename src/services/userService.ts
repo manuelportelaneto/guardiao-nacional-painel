@@ -1,3 +1,29 @@
+/**
+ * @fileoverview Serviço de Gerenciamento de Usuários Administrativos (`src/services/userService.ts`).
+ * 
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Ele provê as operações CRUD de usuários para o painel administrativo (super admins e city admins).
+ * Permite que gestores promovam papéis, bloqueiem contas, adicionem novos usuários e enviem convites
+ * para novos funcionários municipais via e-mail, acionando uma Cloud Function de backend segura.
+ * 
+ * 🏛️ CONCEITOS E FLUXOS IMPLEMENTADOS:
+ * 1. 👑 PROMOÇÃO DE PAPÉIS (`promoteUser`):
+ *    Atualiza o campo `role` e outros atributos de acesso de um usuário diretamente no Firestore.
+ *    Nota: Apenas o painel com token de admin pode realizar esta operação, pois as regras do 
+ *    Firestore (`firestore.rules`) bloqueiam a auto-promoção de papéis pelo cliente.
+ * 
+ * 2. 🔒 BLOQUEIO DE CONTA (`toggleUserBlock`):
+ *    Alterna o campo `status` entre 'active' e 'blocked'. O aplicativo PWA do cidadão e o painel
+ *    verificam este campo no momento do login para negar o acesso a contas bloqueadas.
+ * 
+ * 3. 📧 CONVITE VIA CLOUD FUNCTION (`inviteUser`):
+ *    Este é o fluxo mais sofisticado: para convidar um novo funcionário, o painel obtém o 
+ *    Firebase ID Token do admin logado com `user.getIdToken()` e envia uma requisição HTTP 
+ *    autenticada com `Authorization: Bearer <token>` para o endpoint da Cloud Function 
+ *    `inviteAdminUser`. A Cloud Function valida o token no servidor, verifica se o chamador 
+ *    tem permissão de admin e então cria o novo usuário no Firebase Auth + envia o e-mail de convite.
+ *    Este padrão garante que a criação de contas administrativas NUNCA ocorre direto no cliente.
+ */
 import { db } from '../firebaseConfig';
 import { doc, updateDoc, deleteDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 

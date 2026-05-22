@@ -1,3 +1,30 @@
+/**
+ * @fileoverview Serviço de Inteligência Estratégica — War Room (`src/services/intelService.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Conecta o painel à base de dados de inteligência estratégica armazenada no Supabase PostgreSQL.
+ * Provê dados para a "Sala de Guerra" (War Room): relatórios de risco político, perfis de alvos,
+ * sinais OSINT/SIGINT/HUMINT e análises dimensionais de sentimento e oportunidade.
+ *
+ * 🏛️ POR QUE SUPABASE (E NÃO FIRESTORE)?
+ * Os dados de inteligência estratégica são gerados por pipelines Python externos (N8N, agentes IA)
+ * que gravam diretamente no PostgreSQL (Supabase). O Firestore não é ideal para queries SQL complexas
+ * com joins e aggregations — o PostgreSQL via Supabase é mais adequado para analytics e BI.
+ * O sistema usa uma arquitetura dual: Firestore para dados operacionais em tempo real,
+ * Supabase para dados analíticos e de inteligência de médio prazo.
+ *
+ * 📊 ESTRUTURA DAS TABELAS SUPABASE:
+ * - `intel_reports` (V1): Relatórios consolidados com risk_score e grafos de conhecimento.
+ * - `intel_reports_daily` (V2): Relatórios diários por alvo (cidade ou VIP monitorado).
+ * - `intel_analysis`: Análises por dimensão (risco, sentimento, oportunidade) por alvo.
+ * - `intel_targets`: Lista de alvos de monitoramento ativos (cidades, políticos, entidades).
+ * - `war_room_actions`: Feed de sinais em tempo real (OSINT = open source, SIGINT = signals, HUMINT = human).
+ *
+ * 🔄 FALLBACK DE TARGETS:
+ * Se a tabela `intel_targets` estiver bloqueada por RLS (Row Level Security) ou vazia,
+ * a função `getActiveTargets()` retorna um array hardcoded de fallback para evitar
+ * que a UI quebre completamente durante falhas de configuração.
+ */
 
 import { supabase } from './supabase';
 

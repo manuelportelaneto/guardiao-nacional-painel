@@ -1,6 +1,29 @@
 /**
- * External Data Service — Free APIs for Intelligence Map enrichment
- * All APIs: 100% free, no API keys required
+ * @fileoverview Serviço de APIs Externas Gratuitas para o Mapa de Inteligência (`src/services/externalDataService.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Agrega dados de contexto ambiental e geográfico de APIs públicas e gratuitas, enriquecendo
+ * o Mapa de Inteligência do painel com informações sobre clima, qualidade do ar e enchentes.
+ * Todas as APIs utilizadas são 100% gratuitas e não requerem chave de API (API key-free).
+ *
+ * 🌐 APIs INTEGRADAS:
+ * 1. 🌦️ **Open-Meteo** (open-meteo.com):
+ *    Fornece dados meteorológicos em tempo real: temperatura, código de clima, umidade,
+ *    vento e precipitação. Os códigos WMO (World Meteorological Organization) são
+ *    traduzidos para labels em PT-BR via o mapa `WEATHER_CODES`.
+ *
+ * 2. 💨 **Open-Meteo Air Quality API**:
+ *    Fornece Índice de Qualidade do Ar (AQI) europeu para o município monitorado.
+ *    Útil para correlacionar denúncias de meio ambiente com dados reais de poluição.
+ *
+ * 3. 🌊 **Brasil API — Flood Alerts** (brasilapi.com.br):
+ *    Consulta alertas de enchentes e alagamentos por município (IBGE code).
+ *    Enriquece o mapa com contexto de risco climático em tempo real.
+ *
+ * ⚠️ NOTA DE CONFIABILIDADE:
+ * APIs externas gratuitas podem ter instabilidade ou limites de taxa (rate limits).
+ * Todas as funções tratam falhas silenciosamente (try/catch com return null),
+ * garantindo que falhas externas não travem o carregamento do painel.
  */
 
 // ─── Open-Meteo (Weather) ────────────────────────────────────────────────────

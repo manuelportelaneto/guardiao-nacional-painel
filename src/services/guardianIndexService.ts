@@ -1,8 +1,27 @@
 /**
- * Guardian Index Service — Proprietary indices for the Guardião Nacional Intelligence Map
- * ICA™ (Cidadania Ativa), IRM™ (Responsividade Municipal), SIU™ (Infraestrutura Urbana)
- * IRSP (Risco de Segurança Pública), IRDN (Risco de Desastres Naturais)
- * Admin-only: these indices are restricted to the admin panel.
+ * @fileoverview Serviço de Índices de Inteligência Estratégica (`src/services/guardianIndexService.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Implementa os algoritmos proprietários do Guardião Nacional para cálculo de
+ * "Índices de Termômetro Social". Estes índices traduzem volumes de denúncias brutas
+ * em métricas estratégicas para o gestor público no Mapa de Inteligência.
+ *
+ * 🏛️ ÍNDICES PROPRIETÁRIOS (Admin-only):
+ * 1. 📊 ICA™ (Índice de Cidadania Ativa):
+ *    Mede o engajamento cívico. Alta pontuação significa população participativa.
+ * 2. ⚡ IRM™ (Índice de Responsividade Municipal):
+ *    Mede a eficiência da prefeitura. Ratio entre denúncias 'Resolvidas' e total.
+ * 3. 🏗️ SIU™ (Saúde da Infraestrutura Urbana):
+ *    Avalia problemas de infra (buracos, iluminação, lixo). Inverso da proporção de problemas.
+ * 4. 🚨 IRSP (Índice de Risco de Segurança Pública):
+ *    Gravidade baseada no volume de denúncias na categoria "Segurança".
+ * 5. ⛈️ IRDN (Índice de Risco de Desastres Naturais):
+ *    Foco preventivo, analisando denúncias em "Defesa Civil" e "Meio Ambiente".
+ *
+ * ⚙️ FUNCIONAMENTO:
+ * Recebe o array bruto de denúncias da cidade, agrupa por categoria (traduzidas via
+ * `CATEGORY_TRANSLATIONS`), aplica os pesos de gravidade (`CATEGORY_WEIGHTS`) e
+ * retorna os KPIs que alimentam os widgets analíticos do painel.
  */
 
 // ─── Category Translation (EN → PT-BR) ─────────────────────────────────────

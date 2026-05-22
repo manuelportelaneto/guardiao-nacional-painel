@@ -1,7 +1,26 @@
 /**
- * Zustand Store: Moderation State
- * 
- * Centralized state management for the moderation module
+ * @fileoverview Store de Estado Global da Moderação (`src/stores/moderationStore.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Gerencia o estado compartilhado dos modais e diálogos da tela de moderação de denúncias
+ * usando Zustand — uma biblioteca de gerenciamento de estado React leve e sem boilerplate.
+ *
+ * 🏛️ POR QUE ZUSTAND (E NÃO useState LOCAL)?
+ * A tela de moderação (`AdminModeration`) tem múltiplos componentes que precisam acessar
+ * e modificar o mesmo estado de diálogo (botão de ação → abre modal de confirmação →
+ * submete → fecha modal). Passar esses estados via props causaria "prop drilling" excessivo.
+ * O Zustand resolve isso com um store global simples, sem Context API nem Redux.
+ *
+ * 🎭 ESTADOS GERENCIADOS:
+ * 1. `confirmDialog`: Controla o modal de confirmação de ação (aprovar, rejeitar, banir).
+ *    Armazena qual `action`, qual `contribution` e qual `report` estão em análise.
+ * 2. `replyDialog`: Controla o modal de resposta ao cidadão com texto e template padrão.
+ * 3. Campos de formulário: `rejectionReason`, `approvalRating`, `replyText`, `useDefaultReply`.
+ *
+ * 🔌 SELETORES OTIMIZADOS:
+ * Os hooks `useConfirmDialog()` e `useReplyDialog()` são seletores que acessam
+ * apenas a fatia de estado relevante, evitando re-renders desnecessários em componentes
+ * que não dependem de toda a store.
  */
 
 import { create } from 'zustand';

@@ -1,4 +1,38 @@
-import React, { lazy, Suspense } from 'react';
+/**
+ * @fileoverview Orquestrador Principal de Rotas do Painel Administrativo (`src/App.tsx`).
+ * 
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Define toda a estrutura de navegação (roteamento) e o sistema de controle de acesso (RBAC)
+ * do painel do Guardião. É o ponto de montagem global que organiza quais telas são acessíveis
+ * por quais perfis de usuário, e como a aplicação se divide em módulos carregados sob demanda.
+ * 
+ * 🏛️ CONCEITOS E PADRÕES IMPLEMENTADOS:
+ * 1. ✂️ CODE SPLITTING COM `React.lazy` (Code Splitting / Lazy Loading):
+ *    Módulos pesados e raramente acessados (mapa de inteligência, painel de IA, War Room) são 
+ *    carregados de forma assíncrona somente quando o usuário navega até aquela rota.
+ *    Isso reduz o tamanho do bundle inicial JavaScript, melhorando o tempo de carregamento (LCP).
+ *    O componente `<Suspense>` exibe um spinner durante o download destes módulos.
+ * 
+ * 2. 🛡️ CONTROLE DE ACESSO BASEADO EM ROLES — RBAC (`PrivateRoute`):
+ *    Cada rota protegida é envolvida em `<PrivateRoute>`. O componente avalia 2 níveis de acesso:
+ *    - NÍVEL 1 (Autenticação): Redireciona para `/` se não houver sessão ativa.
+ *    - NÍVEL 2 (Autorização por Role): Redireciona para `/hub` se o usuário não possuir os 
+ *      papéis exigidos pela rota (ex: apenas `super_admin` e `admin` acessam `/admin`).
+ *    - BLOQUEIO DE CIDADÃOS: Cidadãos que tentarem acessar qualquer rota do painel 
+ *      recebem uma tela de "Acesso Restrito" com botão de logout.
+ * 
+ * 3. 🔀 ROTA PÚBLICA COM REDIRECIONAMENTO (`PublicRoute`):
+ *    A tela de login (`/`) é uma rota pública. Se o usuário já está logado e tenta acessar 
+ *    a tela de login, é redirecionado automaticamente para `/hub` para evitar dupla autenticação.
+ * 
+ * 4. 🗺️ HIERARQUIA DE ROTAS:
+ *    - `/` → Tela de Login (pública)
+ *    - `/hub` → Seletor de papel/módulo (todos os admins)
+ *    - `/admin/*` → Módulo Administrativo Global (super_admin, admin, presidente)
+ *    - `/city/select` → Seleção de município
+ *    - `/city/:cityId/*` → Módulo Municipal (gestores e servidores da cidade específica)
+ */
+
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthScreen from './components/screens/AuthScreen';

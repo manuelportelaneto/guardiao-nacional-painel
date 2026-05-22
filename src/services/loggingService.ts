@@ -1,7 +1,34 @@
+/**
+ * @fileoverview Serviço Centralizado de Logs de Auditoria e Erros (`src/services/loggingService.ts`).
+ * 
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Ele implementa a camada de observabilidade e rastreabilidade do painel administrativo.
+ * Todo evento crítico (login, promoção de usuário, banimento, aprovação de denúncia) e todo erro 
+ * de runtime é canalizado por este serviço antes de persistir no Firestore.
+ * 
+ * 🏛️ CONCEITOS E PRÁTICAS IMPLEMENTADAS:
+ * 1. 🔒 CONFORMIDADE COM A LGPD (Lei Geral de Proteção de Dados):
+ *    A função `sanitizeDetails` varre recursivamente qualquer objeto de detalhes antes de gravá-lo
+ *    nos logs. Campos protegidos como CPF, RG, telefone, senhas, tokens e API keys são substituídos
+ *    por `[REDACTED]`. Isso impede que dados pessoais sensíveis trafeguem para trilhas de auditoria,
+ *    garantindo conformidade com o Artigo 46 da LGPD sobre segurança no tratamento de dados.
+ * 
+ * 2. 📝 AUDITORIA ADMINISTRATIVA (AuditLog):
+ *    Registra ações de gestores como CREATE, UPDATE, DELETE, LOGIN e LOGOUT com o par
+ *    `actorId` (quem agiu) e `targetId` (quem/o que foi afetado). Essas trilhas são imutáveis
+ *    no Firestore (regras bloqueiam UPDATE e DELETE em `audit_logs`).
+ * 
+ * 3. 🚨 LOG DE ERROS COM GUARD DE DESENVOLVIMENTO (ErrorLog):
+ *    Em ambiente de desenvolvimento, os erros são apenas logados no console (não gravados),
+ *    evitando poluir a base de dados de produção com dados de testes. Em produção, o stack
+ *    trace e o `deviceInfo` são capturados e gravados com limites de tamanho para evitar
+ *    estouro de quota de faturamento no Firestore.
+ */
 import { db } from '../firebaseConfig';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import type { AuditLog, AuditAction } from '../types/audit';
 import type { ErrorLog } from '../types/errorLog';
+
 
 const COLLECTIONS = {
     AUDIT: 'audit_logs',

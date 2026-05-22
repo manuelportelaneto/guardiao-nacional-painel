@@ -1,3 +1,21 @@
+/**
+ * @fileoverview Serviço de Notificações Transacionais do Painel (`src/services/notificationService.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Permite que o painel administrativo envie e-mails transacionais utilizando a integração
+ * "Trigger Email" do Firebase Extensions.
+ *
+ * 🏛️ PADRÃO DE INTEGRAÇÃO (Serverless SMTP):
+ * O cliente web do painel não se conecta diretamente a um servidor SMTP (o que seria inseguro
+ * por expor chaves). Em vez disso, ele cria um documento na coleção `mail` do Firestore.
+ * O Firebase Extension, rodando no backend de forma segura, escuta a criação deste documento
+ * e despacha o e-mail via um provedor configurado (SendGrid, Brevo, AWS SES).
+ *
+ * 🔑 CASO DE USO NO PAINEL:
+ * Este serviço é crucial no fluxo de convite de novos gestores (`userService`).
+ * O painel gera um link de convite e usa este serviço para enviar o e-mail oficial
+ * de admissão para o novo administrador.
+ */
 import { db } from '../firebaseConfig';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 

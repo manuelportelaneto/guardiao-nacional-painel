@@ -1,3 +1,30 @@
+/**
+ * @fileoverview Serviço de Exportação de Relatórios Técnicos (`src/services/reportService.ts`).
+ *
+ * 💡 O QUE FAZ ESTE ARQUIVO?
+ * Gera e faz download de relatórios técnicos de ocorrências nos formatos PDF e Excel (XLSX)
+ * diretamente no navegador do gestor, sem necessidade de servidor intermediário.
+ *
+ * 🏛️ TECNOLOGIAS DE EXPORTAÇÃO CLIENT-SIDE:
+ * 1. 📊 EXCEL (`SheetJS/xlsx`):
+ *    Converte o array de denúncias em planilha usando `utils.json_to_sheet()` e
+ *    dispara o download com `writeFile()`. Totalmente client-side — nenhum dado
+ *    trafega para um servidor externo.
+ *
+ * 2. 📄 PDF (`jsPDF` + `jspdf-autotable`):
+ *    Gera um PDF com cabeçalho institucional, tabela de dados e rodapé de paginação.
+ *    O `autoTable` formata automaticamente as colunas com larguras otimizadas.
+ *    O ID da denúncia é truncado (6 chars + "...") para caber na coluna sem quebrar.
+ *
+ * 3. 🔒 ANONIMIZAÇÃO DE USUÁRIO (`anonimizeUserId`):
+ *    Por padrão, o `userId` completo é incluído no Excel para auditoria interna.
+ *    A função de anonimização está disponível para casos onde a LGPD exige
+ *    dados reduzidos: mantém apenas os primeiros e últimos 4 caracteres do UID.
+ *
+ * 📅 FORMATAÇÃO DE DATAS:
+ * Firestore retorna datas como `Timestamp` (objetos com `.toDate()`), mas outros campos
+ * podem ser strings ISO ou números epoch. O `formatDate()` normaliza todos os formatos.
+ */
 import { utils, writeFile } from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
