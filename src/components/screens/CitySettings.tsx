@@ -7,7 +7,10 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '../ui/sheet';
-import { Webhook, Save, ArrowLeft, Menu, LayoutDashboard, ClipboardList, Building2, BarChart3, Settings, LogOut } from 'lucide-react';
+import { Switch } from '../ui/switch';
+import { Label } from '../ui/label';
+import { Checkbox } from '../ui/checkbox';
+import { Webhook, Save, ArrowLeft, Menu, LayoutDashboard, ClipboardList, Building2, BarChart3, Settings, LogOut, ShieldAlert, Compass, Tags } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 const CITY_NAMES: { [key: string]: string } = {
@@ -17,15 +20,32 @@ const CITY_NAMES: { [key: string]: string } = {
     'sao-paulo': 'São Paulo'
 };
 
+const CATEGORIES_LIST = [
+    { id: 'iluminacao', label: 'Iluminação Pública' },
+    { id: 'asfalto', label: 'Asfalto e Buracos' },
+    { id: 'lixo', label: 'Lixo e Entulho' },
+    { id: 'seguranca', label: 'Segurança Comunitária' },
+    { id: 'acessibilidade', label: 'Acessibilidade' },
+    { id: 'outros', label: 'Outros Problemas Zeladoria' }
+];
+
 const CitySettings: React.FC = () => {
     const { cityId } = useParams<{ cityId: string }>();
     const navigate = useNavigate();
     const { logout } = useAuth();
 
-    const [webhookUrl, setWebhookUrl] = useState('');
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
+
+    // Configurações da Cidade
+    const [webhookUrl, setWebhookUrl] = useState('');
+    const [serviceRadiusKm, setServiceRadiusKm] = useState('15');
+    const [centerLat, setCenterLat] = useState('-23.5505');
+    const [centerLng, setCenterLng] = useState('-46.6333');
+    const [allowAnonymous, setAllowAnonymous] = useState(true);
+    const [defaultSlaDays, setDefaultSlaDays] = useState('5');
+    const [activeCategories, setActiveCategories] = useState<string[]>(['iluminacao', 'asfalto', 'lixo', 'seguranca', 'acessibilidade', 'outros']);
 
     const cityName = CITY_NAMES[cityId || ''] || cityId;
 
@@ -33,15 +53,20 @@ const CitySettings: React.FC = () => {
         const fetchSettings = async () => {
             if (!cityId) return;
             try {
-                // Try to get from 'cities' collection
-                // Assuming document ID is the normalized cityId ("maua", "sao-paulo") or we query by field.
-                // For simplicity in this demo, accessing doc by cityId.
                 const docRef = doc(db, 'cities', cityId);
                 const snap = await getDoc(docRef);
 
                 if (snap.exists()) {
                     const data = snap.data();
-                    setWebhookUrl(data.webhookUrl || data.settings?.webhookUrl || '');
+                    const s = data.settings || {};
+                    
+                    setWebhookUrl(data.webhookUrl || s.webhookUrl || '');
+                    setServiceRadiusKm(String(s.serviceRadiusKm !== undefined ? s.serviceRadiusKm : '15'));
+                    setCenterLat(String(s.centerCoords?.lat !== undefined ? s.centerCoords.lat : '-23.5505'));
+                    setCenterLng(String(s.centerCoords?.lng !== undefined ? s.centerCoords.lng : '-46.6333'));
+                    setAllowAnonymous(s.allowAnonymous !== undefined ? s.allowAnonymous : true);
+                    setDefaultSlaDays(String(s.defaultSlaDays !== undefined ? s.defaultSlaDays : '5'));
+                    setActiveCategories(s.activeCategories || ['iluminacao', 'asfalto', 'lixo', 'seguranca', 'acessibilidade', 'outros']);
                 }
             } catch (error) {
                 console.error("Error fetching settings:", error);
@@ -59,19 +84,21 @@ const CitySettings: React.FC = () => {
         try {
             const docRef = doc(db, 'cities', cityId);
 
-            // Allow partial update (merge)
             await updateDoc(docRef, {
                 'settings.webhookUrl': webhookUrl,
-                'webhookUrl': webhookUrl, // Flat backup
+                'settings.serviceRadiusKm': Number(serviceRadiusKm),
+                'settings.centerCoords': { lat: Number(centerLat), lng: Number(centerLng) },
+                'settings.allowAnonymous': allowAnonymous,
+                'settings.defaultSlaDays': Number(defaultSlaDays),
+                'settings.activeCategories': activeCategories,
+                'webhookUrl': webhookUrl, // compatibilidade retroativa
                 updatedAt: new Date()
             });
 
             toast.success("Configurações salvas com sucesso!");
         } catch (error) {
             console.error("Error saving settings:", error);
-            // If doc doesn't exist, we might need setDoc instead of updateDoc, 
-            // but assuming city doc exists from admin creation.
-            toast.error("Erro ao salvar. Verifique se a cidade existe.");
+            toast.error("Erro ao salvar configurações municipais.");
         } finally {
             setSaving(false);
         }
@@ -86,17 +113,23 @@ const CitySettings: React.FC = () => {
         navigate(`/city/${cityId}/dashboard`);
     };
 
-    // Navigation Helpers
+    const handleCategoryChange = (categoryId: string, checked: boolean) => {
+        if (checked) {
+            setActiveCategories(prev => [...prev, categoryId]);
+        } else {
+            setActiveCategories(prev => prev.filter(id => id !== categoryId));
+        }
+    };
+
+    // Navegação lateral
     const navigateToDashboard = () => { navigate(`/city/${cityId}/dashboard`); setSidebarOpen(false); };
     const navigateToTasks = () => { navigate(`/city/${cityId}/tasks`); setSidebarOpen(false); };
     const navigateToDepartments = () => { navigate(`/city/${cityId}/departments`); setSidebarOpen(false); };
-
 
     return (
         <div className="p-8 space-y-8 bg-gray-50 min-h-screen">
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                    {/* Sidebar Menu */}
                     <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
                         <SheetTrigger asChild>
                             <Button variant="ghost" size="icon" className="hover:bg-gray-100">
@@ -139,49 +172,164 @@ const CitySettings: React.FC = () => {
 
                     <div>
                         <h1 className="text-3xl font-bold tracking-tight text-gray-900">Configurações - {cityName}</h1>
-                        <p className="text-gray-500">Integrações e parâmetros do sistema</p>
+                        <p className="text-gray-500">Parâmetros operacionais e integrações municipais</p>
                     </div>
                 </div>
+                
+                <Button onClick={handleSave} disabled={loading || saving} className="bg-orange-600 hover:bg-orange-700 text-white font-semibold flex items-center gap-2">
+                    <Save className="h-4 w-4" />
+                    {saving ? 'Salvando...' : 'Salvar Tudo'}
+                </Button>
             </div>
 
-            <div className="max-w-4xl space-y-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Webhook className="h-5 w-5 text-blue-600" />
-                            Webhook de Ocorrências
-                        </CardTitle>
-                        <CardDescription>
-                            Configure uma URL para receber notificações em tempo real (POST) sempre que uma ocorrência for criada ou mudar de status.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">URL do Webhook (POST)</label>
-                            <div className="flex gap-2">
+            {loading ? (
+                <div className="text-center py-12 text-slate-500">Carregando parâmetros...</div>
+            ) : (
+                <div className="max-w-4xl space-y-6">
+                    {/* CARD 1: Limites Geográficos e Operação */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-slate-800">
+                                <Compass className="h-5 w-5 text-orange-600" />
+                                Parâmetros Geográficos
+                            </CardTitle>
+                            <CardDescription>
+                                Defina as coordenadas geográficas do centro administrativo e o raio útil de atuação para geofencing dos cidadãos.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="centerLat">Latitude do Centro</Label>
+                                    <Input
+                                        id="centerLat"
+                                        type="number"
+                                        step="0.000001"
+                                        value={centerLat}
+                                        onChange={(e) => setCenterLat(e.target.value)}
+                                        placeholder="-23.5505"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="centerLng">Longitude do Centro</Label>
+                                    <Input
+                                        id="centerLng"
+                                        type="number"
+                                        step="0.000001"
+                                        value={centerLng}
+                                        onChange={(e) => setCenterLng(e.target.value)}
+                                        placeholder="-46.6333"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="serviceRadius">Raio de Atendimento (km)</Label>
+                                    <Input
+                                        id="serviceRadius"
+                                        type="number"
+                                        value={serviceRadiusKm}
+                                        onChange={(e) => setServiceRadiusKm(e.target.value)}
+                                        placeholder="15"
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* CARD 2: Regras de Negócio e SLA */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-slate-800">
+                                <ShieldAlert className="h-5 w-5 text-orange-600" />
+                                Regras de Negócio & SLA
+                            </CardTitle>
+                            <CardDescription>
+                                Parâmetros para controle de identidade, privacidade e prazos máximos para curadoria e respostas das secretarias.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                                <div className="space-y-0.5">
+                                    <Label className="text-sm font-semibold text-slate-800">Permitir Denúncias Anônimas</Label>
+                                    <p className="text-xs text-slate-500">Permite que cidadãos enviem contribuições sem expor seu nome nos feeds públicos.</p>
+                                </div>
+                                <Switch
+                                    checked={allowAnonymous}
+                                    onCheckedChange={setAllowAnonymous}
+                                />
+                            </div>
+
+                            <div className="space-y-2 max-w-xs">
+                                <Label htmlFor="defaultSla">Tempo Limite de SLA Padrão (Dias)</Label>
                                 <Input
+                                    id="defaultSla"
+                                    type="number"
+                                    value={defaultSlaDays}
+                                    onChange={(e) => setDefaultSlaDays(e.target.value)}
+                                    placeholder="5"
+                                />
+                                <p className="text-[10px] text-slate-400">Prazo padrão de encerramento interno das ocorrências.</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* CARD 3: Categorias de Ocorrência Ativas */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-slate-800">
+                                <Tags className="h-5 w-5 text-orange-600" />
+                                Categorias de Ocorrência Ativas
+                            </CardTitle>
+                            <CardDescription>
+                                Selecione quais tipos de ocorrências e problemas urbanos estão disponíveis para reporte pelos cidadãos neste município.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {CATEGORIES_LIST.map(cat => (
+                                    <div key={cat.id} className="flex items-center space-x-3 p-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg">
+                                        <Checkbox 
+                                            id={`cat-${cat.id}`} 
+                                            checked={activeCategories.includes(cat.id)}
+                                            onCheckedChange={(checked) => handleCategoryChange(cat.id, !!checked)}
+                                        />
+                                        <Label htmlFor={`cat-${cat.id}`} className="text-sm font-medium leading-none cursor-pointer">
+                                            {cat.label}
+                                        </Label>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* CARD 4: Webhook de Ocorrências */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-slate-800">
+                                <Webhook className="h-5 w-5 text-orange-600" />
+                                Webhook de Ocorrências
+                            </CardTitle>
+                            <CardDescription>
+                                Configure uma URL para receber notificações em tempo real (POST) sempre que uma ocorrência for criada ou mudar de status.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="webhookUrl">URL do Webhook (POST)</Label>
+                                <Input
+                                    id="webhookUrl"
                                     placeholder="https://sua-ouvidoria.gov.br/api/webhook"
                                     value={webhookUrl}
                                     onChange={(e) => setWebhookUrl(e.target.value)}
-                                    disabled={loading}
                                 />
-                                <Button onClick={handleSave} disabled={loading || saving} className="min-w-[100px] bg-blue-600 hover:bg-blue-700">
-                                    {saving ? 'Salvando...' : (
-                                        <>
-                                            <Save className="mr-2 h-4 w-4" /> Salvar
-                                        </>
-                                    )}
-                                </Button>
+                                <p className="text-xs text-gray-500">
+                                    O payload enviado conterá: id, status, categoria, localização e dados do cidadão (se público).
+                                </p>
                             </div>
-                            <p className="text-xs text-gray-500">
-                                O payload enviado conterá: id, status, categoria, localização e dados do cidadão (se público).
-                            </p>
-                        </div>
 
-                        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 mt-4">
-                            <h4 className="text-xs font-semibold uppercase text-slate-500 mb-2">Exemplo de Payload</h4>
-                            <pre className="text-xs font-mono text-slate-700 overflow-x-auto">
-                                {`{
+                            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-lg border border-slate-200 dark:border-slate-800 mt-4">
+                                <h4 className="text-xs font-semibold uppercase text-slate-500 mb-2">Exemplo de Payload</h4>
+                                <pre className="text-xs font-mono text-slate-700 dark:text-slate-300 overflow-x-auto">
+                                    {`{
   "event": "contribution_updated",
   "timestamp": "2024-02-03T14:30:00Z",
   "data": {
@@ -191,11 +339,12 @@ const CitySettings: React.FC = () => {
     "location": { "_latitude": -23.1, "_longitude": -46.4 }
   }
 }`}
-                            </pre>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                                </pre>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 };

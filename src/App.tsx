@@ -33,6 +33,7 @@
  *    - `/city/:cityId/*` → Módulo Municipal (gestores e servidores da cidade específica)
  */
 
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import AuthScreen from './components/screens/AuthScreen';
