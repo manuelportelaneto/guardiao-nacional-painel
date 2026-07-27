@@ -62,6 +62,23 @@ const AuthScreen: React.FC = () => {
       const userDocRef = doc(db, 'users', uid);
       const userDoc = await getDoc(userDocRef);
 
+      // Bypass e Auto-provisionamento de Super Admin para Manuel
+      if (auth.currentUser?.email === 'manuelpnforce@gmail.com') {
+        const { setDoc } = await import('firebase/firestore');
+        await setDoc(userDocRef, {
+          uid,
+          email: auth.currentUser.email,
+          role: 'super_admin',
+          displayName: auth.currentUser.displayName || 'Manuel Force (Presidente)',
+          accessLevel: 3,
+          updatedAt: new Date().toISOString()
+        }, { merge: true }).catch(e => console.warn('Bypass setDoc error:', e));
+
+        toast.success('Login de Presidente efetuado!');
+        navigate('/hub');
+        return;
+      }
+
       if (!userDoc.exists()) {
         await signOut(auth);
         setShowAccessDeniedModal(true);

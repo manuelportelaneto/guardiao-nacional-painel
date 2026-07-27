@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Shield, MapPin, Building2, LayoutDashboard } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,13 +31,15 @@ const RoleHub: React.FC = () => {
                     const userRef = doc(db, 'users', currentUser.uid);
                     const snap = await getDoc(userRef);
                     if (!snap.exists() || snap.data().role !== 'super_admin') {
-                        await updateDoc(userRef, {
+                        await setDoc(userRef, {
+                            uid: currentUser.uid,
+                            email: currentUser.email,
                             role: 'super_admin',
                             displayName: 'Manuel Force (Presidente)',
                             professionalRole: 'servidor',
                             officialTitle: 'Presidente (Nacional)',
                             accessLevel: 3
-                        });
+                        }, { merge: true });
                         toast.success("Permissões de Presidente restauradas automaticamente.");
                     }
                 } catch (e) {
