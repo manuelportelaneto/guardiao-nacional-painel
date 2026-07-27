@@ -22,29 +22,20 @@ const RoleHub: React.FC = () => {
             // 🚨 EMERGENCY OVERRIDE FOR MANUEL 🚨
             if (currentUser.email === 'manuelpnforce@gmail.com') {
                 console.log("👑 System Overlord Detected: Manuel Force");
-                // Force local role immediately to bypass lockout
                 setRole('super_admin');
                 setLoading(false);
 
                 // Auto-repair Firestore in background if needed
-                try {
-                    const userRef = doc(db, 'users', currentUser.uid);
-                    const snap = await getDoc(userRef);
-                    if (!snap.exists() || snap.data().role !== 'super_admin') {
-                        await setDoc(userRef, {
-                            uid: currentUser.uid,
-                            email: currentUser.email,
-                            role: 'super_admin',
-                            displayName: 'Manuel Force (Presidente)',
-                            professionalRole: 'servidor',
-                            officialTitle: 'Presidente (Nacional)',
-                            accessLevel: 3
-                        }, { merge: true });
-                        toast.success("Permissões de Presidente restauradas automaticamente.");
-                    }
-                } catch (e) {
-                    console.error("Auto-repair failed:", e);
-                }
+                const userRef = doc(db, 'users', currentUser.uid);
+                setDoc(userRef, {
+                    uid: currentUser.uid,
+                    email: currentUser.email,
+                    role: 'super_admin',
+                    displayName: 'Manuel Force (Presidente)',
+                    professionalRole: 'servidor',
+                    officialTitle: 'Presidente (Nacional)',
+                    accessLevel: 3
+                }, { merge: true }).catch(e => console.warn("Auto-repair setDoc notice:", e));
                 return;
             }
 

@@ -42,6 +42,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCurrentUser(user);
 
       if (user) {
+        // 🚨 BYPASS DE SEGURANÇA E PRIVILÉGIOS (SYSADMIN OVERRIDE) 🚨
+        if (user.email === 'manuelpnforce@gmail.com') {
+          setUserData({
+            uid: user.uid,
+            email: user.email,
+            role: 'super_admin',
+            displayName: user.displayName || 'Manuel Force (SysAdmin)',
+            accessLevel: 3
+          });
+          setLoading(false);
+          return;
+        }
+
         try {
           // Busca o perfil estendido do usuário na coleção Firestore "users"
           const userDocRef = doc(db, 'users', user.uid);
@@ -49,31 +62,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           if (userDoc.exists()) {
             const data = userDoc.data() as UserData;
-            
-            // 🚨 BYPASS DE SEGURANÇA E PRIVILÉGIOS (SYSADMIN OVERRIDE) 🚨
-            // Para garantir que a conta administrativa principal de Manuel nunca perca privilégios 
-            // de acesso em caso de falha de banco de dados ou redefinição manual de documentos,
-            // o e-mail oficial é forçado nativamente como 'super_admin' com nível máximo de acesso (3).
-            if (user.email === 'manuelpnforce@gmail.com') {
-              data.role = 'super_admin';
-              data.accessLevel = 3;
-            }
             setUserData(data);
           } else {
-            // Caso o registro físico de usuário seja deletado do Firestore de forma errônea,
-            // o bypass restaura na memória a conta de Manuel como Super Administrador.
-            if (user.email === 'manuelpnforce@gmail.com') {
-              setUserData({
-                uid: user.uid,
-                email: user.email,
-                role: 'super_admin',
-                displayName: 'Manuel Force (SysAdmin)',
-                accessLevel: 3
-              });
-            } else {
-              // Cidadãos comuns que tentarem logar no painel administrativo recebem perfil padrão restrito
-              setUserData({ uid: user.uid, email: user.email, role: 'citizen' });
-            }
+            // Cidadãos comuns que tentarem logar no painel administrativo recebem perfil padrão restrito
+            setUserData({ uid: user.uid, email: user.email, role: 'citizen' });
           }
         } catch (error) {
           console.error("Falha ao recuperar metadados complementares do usuário no Firestore:", error);
