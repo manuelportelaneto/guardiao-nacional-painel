@@ -13,7 +13,7 @@ import {
 import {
     CircleCheck, TriangleAlert, FileText, Users as UsersIcon,
     Building2, ThumbsUp, Clock, TrendingUp, Activity,
-    Calendar as CalendarIcon, RefreshCw, Sword, Shield, Zap
+    Calendar as CalendarIcon, RefreshCw, Sword, Shield, Zap, MapPin
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -27,6 +27,7 @@ import InsightsWidget from '../widgets/InsightsWidget';
 
 import type { Contribution } from '../../types/contribution';
 import { useAuth } from '../../context/AuthContext';
+import { useScope } from '../../context/ScopeContext';
 
 // ─── Stat Card — improved version ────────────────────────────────────────────
 interface StatCardProps {
@@ -43,19 +44,19 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, descripti
     <Card className={`overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow ${gradient}`}>
         <CardContent className="p-5">
             <div className="flex items-start justify-between">
-                <div>
-                    <p className="text-xs font-semibold text-white/70 uppercase tracking-widest mb-1">{title}</p>
-                    <p className="text-3xl font-extrabold text-white leading-none">{value}</p>
-                    {description && <p className="text-xs text-white/60 mt-1.5">{description}</p>}
+                <div className="text-white space-y-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-white/80">{title}</p>
+                    <p className="text-3xl font-extrabold tracking-tight">{value}</p>
+                    {description && <p className="text-xs text-white/70">{description}</p>}
                 </div>
-                <div className={`p-3 rounded-xl ${iconBg}`}>
-                    <Icon className="w-5 h-5 text-white" />
+                <div className={`p-3 rounded-2xl ${iconBg}`}>
+                    <Icon className="w-6 h-6 text-white" />
                 </div>
             </div>
             {trend !== undefined && (
-                <div className="mt-3 flex items-center gap-1 text-xs text-white/80">
-                    <TrendingUp className="w-3 h-3" />
-                    <span>{trend > 0 ? `+${trend}` : trend}% vs. período anterior</span>
+                <div className="mt-3 flex items-center text-xs text-white/80 font-medium">
+                    <TrendingUp className="w-3.5 h-3.5 mr-1 text-emerald-300" />
+                    <span>{trend > 0 ? `+${trend}%` : `${trend}%`} em relação ao mês anterior</span>
                 </div>
             )}
         </CardContent>
@@ -68,7 +69,8 @@ interface TimelineData { date: string; count: number; }
 // ─── Main Component ───────────────────────────────────────────────────────────
 const AdminOverview: React.FC = () => {
     const { userData } = useAuth();
-    const isPresidente = userData?.role === 'presidente';
+    const { scope, isNational, resetToNational, dataMasking } = useScope();
+    const isPresidente = userData?.role === 'presidente' || userData?.role === 'super_admin';
 
     const [recentContributions, setRecentContributions] = useState<Contribution[]>([]);
     const [allContributions, setAllContributions] = useState<Contribution[]>([]);
@@ -82,30 +84,67 @@ const AdminOverview: React.FC = () => {
     const [graalKnightCount, setGraalKnightCount] = useState(0);
 
     useEffect(() => {
-        const unsubContribs = onSnapshot(collection(db, 'contributions'), (snap) => {
-            const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
-            setAllContributions(all);
-        });
-        const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-            setUserCount(snap.size);
-            // Count users with knight badge
-            const knights = snap.docs.filter(d => d.data().badges?.includes('cavaleiro-do-graal'));
-            setGraalKnightCount(knights.length);
-        });
+        const unsubContribs = onSnapshot(
+            collection(db, 'contributions'),
+            (snap) => {
+                const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
+                setAllContributions(all);
+            },
+            (error) => {
+                console.warn('Interrompido listener de contribuições:', error);
+            }
+        );
+        const unsubUsers = onSnapshot(
+            collection(db, 'users'),
+            (snap) => {
+                setUserCount(snap.size);
+                // Count users with knight badge
+                const knights = snap.docs.filter(d => d.data().badges?.includes('cavaleiro-do-graal'));
+                setGraalKnightCount(knights.length);
+            },
+            (error) => {
+                console.warn('Interrompido listener de usuários:', error);
+            }
+        );
         // Graal reports listener — last 20 graals
         const graalQ = query(collection(db, 'graal_reports'), orderBy('processedAt', 'desc'), limit(20));
-        const unsubGraal = onSnapshot(graalQ, (snap) => {
-            setGraalReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        });
+        const unsubGraal = onSnapshot(
+            graalQ,
+            (snap) => {
+                setGraalReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            },
+            (error) => {
+                console.warn('Interrompido listener do Graal:', error);
+            }
+        );
         return () => { unsubContribs(); unsubUsers(); unsubGraal(); };
     }, []);
 
-    // Filtered contributions
+    // Filtered contributions by Scope & Date
     const contribs = React.useMemo(() => {
         let data = [...allContributions];
+
+        // 1. Filtragem por Escopo Federativo (ScopeContext)
+        if (scope.level === 'STATE' && scope.state) {
+            data = data.filter(c => c.state?.toUpperCase() === scope.state?.toUpperCase());
+        } else if (scope.level === 'MUNICIPAL' || scope.level === 'DEPARTMENT') {
+            data = data.filter(c => {
+                const cCity = (c.city || '').toLowerCase();
+                const cCityId = ((c as any).cityId || '').toLowerCase();
+                const targetId = (scope.cityId || '').toLowerCase();
+                const targetName = (scope.cityName || '').toLowerCase();
+                return (targetId && cCityId === targetId) ||
+                       (targetId && cCity === targetId) ||
+                       (targetName && cCity === targetName);
+            });
+        }
+
+        // 2. Filtro de região manual (se selecionado no dropdown)
         if (regionFilter !== 'all') {
             data = data.filter(c => c.state?.toLowerCase() === regionFilter || c.city?.toLowerCase() === regionFilter);
         }
+
+        // 3. Filtro de intervalo de datas
         if (dateRange.from) {
             data = data.filter(c => {
                 if (!c.createdAt) return false;
@@ -115,7 +154,7 @@ const AdminOverview: React.FC = () => {
             });
         }
         return data;
-    }, [allContributions, regionFilter, dateRange]);
+    }, [allContributions, scope, regionFilter, dateRange]);
 
     useEffect(() => { setRecentContributions(contribs); }, [contribs]);
 
@@ -237,6 +276,47 @@ const AdminOverview: React.FC = () => {
                     </Button>
                 </div>
             </div>
+
+            {/* ─── Banner de Escopo Federativo Ativo (se não for Nacional) ────── */}
+            {!isNational && (
+                <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-blue-700/50">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                            {scope.level === 'STATE' ? <MapPin className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm">
+                                    {scope.level === 'STATE' && `Escopo Estadual: ${scope.state}`}
+                                    {scope.level === 'MUNICIPAL' && `Escopo Municipal: ${scope.cityName || scope.cityId}`}
+                                    {scope.level === 'DEPARTMENT' && `Secretaria: ${scope.departmentName || scope.departmentId} (${scope.cityName || scope.cityId})`}
+                                </span>
+                                {scope.isEmulated && (
+                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-400/30 text-[10px]">
+                                        Modo Emulação
+                                    </Badge>
+                                )}
+                                {dataMasking && (
+                                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
+                                        LGPD Ativa
+                                    </Badge>
+                                )}
+                            </div>
+                            <p className="text-xs text-blue-200/80 mt-0.5">
+                                Métricas, gráficos e registros restritos à jurisdição selecionada ({contribs.length} ocorrências localizadas).
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={resetToNational}
+                        className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs shrink-0"
+                    >
+                        Voltar à Visão Nacional (Brasil)
+                    </Button>
+                </div>
+            )}
 
             {/* ─── Alert banner se há muitas em análise ────────────────────────── */}
             {underReview > 10 && (

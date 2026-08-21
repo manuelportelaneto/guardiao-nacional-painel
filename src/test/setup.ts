@@ -52,20 +52,33 @@ vi.mock('firebase/firestore', () => ({
     getFirestore: vi.fn(),
     collection: vi.fn(),
     doc: vi.fn(),
-    getDocs: vi.fn(() => Promise.resolve({ docs: [] })),
+    getDocs: vi.fn(() => Promise.resolve({
+        docs: [],
+        empty: true,
+        size: 0,
+        forEach: function (cb: any) { this.docs.forEach(cb); }
+    })),
     getDoc: vi.fn(() => Promise.resolve({ exists: () => false, data: () => null })),
     setDoc: vi.fn(() => Promise.resolve()),
     updateDoc: vi.fn(() => Promise.resolve()),
     deleteDoc: vi.fn(() => Promise.resolve()),
+    addDoc: vi.fn(() => Promise.resolve({ id: 'mock-doc-id' })),
     query: vi.fn(),
     where: vi.fn(),
     orderBy: vi.fn(),
+    limit: vi.fn(),
     onAuthStateChanged: vi.fn(() => {
-        // callback(null);
         return vi.fn(); // unsubscribe
     }),
-    onSnapshot: vi.fn((_ref, callback) => {
-        callback({ docs: [] });
+    onSnapshot: vi.fn((_ref, callback, _errorCb) => {
+        if (typeof callback === 'function') {
+            callback({
+                docs: [],
+                empty: true,
+                size: 0,
+                forEach: function (cb: any) { this.docs.forEach(cb); }
+            });
+        }
         return vi.fn();
     }),
     Timestamp: {

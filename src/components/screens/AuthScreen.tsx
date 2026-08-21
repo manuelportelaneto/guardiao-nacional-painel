@@ -62,14 +62,18 @@ const AuthScreen: React.FC = () => {
       const userDocRef = doc(db, 'users', uid);
       const userDoc = await getDoc(userDocRef);
 
+      const userEmail = (auth.currentUser?.email || '').toLowerCase().trim();
+      console.log('🔍 [Auth] Verificando acesso para:', userEmail, 'UID:', uid);
+
       // Bypass e Auto-provisionamento de Super Admin para Manuel
-      if (auth.currentUser?.email === 'manuelpnforce@gmail.com') {
+      if (userEmail === 'manuelpnforce@gmail.com') {
+        console.log('👑 [Auth] SysAdmin identificado:', userEmail);
         const { setDoc } = await import('firebase/firestore');
         await setDoc(userDocRef, {
           uid,
-          email: auth.currentUser.email,
+          email: auth.currentUser?.email,
           role: 'super_admin',
-          displayName: auth.currentUser.displayName || 'Manuel Force (Presidente)',
+          displayName: auth.currentUser?.displayName || 'Manuel Force (Presidente)',
           accessLevel: 3,
           updatedAt: new Date().toISOString()
         }, { merge: true }).catch(e => console.warn('Bypass setDoc error:', e));
@@ -189,11 +193,9 @@ const AuthScreen: React.FC = () => {
 
         {/* Logo Header */}
         <div className="flex flex-col items-center mb-8">
-          <div className="w-16 h-16 rounded-full overflow-hidden mb-4 shadow-md border-2 border-white">
-            <img src="/logo.png?v=3" alt="Logo" className="w-full h-full object-cover" />
-          </div>
-          <h1 className="text-xl font-bold text-primary">Guardião Nacional</h1>
-          <p className="text-sm text-slate-500 mt-1">Painel Administrativo</p>
+          <img src="/logo.png" alt="Guardião Nacional" className="w-20 h-20 object-contain mb-3 drop-shadow-md" />
+          <h1 className="text-2xl font-bold text-slate-900">Guardião Nacional</h1>
+          <p className="text-sm text-slate-500 mt-1">Painel Administrativo & Operacional</p>
         </div>
 
         {/* Card */}

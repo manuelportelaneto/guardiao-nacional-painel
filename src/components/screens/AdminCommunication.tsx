@@ -39,11 +39,17 @@ const AdminCommunication: React.FC = () => {
 
     React.useEffect(() => {
         const settingsRef = doc(db, 'settings', 'global');
-        const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() } as SystemSettings);
+        const unsubscribe = onSnapshot(
+            settingsRef,
+            (docSnap) => {
+                if (docSnap.exists()) {
+                    setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() } as SystemSettings);
+                }
+            },
+            (error) => {
+                console.warn('Interrompido listener de settings em comunicação:', error);
             }
-        });
+        );
         return () => unsubscribe();
     }, []);
 

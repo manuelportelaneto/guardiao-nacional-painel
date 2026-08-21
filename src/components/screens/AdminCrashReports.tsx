@@ -32,16 +32,31 @@ const AdminCrashReports: React.FC = () => {
     const fetchReports = async () => {
         try {
             setLoading(true);
-            const q = query(collection(db, 'crash_reports'), orderBy('timestamp', 'desc'));
-            const querySnapshot = await getDocs(q);
-            const data = querySnapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as CrashReport[];
+            let data: CrashReport[] = [];
+            try {
+                const q = query(collection(db, 'crash_reports'), orderBy('timestamp', 'desc'));
+                const querySnapshot = await getDocs(q);
+                data = querySnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as CrashReport[];
+            } catch (queryErr) {
+                console.warn('Fallback query para crash_reports sem índice:', queryErr);
+                const rawSnapshot = await getDocs(collection(db, 'crash_reports'));
+                data = rawSnapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                })) as CrashReport[];
+                data.sort((a, b) => {
+                    const tA = a.timestamp?.seconds || 0;
+                    const tB = b.timestamp?.seconds || 0;
+                    return tB - tA;
+                });
+            }
             setReports(data);
         } catch (error) {
             console.error('Error fetching crash reports:', error);
-            toast.error('Erro ao carregar relatórios de falha.');
+            setReports([]);
         } finally {
             setLoading(false);
         }

@@ -97,8 +97,22 @@ export const reportService = {
      */
     async exportToPDF(data: ReportData[], cityName: string) {
         const doc = new jsPDF();
+        const pageWidth = doc.internal.pageSize.getWidth();
         const now = new Date();
         const dateStr = format(now, "dd/MM/yyyy HH:mm");
+
+        // Logotipo Oficial
+        try {
+            const logoImg = new Image();
+            logoImg.src = '/logo.png';
+            await new Promise((resolve) => {
+                logoImg.onload = resolve;
+                logoImg.onerror = resolve;
+            });
+            if (logoImg.complete && logoImg.naturalWidth > 0) {
+                doc.addImage(logoImg, 'PNG', pageWidth - 32, 10, 20, 20);
+            }
+        } catch {}
 
         // Cabeçalho do Documento
         doc.setFontSize(18);

@@ -71,6 +71,6 @@ export const FEATURE_FLAGS = {
 /**
  * Role Hierarchy (Synchronized with firestore.rules)
  */
-export const ADMIN_ROLES = ['super_admin', 'admin'] as const;
-export const CITY_ADMIN_ROLES = ['city_admin', 'prefeito', 'assessor', 'analista', 'operador'] as const;
+export const ADMIN_ROLES = ['super_admin', 'admin', 'presidente'] as const;
+export const CITY_ADMIN_ROLES = ['governador', 'city_admin', 'prefeito', 'assessor', 'analista', 'operador', 'servidor'] as const;
 export const ALL_AUTHORIZED_ROLES = [...ADMIN_ROLES, ...CITY_ADMIN_ROLES] as const;

@@ -37,14 +37,21 @@ const MessageHistory: React.FC = () => {
 
     useEffect(() => {
         const q = query(collection(db, 'messages'), orderBy('createdAt', 'desc'), limit(50));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            } as MessageLog));
-            setMessages(data);
-            setLoading(false);
-        });
+        const unsubscribe = onSnapshot(
+            q,
+            (snapshot) => {
+                const data = snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                } as MessageLog));
+                setMessages(data);
+                setLoading(false);
+            },
+            (error) => {
+                console.warn('Interrompido listener de mensagens:', error);
+                setLoading(false);
+            }
+        );
         return () => unsubscribe();
     }, []);
 

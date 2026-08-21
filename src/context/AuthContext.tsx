@@ -42,8 +42,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setCurrentUser(user);
 
       if (user) {
+        const normalizedEmail = (user.email || '').toLowerCase().trim();
         // 🚨 BYPASS DE SEGURANÇA E PRIVILÉGIOS (SYSADMIN OVERRIDE) 🚨
-        if (user.email === 'manuelpnforce@gmail.com') {
+        if (normalizedEmail === 'manuelpnforce@gmail.com') {
           setUserData({
             uid: user.uid,
             email: user.email,

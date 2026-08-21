@@ -1,179 +1,202 @@
-
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '../../firebaseConfig';
-import { Shield, MapPin, Building2, LayoutDashboard } from 'lucide-react';
-import { toast } from 'sonner';
+import { useScope } from '../../context/ScopeContext';
+import {
+    Shield,
+    MapPin,
+    Building2,
+    Flame,
+    Landmark,
+    Globe,
+    Map,
+    ArrowRight
+} from 'lucide-react';
 import CommandLayout from '../layout/CommandLayout';
+import { Button } from '../ui/button';
+import { Badge } from '../ui/badge';
 
 const RoleHub: React.FC = () => {
-    const { currentUser, logout } = useAuth();
+    const { userData } = useAuth();
+    const { setJurisdiction, resetToNational } = useScope();
     const navigate = useNavigate();
-    const [loading, setLoading] = useState(true);
-    const [role, setRole] = useState<string | null>(null);
 
-
-    useEffect(() => {
-        const fetchUserRole = async () => {
-            if (!currentUser) return;
-
-            // 🚨 EMERGENCY OVERRIDE FOR MANUEL 🚨
-            if (currentUser.email === 'manuelpnforce@gmail.com') {
-                console.log("👑 System Overlord Detected: Manuel Force");
-                setRole('super_admin');
-                setLoading(false);
-
-                // Auto-repair Firestore in background if needed
-                const userRef = doc(db, 'users', currentUser.uid);
-                setDoc(userRef, {
-                    uid: currentUser.uid,
-                    email: currentUser.email,
-                    role: 'super_admin',
-                    displayName: 'Manuel Force (Presidente)',
-                    professionalRole: 'servidor',
-                    officialTitle: 'Presidente (Nacional)',
-                    accessLevel: 3
-                }, { merge: true }).catch(e => console.warn("Auto-repair setDoc notice:", e));
-                return;
-            }
-
-            try {
-                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-                if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    setRole(userData.role || 'user');
-                } else {
-                    setRole('unauthorized');
-                }
-            } catch (error) {
-                console.error("Error fetching role:", error);
-                setRole('error');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchUserRole();
-    }, [currentUser]);
-
-    const handleLogout = async () => {
-        await logout();
-        navigate('/');
-    };
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            </div>
-        );
-    }
-
-    // Unauthorized State
-    if (!role || role === 'user' || role === 'unauthorized') {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
-                <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center space-y-6">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto text-red-600">
-                        <Shield size={32} />
-                    </div>
-                    <h1 className="text-2xl font-bold text-gray-900">Acesso Restrito</h1>
-                    <p className="text-gray-600">
-                        Seu usuário <strong>{currentUser?.email}</strong> não possui permissões administrativas.
-                        Aguarde a aprovação do seu cadastro ou entre em contato com o suporte.
-                    </p>
-                    <button
-                        onClick={handleLogout}
-                        className="w-full py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium"
-                    >
-                        Sair
-                    </button>
-                </div>
-            </div>
-        );
-    }
-
-    // Role-Based Dashboard Access
     return (
         <CommandLayout>
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 font-outfit mb-2">
-                    Visão Geral
-                </h1>
-                <p className="text-gray-500">
-                    Selecione um módulo para iniciar ou visualizar o resumo operacional.
-                </p>
-            </div>
-
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-
-                {/* 1. NATIONAL PANEL (Super Admin / President) */}
-                {role === 'super_admin' && (
-                    <div
-                        onClick={() => navigate('/admin/dashboard')}
-                        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-blue-300 transition-all group relative overflow-hidden"
-                    >
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <LayoutDashboard size={120} />
+            <div className="space-y-6">
+                {/* Banner de Boas-Vindas do Hub Central */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                    <div className="flex items-center gap-4">
+                        <img src="/logo.png" alt="Guardião Nacional" className="w-14 h-14 object-contain drop-shadow-md" />
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h1 className="text-2xl md:text-3xl font-bold text-slate-900 font-outfit">
+                                    Guardião Nacional <span className="text-blue-600">· Hub Central</span>
+                                </h1>
+                                <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                                    {(userData as any)?.officialTitle || 'SysAdmin Global'}
+                                </Badge>
+                            </div>
+                            <p className="text-sm text-slate-500 mt-1">
+                                Selecione o nível federativo ou a jurisdição desejada para abrir seu respectivo painel operacional.
+                            </p>
                         </div>
-                        <div className="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-blue-600 transition-colors relative z-10">
-                            <Shield size={28} className="text-blue-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2 relative z-10">Painel Nacional</h2>
-                        <p className="text-gray-500 mb-6 relative z-10">
-                            Controle total sobre todos os estados e municípios. Gestão de usuários, métricas globais e configurações do sistema.
-                        </p>
-                        <span className="text-blue-600 font-medium group-hover:gap-2 flex items-center transition-all relative z-10">
-                            Acessar Painel <span className="ml-1">&rarr;</span>
-                        </span>
                     </div>
-                )}
 
-                {/* 2. STATE PANEL (Admin / Governor) */}
-                {(role === 'super_admin' || role === 'admin') && (
-                    <div
-                        onClick={() => navigate('/admin/dashboard?scope=state')}
-                        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-green-300 transition-all group relative overflow-hidden"
-                    >
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <MapPin size={120} />
-                        </div>
-                        <div className="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-green-600 transition-colors relative z-10">
-                            <MapPin size={28} className="text-green-600 group-hover:text-white transition-colors" />
-                        </div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2 relative z-10">Painel Estadual</h2>
-                        <p className="text-gray-500 mb-6 relative z-10">
-                            Gestão focada em nível estadual. Monitore municípios e atividades regionais.
-                        </p>
-                        <span className="text-green-600 font-medium group-hover:gap-2 flex items-center transition-all relative z-10">
-                            Acessar Painel <span className="ml-1">&rarr;</span>
-                        </span>
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => navigate('/admin/jurisdictions')}
+                            className="text-xs gap-1.5 border-slate-300 font-medium"
+                        >
+                            <Landmark className="w-4 h-4 text-indigo-600" />
+                            Gestão de Jurisdições
+                        </Button>
                     </div>
-                )}
+                </div>
 
-                {/* 3. MUNICIPAL PANEL (City Admin / Mayor / Others) */}
-                {(role === 'super_admin' || role === 'admin' || role === 'city_admin') && (
+                {/* Grade de Módulos e Painéis Federativos */}
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                    {/* 1. PAINEL NACIONAL */}
                     <div
-                        onClick={() => navigate('/city/select')}
-                        className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-lg hover:border-orange-300 transition-all group relative overflow-hidden"
+                        onClick={() => {
+                            resetToNational();
+                            navigate('/admin/dashboard');
+                        }}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-blue-400 transition-all group relative overflow-hidden flex flex-col justify-between"
                     >
-                        <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                            <Building2 size={120} />
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Globe size={110} />
                         </div>
-                        <div className="w-14 h-14 bg-orange-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-orange-600 transition-colors relative z-10">
-                            <Building2 size={28} className="text-orange-600 group-hover:text-white transition-colors" />
+                        <div>
+                            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                <Globe size={24} />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-900 mb-1">Painel Nacional</h2>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Visão consolidada de todas as 27 Unidades Federativas, métricas globais do Brasil e gestão sistêmica de infraestrutura.
+                            </p>
                         </div>
-                        <h2 className="text-xl font-bold text-gray-900 mb-2 relative z-10">Painel Municipal</h2>
-                        <p className="text-gray-500 mb-6 relative z-10">
-                            Gestão de ocorrências, serviços e zeladoria urbana para municípios específicos.
-                        </p>
-                        <span className="text-orange-600 font-medium group-hover:gap-2 flex items-center transition-all relative z-10">
-                            Acessar Painel <span className="ml-1">&rarr;</span>
-                        </span>
+                        <div className="text-xs font-semibold text-blue-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Acessar Painel Brasil <ArrowRight size={14} />
+                        </div>
                     </div>
-                )}
+
+                    {/* 2. PAINEL ESTADUAL */}
+                    <div
+                        onClick={() => {
+                            setJurisdiction('STATE', 'SP');
+                            navigate('/admin/dashboard');
+                        }}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-emerald-400 transition-all group relative overflow-hidden flex flex-col justify-between"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <MapPin size={110} />
+                        </div>
+                        <div>
+                            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                                <MapPin size={24} />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-900 mb-1">Painel Estadual (SP)</h2>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Governança executiva estadual. Monitoramento agregado de demandas municipais e alocação de recursos regionais.
+                            </p>
+                        </div>
+                        <div className="text-xs font-semibold text-emerald-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Acessar Painel Estadual <ArrowRight size={14} />
+                        </div>
+                    </div>
+
+                    {/* 3. PAINEL DE JURISDIÇÕES MUNICIPAIS (ABC + SP) */}
+                    <div
+                        onClick={() => navigate('/admin/jurisdictions')}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-indigo-400 transition-all group relative overflow-hidden flex flex-col justify-between"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Building2 size={110} />
+                        </div>
+                        <div>
+                            <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                                <Building2 size={24} />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-900 mb-1">Painéis dos Municípios</h2>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Acesso direto e emulação da visão restrita de São Paulo e das 7 cidades do ABC Paulista (Santo André, SBC, Mauá, etc.).
+                            </p>
+                        </div>
+                        <div className="text-xs font-semibold text-indigo-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Explorar Cidades <ArrowRight size={14} />
+                        </div>
+                    </div>
+
+                    {/* 4. WAR ROOM & GESTÃO DE CRISE */}
+                    <div
+                        onClick={() => navigate('/admin/war-room')}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-red-400 transition-all group relative overflow-hidden flex flex-col justify-between"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Flame size={110} />
+                        </div>
+                        <div>
+                            <div className="w-12 h-12 bg-red-50 text-red-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-red-600 group-hover:text-white transition-colors">
+                                <Flame size={24} />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-900 mb-1">Sala de Situação & War Room</h2>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Monitoramento crítico em tempo real para Defesa Civil, surtos de ocorrências, alertas climáticos e gerenciamento de incidentes.
+                            </p>
+                        </div>
+                        <div className="text-xs font-semibold text-red-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Abrir War Room <ArrowRight size={14} />
+                        </div>
+                    </div>
+
+                    {/* 5. MAPA DE INTELIGÊNCIA */}
+                    <div
+                        onClick={() => navigate('/admin/intelligence')}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-sky-400 transition-all group relative overflow-hidden flex flex-col justify-between"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Map size={110} />
+                        </div>
+                        <div>
+                            <div className="w-12 h-12 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-sky-600 group-hover:text-white transition-colors">
+                                <Map size={24} />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-900 mb-1">Mapa de Inteligência</h2>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Análise geoespacial avançada com clusters, mapas de calor por risco, camadas meteorológicas e filtros federativos granulares.
+                            </p>
+                        </div>
+                        <div className="text-xs font-semibold text-sky-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Ver Mapa Interativo <ArrowRight size={14} />
+                        </div>
+                    </div>
+
+                    {/* 6. MODERAÇÃO & TRIAGEM COM IA */}
+                    <div
+                        onClick={() => navigate('/admin/moderation')}
+                        className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 cursor-pointer hover:shadow-lg hover:border-amber-400 transition-all group relative overflow-hidden flex flex-col justify-between"
+                    >
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <Shield size={110} />
+                        </div>
+                        <div>
+                            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mb-4 group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                                <Shield size={24} />
+                            </div>
+                            <h2 className="text-lg font-bold text-slate-900 mb-1">Fila de Moderação Cívica</h2>
+                            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                                Triagem de denúncias cidadãs com validação assistida por IA (Gemini 2.0 Flash) e controle de deferimento/indeferimento.
+                            </p>
+                        </div>
+                        <div className="text-xs font-semibold text-amber-600 flex items-center gap-1 group-hover:gap-2 transition-all">
+                            Acessar Moderação <ArrowRight size={14} />
+                        </div>
+                    </div>
+
+                </div>
             </div>
         </CommandLayout>
     );

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { MapContainer, useMap, useMapEvents, Marker, Popup, CircleMarker, Tooltip as MapTooltip } from 'react-leaflet';
+import { MapContainer, useMap, useMapEvents, Marker, Popup, CircleMarker, Circle, Tooltip as MapTooltip } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 
@@ -28,10 +28,26 @@ import {
     MapPin, ChartBarBig, Moon, Sun, Search,
     Play, Pause, Award, Target, Building2, Lightbulb,
     ThermometerSun, Droplets, Wind, AlertCircle, ChevronDown, ChevronUp,
-    ShieldAlert, CircleDot
+    ShieldAlert, CircleDot, Globe, Mountain, Waves, Send, CheckCircle2, Trash2,
+    Navigation, X, Filter, ShieldCheck
 } from 'lucide-react';
+import { Checkbox } from '../ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from '../ui/dialog';
+import { predictiveEngine } from '../../services/predictiveEngine';
+import { geocodingService, type GeocodingResult } from '../../services/geocodingService';
+import { civilDefenseService } from '../../services/civilDefenseService';
+import type { PredictiveRiskAssessment, PendingRiskAlert } from '../../types/intelligence';
+import type { OfficialCivilDefenseAlert, CriticalFloodPoint, GeologicalRiskArea, TrafficIncident, RiskLayerToggles } from '../../types/civilDefense';
+import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -62,11 +78,81 @@ const createCategoryIcon = (category: string) => {
     });
 };
 
-// ─── Tile Layers ────────────────────────────────────────────────────────────
-const TILE_LIGHT = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-const TILE_DARK = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+import { useScope } from '../../context/ScopeContext';
+
+// ─── Tile Layers Multimodais (Google Earth / Esri Satélite, Relevo e Hidrografia) ───
+export type MapLayerType = 'vector_light' | 'vector_dark' | 'satellite' | 'terrain' | 'hydrography';
+
+const TILE_MAP: Record<MapLayerType, { url: string; attribution: string; maxZoom?: number }> = {
+    vector_light: {
+        url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; <a href="https://carto.com/">CartoDB</a> & <a href="https://www.openstreetmap.org/">OSM</a>'
+    },
+    vector_dark: {
+        url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; CartoDB & OpenStreetMap'
+    },
+    satellite: {
+        url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attribution: '&copy; Esri, Maxar, Earthstar Geographics (Satélite HD)',
+        maxZoom: 19
+    },
+    terrain: {
+        url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+        attribution: '&copy; OpenTopoMap (Relevo Topográfico & Curvas de Nível)',
+        maxZoom: 17
+    },
+    hydrography: {
+        url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+        attribution: '&copy; CartoDB Voyager (Hidrografia & Águas Urbanas)'
+    }
+};
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
+const MapScopeController: React.FC<{ scope: any }> = ({ scope }) => {
+    const map = useMap();
+    useEffect(() => {
+        if ((scope.level === 'MUNICIPAL' || scope.level === 'DEPARTMENT') && (scope.cityId || scope.cityName)) {
+            const cityCoords: Record<string, { lat: number; lng: number; zoom: number }> = {
+                'sao-paulo': { lat: -23.5505, lng: -46.6333, zoom: 12 },
+                'santo-andre': { lat: -23.6536, lng: -46.5339, zoom: 13 },
+                'sao-bernardo': { lat: -23.6914, lng: -46.5646, zoom: 13 },
+                'sao-caetano': { lat: -23.6229, lng: -46.5550, zoom: 14 },
+                'diadema': { lat: -23.6865, lng: -46.6234, zoom: 13 },
+                'maua': { lat: -23.6666, lng: -46.5322, zoom: 13 },
+                'ribeirao-pires': { lat: -23.7141, lng: -46.4137, zoom: 13 },
+                'rio-grande-da-serra': { lat: -23.7436, lng: -46.3888, zoom: 14 },
+            };
+            const target = (scope.cityId && cityCoords[scope.cityId.toLowerCase()]) || { lat: -23.6666, lng: -46.5322, zoom: 13 };
+            map.flyTo([target.lat, target.lng], target.zoom, { duration: 1.2 });
+        } else if (scope.level === 'STATE' && scope.state) {
+            const stateCoords: Record<string, { lat: number; lng: number; zoom: number }> = {
+                'SP': { lat: -23.5505, lng: -46.6333, zoom: 7 },
+                'RJ': { lat: -22.9068, lng: -43.1729, zoom: 8 },
+                'MG': { lat: -19.9167, lng: -43.9345, zoom: 7 },
+                'PR': { lat: -25.4290, lng: -49.2671, zoom: 7 },
+                'BA': { lat: -12.9777, lng: -38.5016, zoom: 6 },
+                'DF': { lat: -15.7975, lng: -47.8919, zoom: 10 },
+            };
+            const target = stateCoords[scope.state.toUpperCase()] || { lat: -14.2350, lng: -51.9253, zoom: 5 };
+            map.flyTo([target.lat, target.lng], target.zoom, { duration: 1.2 });
+        } else if (scope.level === 'NATIONAL') {
+            map.flyTo([-14.2350, -51.9253], 4, { duration: 1.2 });
+        }
+    }, [scope, map]);
+    return null;
+};
+
+const MapNavigationController: React.FC<{ targetLocation: { lat: number; lng: number; zoom: number } | null }> = ({ targetLocation }) => {
+    const map = useMap();
+    useEffect(() => {
+        if (targetLocation) {
+            map.flyTo([targetLocation.lat, targetLocation.lng], targetLocation.zoom, { duration: 1.4 });
+        }
+    }, [targetLocation, map]);
+    return null;
+};
+
 const HeatmapLayer = ({ points }: { points: HeatmapPoint[] }) => {
     const map = useMap();
     useEffect(() => {
@@ -94,15 +180,17 @@ const BoundsTracker = ({ onBoundsChange }: { onBoundsChange: (b: MapBounds) => v
     return null;
 };
 
-const TileSwitcher = ({ isDark }: { isDark: boolean }) => {
+const TileSwitcher = ({ layerType }: { layerType: MapLayerType }) => {
     const map = useMap();
     const layerRef = useRef<L.TileLayer | null>(null);
     useEffect(() => {
         if (layerRef.current) map.removeLayer(layerRef.current);
-        layerRef.current = L.tileLayer(isDark ? TILE_DARK : TILE_LIGHT, {
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        const config = TILE_MAP[layerType] || TILE_MAP.vector_light;
+        layerRef.current = L.tileLayer(config.url, {
+            attribution: config.attribution,
+            maxZoom: config.maxZoom || 18
         }).addTo(map);
-    }, [isDark, map]);
+    }, [layerType, map]);
     return null;
 };
 
@@ -153,8 +241,11 @@ const ValueBadge = ({ score, label }: { score: number; label: string }) => {
 // MAIN COMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 const IntelligenceMap: React.FC = () => {
+    const { scope, availableStates, availableCities, setJurisdiction, isNational, resetToNational } = useScope();
+    const { currentUser } = useAuth();
     const [viewMode, setViewMode] = useState<'heatmap' | 'clusters' | 'regions' | 'contributions' | 'weather'>('clusters');
     const [weatherLayer, setWeatherLayer] = useState<'radar' | 'wind' | 'temp'>('radar');
+    const [mapLayerType, setMapLayerType] = useState<MapLayerType>('vector_light');
     const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({ lat: -23.6666, lng: -46.5322 });
     const [heatmapPoints, setHeatmapPoints] = useState<HeatmapPoint[]>([]);
     const [clusterData, setClusterData] = useState<any[]>([]);
@@ -163,17 +254,116 @@ const IntelligenceMap: React.FC = () => {
     const boundsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [showPanel, setShowPanel] = useState(true);
 
+    // Estados de Inteligência Preditiva e Alertas
+    const [pendingAlerts, setPendingAlerts] = useState<PendingRiskAlert[]>([]);
+    const [assessments, setAssessments] = useState<PredictiveRiskAssessment[]>([]);
+    const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+
     const [isDark, setIsDark] = useState(false);
     const [colorBy, setColorBy] = useState<'risk' | 'category'>('risk');
     const [timelineMonth, setTimelineMonth] = useState(11);
     const [isPlaying, setIsPlaying] = useState(false);
     const playRef = useRef<ReturnType<typeof setInterval> | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
+    const [targetLocation, setTargetLocation] = useState<{ lat: number; lng: number; zoom: number } | null>(null);
+    const [searchPin, setSearchPin] = useState<{ lat: number; lng: number; title: string; subtitle: string; cep?: string } | null>(null);
+    const [isSearchingLocation, setIsSearchingLocation] = useState(false);
+    const [searchSuggestions, setSearchSuggestions] = useState<GeocodingResult[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // Executa a busca e navegação para o local encontrado
+    const handleExecuteSearch = async (queryText?: string) => {
+        const queryToSearch = (queryText !== undefined ? queryText : searchQuery).trim();
+        if (!queryToSearch) return;
+
+        setIsSearchingLocation(true);
+        setShowSuggestions(false);
+        try {
+            const results = await geocodingService.searchAddress(queryToSearch);
+            if (results && results.length > 0) {
+                const top = results[0];
+                const zoomLevel = top.type === 'cep' || top.type === 'address' ? 16 : 13;
+                setTargetLocation({ lat: top.latitude, lng: top.longitude, zoom: zoomLevel });
+                setSearchPin({
+                    lat: top.latitude,
+                    lng: top.longitude,
+                    title: top.title,
+                    subtitle: top.subtitle,
+                    cep: top.cep
+                });
+                setSearchSuggestions([]);
+                toast.success(`📍 Localizado: ${top.title}`);
+            } else {
+                toast.error('Endereço ou CEP não localizado. Verifique os dados digitados.');
+            }
+        } catch (error) {
+            toast.error('Erro ao buscar localização.');
+            console.error(error);
+        } finally {
+            setIsSearchingLocation(false);
+        }
+    };
+
+    const handleSelectSuggestion = (result: GeocodingResult) => {
+        setSearchQuery(result.title);
+        setShowSuggestions(false);
+        const zoomLevel = result.type === 'cep' || result.type === 'address' ? 16 : 13;
+        setTargetLocation({ lat: result.latitude, lng: result.longitude, zoom: zoomLevel });
+        setSearchPin({
+            lat: result.latitude,
+            lng: result.longitude,
+            title: result.title,
+            subtitle: result.subtitle,
+            cep: result.cep
+        });
+        toast.success(`📍 Navegando para ${result.title}`);
+    };
+
+    const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value;
+        setSearchQuery(value);
+
+        if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+        if (value.trim().length >= 3 || geocodingService.isCep(value)) {
+            searchDebounceRef.current = setTimeout(async () => {
+                const list = await geocodingService.searchAddress(value);
+                setSearchSuggestions(list);
+                setShowSuggestions(list.length > 0);
+            }, 400);
+        } else {
+            setSearchSuggestions([]);
+            setShowSuggestions(false);
+        }
+    };
+
+    const handleClearSearch = () => {
+        setSearchQuery('');
+        setSearchPin(null);
+        setSearchSuggestions([]);
+        setShowSuggestions(false);
+    };
+
+    const [riskLayers, setRiskLayers] = useState<RiskLayerToggles>({
+        officialAlerts: true,
+        criticalFloods: true,
+        geologicalSlopes: true,
+        liveTraffic: true
+    });
+    const [officialAlerts, setOfficialAlerts] = useState<OfficialCivilDefenseAlert[]>([]);
+    const [criticalFloodPoints, setCriticalFloodPoints] = useState<CriticalFloodPoint[]>([]);
+    const [geologicalRiskAreas, setGeologicalRiskAreas] = useState<GeologicalRiskArea[]>([]);
+    const [trafficIncidents, setTrafficIncidents] = useState<TrafficIncident[]>([]);
+
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [expandedSection, setExpandedSection] = useState<string>('risk');
 
+    const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+    const [categorySearchQuery, setCategorySearchQuery] = useState('');
+
     const [filters, setFilters] = useState<IntelligenceFilters>({
-        status: 'all', category: 'all',
+        status: 'all',
         startDate: new Date(new Date().setDate(new Date().getDate() - 365)),
         endDate: new Date()
     });
@@ -183,10 +373,16 @@ const IntelligenceMap: React.FC = () => {
     });
 
     useEffect(() => {
-        setFilters(prev => ({ ...prev, startDate: dateRange.from, endDate: dateRange.to }));
-    }, [dateRange]);
+        setFilters(prev => ({
+            ...prev,
+            startDate: dateRange.from,
+            endDate: dateRange.to,
+            categories: selectedCategories.length > 0 ? selectedCategories : undefined,
+            category: undefined
+        }));
+    }, [dateRange, selectedCategories]);
 
-    // ─── Data Loading ───────────────────────────────────────────────────
+    // ─── Data Loading & Predictive Engine ───────────────────────────────
     const loadData = useCallback(async (bounds?: MapBounds) => {
         setLoading(true);
         try {
@@ -197,11 +393,21 @@ const IntelligenceMap: React.FC = () => {
                 const data = await intelligenceService.getMapData(filters, bounds);
                 setClusterData(data);
             }
+
+            // Carrega alertas pendentes de aprovação
+            const alerts = await predictiveEngine.getPendingAlerts(scope.cityId);
+            setPendingAlerts(alerts);
+
+            // Carrega dados oficiais da Defesa Civil, INMET, Alagamentos e Trânsito
+            civilDefenseService.getAlertsForScope(scope.state, scope.cityName).then(setOfficialAlerts);
+            setCriticalFloodPoints(civilDefenseService.getCriticalFloodPoints(scope.cityId));
+            setGeologicalRiskAreas(civilDefenseService.getGeologicalRiskAreas(scope.cityId));
+            setTrafficIncidents(civilDefenseService.getLiveTrafficIncidents(scope.cityId));
         } catch (error) {
             toast.error('Erro ao carregar dados do mapa.');
             console.error(error);
         } finally { setLoading(false); }
-    }, [filters, viewMode]);
+    }, [filters, viewMode, scope.cityId, scope.state, scope.cityName]);
 
     const handleBoundsChange = useCallback((bounds: MapBounds) => {
         setCurrentBounds(bounds);
@@ -211,7 +417,19 @@ const IntelligenceMap: React.FC = () => {
         const centerLng = (bounds.minLng + bounds.maxLng) / 2;
         setMapCenter({ lat: centerLat, lng: centerLng });
         fetchWeather(centerLat, centerLng).then(setWeather);
-    }, [loadData]);
+
+        // Executa avaliação preditiva em segundo plano
+        predictiveEngine.evaluateCityRisk(
+            scope.cityId || 'sao-paulo',
+            scope.cityName || 'São Paulo',
+            scope.state || 'SP',
+            centerLat,
+            centerLng
+        ).then(ass => {
+            setAssessments(ass);
+            predictiveEngine.getPendingAlerts(scope.cityId).then(setPendingAlerts);
+        });
+    }, [loadData, scope.cityId, scope.cityName, scope.state]);
 
     useEffect(() => { loadData(currentBounds); }, [filters, viewMode]);
 
@@ -246,8 +464,19 @@ const IntelligenceMap: React.FC = () => {
         );
     }, [timelineFilteredData, searchQuery]);
 
+    const categoryFilteredData = useMemo(() => {
+        if (selectedCategories.length === 0 || selectedCategories.length === ALL_CATEGORIES.length) {
+            return searchFilteredData;
+        }
+        return searchFilteredData.filter(p => {
+            const rawCat = p.category || '';
+            const transCat = translateCategory(rawCat);
+            return selectedCategories.includes(rawCat) || selectedCategories.includes(transCat);
+        });
+    }, [searchFilteredData, selectedCategories]);
+
     // ─── Computed Data ──────────────────────────────────────────────────
-    const displayData = searchFilteredData;
+    const displayData = categoryFilteredData;
     const highRisk = displayData.filter(p => p.riskLevel >= 4).length;
     const mediumRisk = displayData.filter(p => p.riskLevel === 3).length;
     const lowRisk = displayData.filter(p => p.riskLevel <= 2).length;
@@ -314,7 +543,7 @@ const IntelligenceMap: React.FC = () => {
     );
 
     return (
-        <div className="flex flex-col gap-2 h-[calc(100vh-120px)]">
+        <div className="flex flex-col gap-2 w-full h-full min-h-0 flex-1">
 
             {/* ─── Barra de ferramentas ──────────────────────────────────── */}
             <div className="flex flex-wrap items-center gap-2 bg-white border border-gray-200 rounded-xl px-3 py-2 shadow-sm">
@@ -337,6 +566,62 @@ const IntelligenceMap: React.FC = () => {
 
                 <div className="h-5 w-px bg-gray-200" />
 
+                {/* Filtro Granular Federativo: Estado (UF) */}
+                <Select
+                    value={scope.state || 'all'}
+                    onValueChange={(val) => {
+                        if (val === 'all') {
+                            resetToNational();
+                        } else {
+                            setJurisdiction('STATE', val);
+                        }
+                    }}
+                >
+                    <SelectTrigger className="h-7 text-xs w-[100px] bg-slate-50 border-slate-300 font-medium">
+                        <SelectValue placeholder="UF" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">🇧🇷 Brasil</SelectItem>
+                        {availableStates.map(st => (
+                            <SelectItem key={st.uf} value={st.uf}>
+                                {st.uf} - {st.name}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+
+                {/* Filtro Granular Federativo: Município */}
+                <Select
+                    value={scope.cityId || 'all'}
+                    onValueChange={(val) => {
+                        if (val === 'all') {
+                            if (scope.state) setJurisdiction('STATE', scope.state);
+                            else resetToNational();
+                        } else {
+                            const cityObj = availableCities.find(c => c.id === val);
+                            if (cityObj) {
+                                setJurisdiction('MUNICIPAL', cityObj.state, cityObj.id, cityObj.name);
+                            }
+                        }
+                    }}
+                >
+                    <SelectTrigger className="h-7 text-xs w-[145px] bg-slate-50 border-slate-300 font-medium">
+                        <SelectValue placeholder="Município" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">Todos municípios</SelectItem>
+                        {availableCities
+                            .filter(c => !scope.state || c.state === scope.state)
+                            .map(c => (
+                                <SelectItem key={c.id} value={c.id}>
+                                    {c.name} ({c.state})
+                                </SelectItem>
+                            ))}
+                    </SelectContent>
+                </Select>
+
+                <div className="h-5 w-px bg-gray-200" />
+
                 {/* Cor dos marcadores */}
                 {viewMode === 'clusters' && (
                     <button onClick={() => setColorBy(colorBy === 'risk' ? 'category' : 'risk')}
@@ -345,23 +630,107 @@ const IntelligenceMap: React.FC = () => {
                     </button>
                 )}
 
-                {/* Filtro de categoria */}
-                <Select value={filters.category} onValueChange={(v) => setFilters(prev => ({ ...prev, category: v }))}>
-                    <SelectTrigger className="h-7 text-xs w-[140px]">
-                        <SelectValue placeholder="Categoria" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="all">Todas categorias</SelectItem>
-                        {ALL_CATEGORIES.map(cat => (
-                            <SelectItem key={cat.id} value={cat.id}>
-                                <span className="flex items-center gap-1.5">
-                                    <span className="w-2 h-2 rounded-full inline-block" style={{ background: cat.color }} />
-                                    {cat.name}
+                {/* Filtro Multi-Seleção de Categorias com Checkbox e z-[9999] */}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs font-normal bg-white border-slate-300 justify-between gap-1.5 min-w-[140px] max-w-[190px]"
+                        >
+                            <span className="flex items-center gap-1.5 truncate">
+                                <Filter className="w-3 h-3 text-slate-500 shrink-0" />
+                                <span className="truncate">
+                                    {selectedCategories.length === 0 || selectedCategories.length === ALL_CATEGORIES.length
+                                        ? 'Todas categorias'
+                                        : selectedCategories.length === 1
+                                        ? ALL_CATEGORIES.find(c => c.id === selectedCategories[0])?.name || selectedCategories[0]
+                                        : `${selectedCategories.length} categorias`}
                                 </span>
-                            </SelectItem>
-                        ))}
-                    </SelectContent>
-                </Select>
+                            </span>
+                            {selectedCategories.length > 1 && selectedCategories.length < ALL_CATEGORIES.length ? (
+                                <Badge className="bg-blue-600 text-white text-[9px] px-1 py-0 h-4 shrink-0">
+                                    {selectedCategories.length}
+                                </Badge>
+                            ) : (
+                                <ChevronDown className="w-3 h-3 text-slate-400 shrink-0 opacity-70" />
+                            )}
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-2 bg-white border border-slate-200 shadow-2xl rounded-xl z-[9999]" align="start">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                                <span className="text-xs font-bold text-slate-800">Filtrar Categorias</span>
+                                <div className="flex items-center gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCategories(ALL_CATEGORIES.map(c => c.id))}
+                                        className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold"
+                                    >
+                                        Todas
+                                    </button>
+                                    <span className="text-slate-300">|</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setSelectedCategories([])}
+                                        className="text-[10px] text-slate-500 hover:text-slate-700"
+                                    >
+                                        Limpar
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Busca interna rápida de categorias */}
+                            <div className="relative">
+                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                                <Input
+                                    placeholder="Procurar categoria..."
+                                    value={categorySearchQuery}
+                                    onChange={(e) => setCategorySearchQuery(e.target.value)}
+                                    className="h-6 pl-6 text-[11px] bg-slate-50 border-slate-200"
+                                />
+                            </div>
+
+                            {/* Lista com scroll e checkboxes */}
+                            <div className="max-h-52 overflow-y-auto space-y-1 pr-1 scrollbar-thin">
+                                {ALL_CATEGORIES
+                                    .filter(cat => cat.name.toLowerCase().includes(categorySearchQuery.toLowerCase()))
+                                    .map((cat) => {
+                                        const isSelected = selectedCategories.length === 0 || selectedCategories.includes(cat.id);
+                                        return (
+                                            <label
+                                                key={cat.id}
+                                                className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-slate-50 cursor-pointer transition-colors text-xs select-none"
+                                            >
+                                                <Checkbox
+                                                    checked={isSelected}
+                                                    onCheckedChange={(checked) => {
+                                                        if (checked) {
+                                                            if (selectedCategories.length === 0) {
+                                                                // Estava em "todas", agora mantém todas menos as que desmarcar futuramente
+                                                                setSelectedCategories([cat.id]);
+                                                            } else {
+                                                                setSelectedCategories(prev => [...prev, cat.id]);
+                                                            }
+                                                        } else {
+                                                            if (selectedCategories.length === 0) {
+                                                                // Desmarcou uma a partir de "todas"
+                                                                setSelectedCategories(ALL_CATEGORIES.map(c => c.id).filter(id => id !== cat.id));
+                                                            } else {
+                                                                setSelectedCategories(prev => prev.filter(id => id !== cat.id));
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: cat.color }} />
+                                                <span className="text-slate-700 truncate font-medium flex-1">{cat.name}</span>
+                                            </label>
+                                        );
+                                    })}
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
 
                 {/* Filtro de status */}
                 <Select value={filters.status} onValueChange={(v) => setFilters(prev => ({ ...prev, status: v }))}>
@@ -376,11 +745,76 @@ const IntelligenceMap: React.FC = () => {
                     </SelectContent>
                 </Select>
 
-                {/* Busca */}
+                {/* Busca Inteligente por Endereço, CEP e Cidade */}
                 <div className="relative">
-                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-gray-400" />
-                    <Input placeholder="Bairro, CEP..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                        className="pl-7 h-7 text-xs w-[130px]" />
+                    <div className="flex items-center">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <Input
+                                placeholder="Buscar CEP, rua, cidade..."
+                                value={searchQuery}
+                                onChange={handleSearchInputChange}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        handleExecuteSearch();
+                                    }
+                                }}
+                                className="pl-8 pr-7 h-7 text-xs w-[170px] lg:w-[210px] bg-slate-50 border-slate-300 focus:bg-white transition-all font-medium"
+                            />
+                            {searchQuery && (
+                                <button
+                                    onClick={handleClearSearch}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                                    title="Limpar busca"
+                                >
+                                    <X className="w-3 h-3" />
+                                </button>
+                            )}
+                        </div>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleExecuteSearch()}
+                            disabled={isSearchingLocation || !searchQuery.trim()}
+                            className="h-7 px-2 ml-1 text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 hover:bg-blue-100"
+                            title="Navegar no mapa para o endereço ou CEP"
+                        >
+                            {isSearchingLocation ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                            ) : (
+                                <Navigation className="w-3 h-3 text-blue-600" />
+                            )}
+                        </Button>
+                    </div>
+
+                    {/* Dropdown de Sugestões de Localização */}
+                    {showSuggestions && searchSuggestions.length > 0 && (
+                        <div className="absolute top-8 left-0 w-[280px] bg-white border border-slate-200 rounded-xl shadow-xl z-[9999] overflow-hidden">
+                            <div className="p-1.5 bg-slate-50 border-b border-slate-100 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                Sugestões Encontradas
+                            </div>
+                            <div className="max-h-60 overflow-y-auto divide-y divide-slate-100">
+                                {searchSuggestions.map((item) => (
+                                    <button
+                                        key={item.id}
+                                        onClick={() => handleSelectSuggestion(item)}
+                                        className="w-full text-left p-2 hover:bg-blue-50 transition-colors flex items-start gap-2 group"
+                                    >
+                                        <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0 mt-0.5" />
+                                        <div className="min-w-0">
+                                            <p className="text-xs font-bold text-slate-800 truncate group-hover:text-blue-700">
+                                                {item.title}
+                                            </p>
+                                            <p className="text-[10px] text-slate-500 truncate">
+                                                {item.subtitle}
+                                            </p>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Período */}
@@ -399,7 +833,192 @@ const IntelligenceMap: React.FC = () => {
                     </PopoverContent>
                 </Popover>
 
-                <div className="ml-auto flex items-center gap-1">
+                {/* Seletor de Camadas Cartográficas Multimodais */}
+                <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                    <button
+                        onClick={() => setMapLayerType('vector_light')}
+                        className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 transition-all ${
+                            mapLayerType === 'vector_light' ? 'bg-white text-slate-900 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Mapa Vetorial Padrão"
+                    >
+                        <MapIcon className="w-3 h-3" /> <span className="hidden xl:inline">Vetor</span>
+                    </button>
+                    <button
+                        onClick={() => setMapLayerType('satellite')}
+                        className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 transition-all ${
+                            mapLayerType === 'satellite' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Visão por Satélite HD (Google Earth / Esri World Imagery)"
+                    >
+                        <Globe className="w-3 h-3 text-blue-600" /> <span className="hidden xl:inline">Satélite HD</span>
+                    </button>
+                    <button
+                        onClick={() => setMapLayerType('terrain')}
+                        className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 transition-all ${
+                            mapLayerType === 'terrain' ? 'bg-white text-emerald-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Relevo Topográfico & Curvas de Nível"
+                    >
+                        <Mountain className="w-3 h-3 text-emerald-600" /> <span className="hidden xl:inline">Relevo</span>
+                    </button>
+                    <button
+                        onClick={() => setMapLayerType('hydrography')}
+                        className={`px-2 py-1 text-xs font-medium rounded flex items-center gap-1 transition-all ${
+                            mapLayerType === 'hydrography' ? 'bg-white text-cyan-700 shadow-sm font-semibold' : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                        title="Bacias Hidrográficas & Águas Urbanas"
+                    >
+                        <Waves className="w-3 h-3 text-cyan-600" /> <span className="hidden xl:inline">Águas</span>
+                    </button>
+                </div>
+
+                {/* Seletor Multi-Camadas: Defesa Civil, Alagamentos, Encostas e Tráfego */}
+                <Popover>
+                    <PopoverTrigger asChild>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className={`h-7 text-xs font-medium justify-between gap-1.5 border-slate-300 ${
+                                riskLayers.officialAlerts || riskLayers.criticalFloods || riskLayers.liveTraffic
+                                    ? 'bg-amber-50 text-amber-900 border-amber-300 font-semibold'
+                                    : 'bg-white text-slate-700'
+                            }`}
+                        >
+                            <span className="flex items-center gap-1.5">
+                                <ShieldAlert className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span>Riscos & Tráfego</span>
+                            </span>
+                            <ChevronDown className="w-3 h-3 text-slate-400 opacity-70" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-2.5 bg-white border border-slate-200 shadow-2xl rounded-xl z-[9999]" align="end">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+                                <div className="flex items-center gap-1.5">
+                                    <ShieldCheck className="w-4 h-4 text-blue-600" />
+                                    <span className="text-xs font-bold text-slate-800">Camadas de Risco & Mobilidade</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                {/* 1. Alertas Oficiais Defesa Civil & INMET */}
+                                <label className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-all">
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            checked={riskLayers.officialAlerts}
+                                            onCheckedChange={(checked) => setRiskLayers(prev => ({ ...prev, officialAlerts: !!checked }))}
+                                        />
+                                        <div>
+                                            <p className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                                                <span>⚠️</span> Alertas Oficiais (INMET / Defesa Civil)
+                                            </p>
+                                            <p className="text-[10px] text-slate-500">Tempestades, vendavais e ciclones</p>
+                                        </div>
+                                    </div>
+                                    {officialAlerts.length > 0 && (
+                                        <Badge className="bg-red-500 text-white text-[9px] px-1 py-0 h-4">
+                                            {officialAlerts.length}
+                                        </Badge>
+                                    )}
+                                </label>
+
+                                {/* 2. Pontos Críticos de Alagamento (ABC Paulista & SP) */}
+                                <label className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-all">
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            checked={riskLayers.criticalFloods}
+                                            onCheckedChange={(checked) => setRiskLayers(prev => ({ ...prev, criticalFloods: !!checked }))}
+                                        />
+                                        <div>
+                                            <p className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                                                <span>🌊</span> Pontos de Alagamento (ABC & SP)
+                                            </p>
+                                            <p className="text-[10px] text-slate-500">Rios Tamanduateí, Meninos, Couros</p>
+                                        </div>
+                                    </div>
+                                    <Badge className="bg-blue-600 text-white text-[9px] px-1 py-0 h-4">
+                                        {criticalFloodPoints.length}
+                                    </Badge>
+                                </label>
+
+                                {/* 3. Áreas de Risco Geológico / Encostas */}
+                                <label className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-all">
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            checked={riskLayers.geologicalSlopes}
+                                            onCheckedChange={(checked) => setRiskLayers(prev => ({ ...prev, geologicalSlopes: !!checked }))}
+                                        />
+                                        <div>
+                                            <p className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                                                <span>⛰️</span> Áreas de Encosta & Deslizamento
+                                            </p>
+                                            <p className="text-[10px] text-slate-500">Saturação do solo e taludes</p>
+                                        </div>
+                                    </div>
+                                    <Badge className="bg-amber-600 text-white text-[9px] px-1 py-0 h-4">
+                                        {geologicalRiskAreas.length}
+                                    </Badge>
+                                </label>
+
+                                {/* 4. Tráfego e Trânsito em Tempo Real */}
+                                <label className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-transparent hover:border-slate-200 transition-all">
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            checked={riskLayers.liveTraffic}
+                                            onCheckedChange={(checked) => setRiskLayers(prev => ({ ...prev, liveTraffic: !!checked }))}
+                                        />
+                                        <div>
+                                            <p className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                                                <span>🚗</span> Tráfego & Trânsito em Tempo Real
+                                            </p>
+                                            <p className="text-[10px] text-slate-500">Lentidão, bloqueios e vias interditadas</p>
+                                        </div>
+                                    </div>
+                                    <Badge className="bg-emerald-600 text-white text-[9px] px-1 py-0 h-4">
+                                        Ao Vivo
+                                    </Badge>
+                                </label>
+                            </div>
+                        </div>
+                    </PopoverContent>
+                </Popover>
+
+                <div className="ml-auto flex items-center gap-1.5">
+                    {/* Botão de Alertas Preditivos IA */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsAlertModalOpen(true)}
+                        className={`h-7 text-xs gap-1.5 font-bold transition-all ${
+                            pendingAlerts.length > 0
+                                ? 'bg-red-50 text-red-700 border-red-300 animate-pulse hover:bg-red-100'
+                                : 'bg-slate-50 text-slate-700 border-slate-300'
+                        }`}
+                        title="Alertas Preditivos Gerados pela IA pendentes de aprovação"
+                    >
+                        <ShieldAlert className={`w-3.5 h-3.5 ${pendingAlerts.length > 0 ? 'text-red-600' : 'text-slate-500'}`} />
+                        <span>Alertas IA</span>
+                        {pendingAlerts.length > 0 && (
+                            <Badge className="bg-red-600 text-white text-[9px] px-1 py-0 h-4">
+                                {pendingAlerts.length}
+                            </Badge>
+                        )}
+                    </Button>
+
+                    {!isNational && (
+                        <div className="flex items-center gap-1 bg-blue-50 border border-blue-200 text-blue-800 px-2 py-0.5 rounded-lg text-xs font-semibold">
+                            <MapPin className="w-3 h-3 text-blue-600" />
+                            <span>{scope.cityName || scope.state}</span>
+                            <button
+                                onClick={resetToNational}
+                                className="ml-1 text-[10px] text-blue-500 hover:text-blue-700 underline"
+                                title="Voltar ao Brasil"
+                            >
+                                Brasil
+                            </button>
+                        </div>
+                    )}
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setIsDark(!isDark)}
                         title={isDark ? 'Modo Claro' : 'Modo Escuro'}>
                         {isDark ? <Sun size={14} /> : <Moon size={14} />}
@@ -412,6 +1031,40 @@ const IntelligenceMap: React.FC = () => {
                     </Button>
                 </div>
             </div>
+
+            {/* ─── Banner de Modo de Risco Ativo (Defesa Civil / INMET) ─────── */}
+            {riskLayers.officialAlerts && officialAlerts.length > 0 && (
+                <div className="bg-gradient-to-r from-red-600 to-amber-600 text-white rounded-xl p-2.5 shadow-md flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-lg bg-white/20 backdrop-blur flex items-center justify-center shrink-0 text-lg">
+                            ⚠️
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                                <Badge className="bg-white text-red-700 font-black text-[9px] px-1.5 py-0 h-4">
+                                    MODO DE RISCO ATIVO
+                                </Badge>
+                                <span className="text-[11px] font-semibold text-white/90">
+                                    {officialAlerts[0].source} • {officialAlerts[0].severity.replace('_', ' ')}
+                                </span>
+                            </div>
+                            <p className="text-xs font-bold truncate mt-0.5">
+                                {officialAlerts[0].title}: {officialAlerts[0].description}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                        <Button
+                            size="sm"
+                            onClick={() => setIsAlertModalOpen(true)}
+                            className="h-7 text-xs bg-white text-red-700 font-bold hover:bg-red-50 shadow-sm"
+                        >
+                            <ShieldAlert className="w-3.5 h-3.5 mr-1 text-red-600" />
+                            Avaliar Alerta Preditivo
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* ─── Linha do Tempo ─────────────────────────────────────────── */}
             <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-3 py-1.5 shadow-sm">
@@ -457,6 +1110,26 @@ const IntelligenceMap: React.FC = () => {
                                 <KpiCard label="Médio Risco" value={mediumRisk} color="bg-orange-50 border-orange-200 text-orange-700" icon={TriangleAlert} />
                                 <KpiCard label="Baixo Risco" value={lowRisk} color="bg-blue-50 border-blue-200 text-blue-700" icon={MapPin} />
                                 <KpiCard label="Resolvidos" value={resolved} color="bg-green-50 border-green-200 text-green-700" icon={TrendingUp} />
+                            </div>
+                        )}
+
+                        {/* IA Preditiva */}
+                        <SectionHeader id="predictive" title="IA Preditiva" icon={ShieldAlert} count={assessments.length} />
+                        {expandedSection === 'predictive' && (
+                            <div className="space-y-1">
+                                {assessments.length === 0 ? (
+                                    <p className="text-[10px] text-gray-500 p-2 text-center">Monitoramento preventivo ativo sem risco iminente.</p>
+                                ) : (
+                                    assessments.slice(0, 3).map(a => (
+                                        <div key={a.id} className="p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[11px] font-bold text-slate-800 truncate">{a.title}</span>
+                                                <Badge className="text-[8px] px-1 py-0 bg-blue-600 text-white">{a.riskProbability}%</Badge>
+                                            </div>
+                                            <p className="text-[9px] text-slate-600 mt-0.5 line-clamp-2">{a.suggestedAction}</p>
+                                        </div>
+                                    ))
+                                )}
                             </div>
                         )}
 
@@ -678,8 +1351,41 @@ const IntelligenceMap: React.FC = () => {
                         /* ─── Leaflet Map (all other modes) ───────────── */
                         <>
                             <MapContainer center={[-15.7801, -47.9292]} zoom={5} style={{ height: '100%', width: '100%' }} zoomControl={false}>
-                                <TileSwitcher isDark={isDark} />
+                                <MapScopeController scope={scope} />
+                                <MapNavigationController targetLocation={targetLocation} />
+                                <TileSwitcher layerType={mapLayerType} />
                                 <BoundsTracker onBoundsChange={handleBoundsChange} />
+
+                                {/* Marcador do Local Pesquisado (CEP / Endereço / Cidade) */}
+                                {searchPin && (
+                                    <Marker
+                                        position={[searchPin.lat, searchPin.lng]}
+                                        icon={L.divIcon({
+                                            className: '',
+                                            html: `
+                                                <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+                                                    <div style="position:absolute;width:44px;height:44px;border-radius:50%;background:rgba(37,99,235,0.35);animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></div>
+                                                    <div style="background:#2563eb;color:white;width:34px;height:34px;border-radius:50%;border:3px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;z-index:2;">📍</div>
+                                                </div>
+                                            `,
+                                            iconSize: [34, 34],
+                                            iconAnchor: [17, 17]
+                                        })}
+                                    >
+                                        <Popup autoPan>
+                                            <div className="p-2 min-w-[220px]">
+                                                <Badge className="bg-blue-600 text-white mb-1 text-[10px]">Local Pesquisado</Badge>
+                                                <h4 className="font-bold text-sm text-slate-900 leading-tight">{searchPin.title}</h4>
+                                                <p className="text-xs text-slate-600 mt-1">{searchPin.subtitle}</p>
+                                                {searchPin.cep && (
+                                                    <p className="text-[11px] font-mono font-bold text-blue-700 mt-1.5 bg-blue-50 p-1 rounded">
+                                                        CEP: {searchPin.cep}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                )}
 
                                 {viewMode === 'heatmap' && <HeatmapLayer points={heatmapPoints} />}
 
@@ -869,6 +1575,181 @@ const IntelligenceMap: React.FC = () => {
                                         </Marker>
                                     );
                                 })}
+
+                                {/* ─── Camada de Alertas Oficiais da Defesa Civil / INMET ─── */}
+                                {riskLayers.officialAlerts && officialAlerts.map(alert => (
+                                    <React.Fragment key={alert.id}>
+                                        <Circle
+                                            center={[mapCenter.lat, mapCenter.lng]}
+                                            radius={8000}
+                                            pathOptions={{
+                                                fillColor: alert.severity === 'GRANDE_PERIGO' ? '#ef4444' : '#f97316',
+                                                color: alert.severity === 'GRANDE_PERIGO' ? '#b91c1c' : '#ea580c',
+                                                weight: 2,
+                                                fillOpacity: 0.18,
+                                                dashArray: '6, 6'
+                                            }}
+                                        />
+                                        <Marker
+                                            position={[mapCenter.lat, mapCenter.lng]}
+                                            icon={L.divIcon({
+                                                className: '',
+                                                html: `
+                                                    <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+                                                        <div style="position:absolute;width:40px;height:40px;border-radius:50%;background:${alert.severity === 'GRANDE_PERIGO' ? 'rgba(239,68,68,0.4)' : 'rgba(249,115,22,0.4)'};animation:ping 1.2s cubic-bezier(0,0,0.2,1) infinite;"></div>
+                                                        <div style="background:${alert.severity === 'GRANDE_PERIGO' ? '#ef4444' : '#f97316'};color:white;width:32px;height:32px;border-radius:50%;border:2px solid white;box-shadow:0 4px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:16px;position:relative;z-index:2;">${alert.icon}</div>
+                                                    </div>
+                                                `,
+                                                iconSize: [32, 32],
+                                                iconAnchor: [16, 16]
+                                            })}
+                                        >
+                                            <Popup>
+                                                <div className="p-2 min-w-[260px] max-w-[320px]">
+                                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                                        <Badge className={`${alert.severity === 'GRANDE_PERIGO' ? 'bg-red-600' : 'bg-orange-600'} text-white text-[10px]`}>
+                                                            {alert.source} • {alert.severity.replace('_', ' ')}
+                                                        </Badge>
+                                                        <span className="text-[10px] text-slate-500 font-mono">Oficial</span>
+                                                    </div>
+                                                    <h4 className="font-bold text-sm text-slate-900 leading-tight">{alert.title}</h4>
+                                                    <p className="text-xs text-slate-600 mt-1 leading-snug">{alert.description}</p>
+                                                    
+                                                    <div className="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                                                        <p className="text-[11px] font-bold text-slate-800">Recomendações da Defesa Civil:</p>
+                                                        <ul className="text-[10px] text-slate-600 list-disc pl-4 space-y-0.5">
+                                                            {alert.instructions.slice(0, 3).map((inst, i) => (
+                                                                <li key={i}>{inst}</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+
+                                                    <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+                                                        <span className="text-[9px] text-slate-400">Até {new Date(alert.endDate).toLocaleDateString('pt-BR')}</span>
+                                                        <Button
+                                                            size="sm"
+                                                            className="h-6 text-[10px] bg-red-600 hover:bg-red-700 text-white font-bold"
+                                                            onClick={() => {
+                                                                predictiveEngine.evaluateCityRisk(scope.cityId || 'sao-paulo', scope.cityName || 'São Paulo', scope.state || 'SP', mapCenter.lat, mapCenter.lng);
+                                                                setIsAlertModalOpen(true);
+                                                            }}
+                                                        >
+                                                            Ver na Fila de Alertas
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            </Popup>
+                                        </Marker>
+                                    </React.Fragment>
+                                ))}
+
+                                {/* ─── Camada de Pontos Críticos de Alagamento (ABC Paulista & SP) ─── */}
+                                {riskLayers.criticalFloods && criticalFloodPoints.map(flood => (
+                                    <Marker
+                                        key={flood.id}
+                                        position={[flood.latitude, flood.longitude]}
+                                        icon={L.divIcon({
+                                            className: '',
+                                            html: `
+                                                <div style="background:${flood.currentStatus === 'EMERGENCIA' || flood.currentStatus === 'INTRANSITAVEL' ? '#ef4444' : flood.currentStatus === 'ATENCAO' ? '#f59e0b' : '#3b82f6'};color:white;width:28px;height:28px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;">
+                                                    🌊
+                                                </div>
+                                            `,
+                                            iconSize: [28, 28],
+                                            iconAnchor: [14, 14]
+                                        })}
+                                    >
+                                        <Popup>
+                                            <div className="p-1.5 min-w-[230px]">
+                                                <div className="flex items-center justify-between gap-1 mb-1">
+                                                    <Badge className={`${
+                                                        flood.currentStatus === 'NORMAL' ? 'bg-blue-600' : flood.currentStatus === 'ATENCAO' ? 'bg-amber-600' : 'bg-red-600'
+                                                    } text-white text-[9px]`}>
+                                                        Status: {flood.currentStatus}
+                                                    </Badge>
+                                                    <span className="text-[10px] text-slate-500 font-semibold">{flood.cityName}</span>
+                                                </div>
+                                                <h4 className="font-bold text-xs text-slate-900">{flood.name}</h4>
+                                                <p className="text-[10px] text-slate-600 mt-0.5">{flood.referenceStreet}</p>
+                                                <div className="mt-1.5 pt-1.5 border-t border-slate-100 grid grid-cols-2 gap-1 text-[10px]">
+                                                    <div className="bg-slate-50 p-1 rounded">
+                                                        <span className="text-slate-400 block text-[9px]">Bacia / Rio</span>
+                                                        <strong className="text-slate-800 truncate block">{flood.riverOrBasin}</strong>
+                                                    </div>
+                                                    <div className="bg-slate-50 p-1 rounded">
+                                                        <span className="text-slate-400 block text-[9px]">Cota Crítica</span>
+                                                        <strong className="text-slate-800">{flood.criticalWaterLevelCm} cm</strong>
+                                                    </div>
+                                                </div>
+                                                <p className="text-[9px] text-slate-500 mt-1">Histórico: {flood.historicFloodCount} alagamentos registrados</p>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                ))}
+
+                                {/* ─── Camada de Áreas de Risco Geológico / Encostas ─── */}
+                                {riskLayers.geologicalSlopes && geologicalRiskAreas.map(geo => (
+                                    <Marker
+                                        key={geo.id}
+                                        position={[geo.latitude, geo.longitude]}
+                                        icon={L.divIcon({
+                                            className: '',
+                                            html: `
+                                                <div style="background:${geo.vulnerabilityLevel === 'MUITO_ALTA' ? '#dc2626' : '#d97706'};color:white;width:28px;height:28px;border-radius:50%;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;">
+                                                    ⛰️
+                                                </div>
+                                            `,
+                                            iconSize: [28, 28],
+                                            iconAnchor: [14, 14]
+                                        })}
+                                    >
+                                        <Popup>
+                                            <div className="p-1.5 min-w-[230px]">
+                                                <div className="flex items-center justify-between gap-1 mb-1">
+                                                    <Badge className="bg-amber-600 text-white text-[9px]">
+                                                        Risco: {geo.vulnerabilityLevel}
+                                                    </Badge>
+                                                    <span className="text-[10px] text-slate-500 font-semibold">{geo.cityName}</span>
+                                                </div>
+                                                <h4 className="font-bold text-xs text-slate-900">{geo.name}</h4>
+                                                <p className="text-[10px] text-slate-600 mt-0.5">{geo.threatDescription}</p>
+                                                <div className="mt-1.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
+                                                    <span>Saturação do Solo:</span>
+                                                    <strong className="text-amber-700 font-bold">{geo.soilSaturationPercent}%</strong>
+                                                </div>
+                                                <p className="text-[9px] text-slate-400 mt-0.5">Monitoramento: {geo.monitoredBy}</p>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                ))}
+
+                                {/* ─── Camada de Tráfego / Incidentes ─── */}
+                                {riskLayers.liveTraffic && trafficIncidents.map(traffic => (
+                                    <Marker
+                                        key={traffic.id}
+                                        position={[traffic.latitude, traffic.longitude]}
+                                        icon={L.divIcon({
+                                            className: '',
+                                            html: `
+                                                <div style="background:${traffic.severity === 'GRAVE' ? '#ef4444' : '#f59e0b'};color:white;width:26px;height:26px;border-radius:6px;border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;font-size:12px;">
+                                                    🚗
+                                                </div>
+                                            `,
+                                            iconSize: [26, 26],
+                                            iconAnchor: [13, 13]
+                                        })}
+                                    >
+                                        <Popup>
+                                            <div className="p-1.5 min-w-[210px]">
+                                                <Badge className="bg-slate-800 text-white text-[9px] mb-1">
+                                                    Trânsito: +{traffic.delayMinutes} min de atraso
+                                                </Badge>
+                                                <h4 className="font-bold text-xs text-slate-900">{traffic.title}</h4>
+                                                <p className="text-[10px] text-slate-600 mt-0.5">{traffic.description}</p>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                ))}
                             </MapContainer>
 
                             {/* Legenda do mapa de calor */}
@@ -904,8 +1785,155 @@ const IntelligenceMap: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* ─── MODAL DE ALERTAS PREDITIVOS IA (APROVAÇÃO DO SYSADMIN) ─── */}
+            <Dialog open={isAlertModalOpen} onOpenChange={setIsAlertModalOpen}>
+                <DialogContent className="max-w-3xl z-[9999] bg-white border border-slate-200 shadow-2xl rounded-2xl p-6">
+                    <DialogHeader>
+                        <div className="flex items-center justify-between gap-2">
+                            <DialogTitle className="flex items-center gap-2 text-slate-900 text-lg font-black">
+                                <ShieldAlert className="w-5 h-5 text-red-600 shrink-0" />
+                                Centro de Gestão de Riscos & Alertas Preditivos IA
+                            </DialogTitle>
+                            <Badge className="bg-blue-600 text-white text-[10px] px-2 py-0.5">
+                                Human-in-the-Loop
+                            </Badge>
+                        </div>
+                        <DialogDescription className="text-xs text-slate-500">
+                            Monitoramento em tempo real cruzando dados meteorológicos, alertas do INMET/Defesa Civil e ocorrências da malha urbana. Nenhum alerta público é emitido sem sua autorização expressa.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin">
+                        {/* 1. Alertas Oficiais Vigentes (INMET / Defesa Civil) */}
+                        {officialAlerts.length > 0 && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                        <span>🏛️</span> Alertas Oficiais Vigentes (INMET / Defesa Civil)
+                                    </h4>
+                                    <Badge className="bg-amber-100 text-amber-800 border border-amber-300 text-[10px]">
+                                        {officialAlerts.length} ativo(s)
+                                    </Badge>
+                                </div>
+
+                                {officialAlerts.map(alert => (
+                                    <div key={alert.id} className="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200 space-y-2">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={alert.severity === 'GRANDE_PERIGO' ? 'bg-red-600 text-white text-[10px]' : 'bg-orange-500 text-white text-[10px]'}>
+                                                        {alert.source} • {alert.severity.replace('_', ' ')}
+                                                    </Badge>
+                                                    <span className="text-xs font-bold text-slate-900">{alert.affectedStates.join(', ')}</span>
+                                                </div>
+                                                <h5 className="font-bold text-sm text-slate-900 mt-1">{alert.title}</h5>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-slate-700 leading-relaxed">{alert.description}</p>
+                                        <div className="bg-white/80 p-2 rounded-lg border border-amber-100 text-[11px] text-slate-600 space-y-1">
+                                            <strong>Recomendações Oficiais:</strong>
+                                            <ul className="list-disc pl-4 space-y-0.5 text-[10px]">
+                                                {alert.instructions.slice(0, 2).map((inst, i) => (
+                                                    <li key={i}>{inst}</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* 2. Fila de Alertas Propostos para Envio aos Cidadãos */}
+                        <div className="space-y-2 pt-2 border-t border-slate-100">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                    <span>📢</span> Fila de Alertas para Aprovação do SysAdmin
+                                </h4>
+                                <Badge className="bg-red-100 text-red-800 border border-red-300 text-[10px]">
+                                    {pendingAlerts.length} pendente(s)
+                                </Badge>
+                            </div>
+
+                            {pendingAlerts.length === 0 ? (
+                                <div className="p-6 text-center bg-slate-50 rounded-xl border border-slate-200">
+                                    <CheckCircle2 className="w-7 h-7 text-emerald-600 mx-auto mb-1.5" />
+                                    <p className="font-semibold text-xs text-slate-800">Fila Limpa: Nenhum Despacho de Emergência Pendente</p>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                        Quando o motor preditivo ou o INMET detectarem risco crítico, uma notificação será enfileirada aqui para seu despacho.
+                                    </p>
+                                </div>
+                            ) : (
+                                pendingAlerts.map(alert => (
+                                    <div key={alert.id} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={alert.severity === 'CRITICO' ? 'bg-red-600 text-white text-[10px]' : 'bg-amber-500 text-white text-[10px]'}>
+                                                        Risco {alert.severity}
+                                                    </Badge>
+                                                    <span className="text-xs font-bold text-slate-900">{alert.cityName} ({alert.state})</span>
+                                                </div>
+                                                <h4 className="font-bold text-sm text-slate-900 mt-1">{alert.title}</h4>
+                                            </div>
+                                        </div>
+
+                                        <p className="text-xs text-slate-600 leading-relaxed">
+                                            {alert.message}
+                                        </p>
+
+                                        <div className="flex flex-wrap gap-2 text-[11px] text-slate-500 bg-white p-2.5 rounded-lg border border-slate-200">
+                                            <span><strong>Bairros Afetados:</strong> {alert.targetNeighborhoods?.join(', ')}</span>
+                                            <span>•</span>
+                                            <span><strong>Público Estimado:</strong> ~{alert.estimatedPopulation} cidadãos</span>
+                                        </div>
+
+                                        <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-200">
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={async () => {
+                                                    if (!currentUser) return;
+                                                    await predictiveEngine.rejectAlert(alert.id, 'Descartado pelo SysAdmin', currentUser.uid);
+                                                    toast.info('Alerta preditivo descartado.');
+                                                    const updated = await predictiveEngine.getPendingAlerts(scope.cityId);
+                                                    setPendingAlerts(updated);
+                                                }}
+                                                className="text-xs gap-1 text-slate-600 hover:text-red-600"
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" /> Descartar
+                                            </Button>
+
+                                            <Button
+                                                size="sm"
+                                                onClick={async () => {
+                                                    if (!currentUser) return;
+                                                    await predictiveEngine.approveAlert(alert.id, currentUser.uid);
+                                                    toast.success(`Alerta aprovado e despachado para os cidadãos de ${alert.cityName}!`);
+                                                    const updated = await predictiveEngine.getPendingAlerts(scope.cityId);
+                                                    setPendingAlerts(updated);
+                                                }}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1 font-bold shadow-sm"
+                                            >
+                                                <Send className="w-3.5 h-3.5" /> Aprovar & Despachar aos Cidadãos
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsAlertModalOpen(false)}>
+                            Fechar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };
 
 export default IntelligenceMap;
+

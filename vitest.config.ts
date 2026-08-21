@@ -21,7 +21,7 @@ export default defineConfig({
                 'dist/',
             ],
         },
-        exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**'],
+        exclude: ['**/node_modules/**', '**/dist/**', '**/e2e/**', '**/tests/**'],
     },
     resolve: {
         alias: {

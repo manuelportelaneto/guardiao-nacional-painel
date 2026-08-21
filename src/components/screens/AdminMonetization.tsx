@@ -111,14 +111,21 @@ const AdminMonetization: React.FC = () => {
     // Listen to Firestore config
     useEffect(() => {
         const configRef = doc(db, 'settings', 'monetization');
-        const unsubscribe = onSnapshot(configRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setConfig({ ...DEFAULT_CONFIG, ...docSnap.data() } as AdsConfig);
-            } else {
-                setConfig(DEFAULT_CONFIG);
+        const unsubscribe = onSnapshot(
+            configRef,
+            (docSnap) => {
+                if (docSnap.exists()) {
+                    setConfig({ ...DEFAULT_CONFIG, ...docSnap.data() } as AdsConfig);
+                } else {
+                    setConfig(DEFAULT_CONFIG);
+                }
+                setLoading(false);
+            },
+            (error) => {
+                console.warn('Interrompido listener de monetização:', error);
+                setLoading(false);
             }
-            setLoading(false);
-        });
+        );
         return () => unsubscribe();
     }, []);
 
@@ -142,20 +149,32 @@ const AdminMonetization: React.FC = () => {
     // --- Load Exempt Users (Livro dos Guardiões) ---
     useEffect(() => {
         const q = query(collection(db, 'ad_exempt_users'), orderBy('createdAt', 'desc'));
-        const unsub = onSnapshot(q, (snap) => {
-            const data: AdExemptUser[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as AdExemptUser));
-            setExemptUsers(data);
-        });
+        const unsub = onSnapshot(
+            q,
+            (snap) => {
+                const data: AdExemptUser[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as AdExemptUser));
+                setExemptUsers(data);
+            },
+            (error) => {
+                console.warn('Interrompido listener de usuários isentos:', error);
+            }
+        );
         return () => unsub();
     }, []);
 
     // --- Load Subscriber Cities ---
     useEffect(() => {
         const q = query(collection(db, 'subscriber_cities'), orderBy('subscribedAt', 'desc'));
-        const unsub = onSnapshot(q, (snap) => {
-            const data: SubscriberCity[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as SubscriberCity));
-            setSubscriberCities(data);
-        });
+        const unsub = onSnapshot(
+            q,
+            (snap) => {
+                const data: SubscriberCity[] = snap.docs.map(d => ({ id: d.id, ...d.data() } as SubscriberCity));
+                setSubscriberCities(data);
+            },
+            (error) => {
+                console.warn('Interrompido listener de cidades assinantes:', error);
+            }
+        );
         return () => unsub();
     }, []);
 

@@ -30,10 +30,15 @@
  *    privadas, navegadores sem suporte), a inicialização falha silenciosamente com um `try/catch`,
  *    garantindo que o restante da aplicação funcione normalmente sem crash.
  */
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore";
+import {
+    getFirestore,
+    initializeFirestore,
+    persistentLocalCache,
+    persistentMultipleTabManager
+} from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getMessaging } from "firebase/messaging";
 import { getFunctions } from "firebase/functions";
@@ -49,8 +54,8 @@ const firebaseConfig = {
     measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// Inicializa o Firebase
-const app = initializeApp(firebaseConfig);
+// Inicializa o Firebase Singleton
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 // Proteção Anti-Bot via App Check (GCP)
 export let appCheck: any;
@@ -66,9 +71,22 @@ if (typeof window !== "undefined") {
     }
 }
 
+// Inicialização resiliente do Firestore (previne falhas de assert interno em watch streams e WebChannel)
+let firestoreDb: any;
+try {
+    firestoreDb = initializeFirestore(app, {
+        localCache: persistentLocalCache({
+            tabManager: persistentMultipleTabManager()
+        }),
+        experimentalAutoDetectLongPolling: true
+    });
+} catch {
+    firestoreDb = getFirestore(app);
+}
+
 // Exporta as instâncias dos serviços que vamos usar
 export const auth = getAuth(app);
-export const db = getFirestore(app);
+export const db = firestoreDb;
 export const storage = getStorage(app);
 export const functions = getFunctions(app, 'southamerica-east1');
 

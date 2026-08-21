@@ -15,7 +15,8 @@ import {
     Briefcase,
     Building2,
     Heart,
-    Plus
+    Plus,
+    MapPin
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { toggleUserBlock, promoteUser, removeUser } from '../../services/userService';
@@ -23,12 +24,14 @@ import type { UserManagement } from '../../services/userService';
 import { USER_RANKS } from '../../types/userRanks';
 import { loggingService } from '../../services/loggingService';
 import { useAuth } from '../../context/AuthContext';
+import { useScope } from '../../context/ScopeContext';
 import { PromoteUserModal } from './PromoteUserModal';
 import UserProfileModal from './UserProfileModal';
 import InviteUserModal from './InviteUserModal';
 
 const AdminUsers: React.FC = () => {
     const { currentUser } = useAuth();
+    const { scope, isNational, resetToNational, dataMasking } = useScope();
     const [users, setUsers] = useState<UserManagement[]>([]);
     const [loading, setLoading] = useState(true);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
@@ -212,6 +215,35 @@ const AdminUsers: React.FC = () => {
         }
     };
 
+    // Usuários filtrados reativamente por jurisdição e com mascaramento LGPD
+    const displayedUsers = React.useMemo(() => {
+        return users.filter(u => {
+            const userState = u.uf || (u as any).state;
+            if (scope.level === 'STATE' && scope.state) {
+                if (userState && userState.toUpperCase() !== scope.state.toUpperCase()) return false;
+            } else if (scope.level === 'MUNICIPAL' || scope.level === 'DEPARTMENT') {
+                const uCity = (u.city || '').toLowerCase();
+                const uCityId = ((u as any).cityId || '').toLowerCase();
+                const targetId = (scope.cityId || '').toLowerCase();
+                const targetName = (scope.cityName || '').toLowerCase();
+                const match = (targetId && uCityId === targetId) ||
+                              (targetId && uCity === targetId) ||
+                              (targetName && uCity === targetName);
+                if (u.city && !match) return false;
+            }
+            return true;
+        }).map(u => {
+            if (dataMasking && u.role === 'user') {
+                return {
+                    ...u,
+                    email: u.email ? u.email.replace(/(?<=.{2}).(?=.*@)/g, '***') : '',
+                    phoneNumber: u.phoneNumber ? '••• •••••-••••' : undefined,
+                } as UserManagement;
+            }
+            return u;
+        });
+    }, [users, scope, dataMasking]);
+
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
@@ -224,6 +256,47 @@ const AdminUsers: React.FC = () => {
                     Convidar Usuário
                 </Button>
             </div>
+
+            {/* ─── Banner de Escopo Federativo Ativo ────────────────────────── */}
+            {!isNational && (
+                <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-blue-700/50">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                            {scope.level === 'STATE' ? <MapPin className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm">
+                                    {scope.level === 'STATE' && `Jurisdição: Estado de ${scope.state}`}
+                                    {scope.level === 'MUNICIPAL' && `Jurisdição: Município de ${scope.cityName || scope.cityId}`}
+                                    {scope.level === 'DEPARTMENT' && `Jurisdição: Secretaria (${scope.cityName || scope.cityId})`}
+                                </span>
+                                {scope.isEmulated && (
+                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-400/30 text-[10px]">
+                                        Modo Emulação
+                                    </Badge>
+                                )}
+                                {dataMasking && (
+                                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
+                                        LGPD Anonimizada
+                                    </Badge>
+                                )}
+                            </div>
+                            <p className="text-xs text-blue-200/80 mt-0.5">
+                                Filtrando usuários locais e servidores associados ({displayedUsers.length} usuários).
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={resetToNational}
+                        className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs shrink-0"
+                    >
+                        Voltar à Gestão Nacional
+                    </Button>
+                </div>
+            )}
 
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm space-y-4">
                 <div className="flex flex-wrap gap-2">
@@ -267,11 +340,11 @@ const AdminUsers: React.FC = () => {
 
             {loading ? (
                 <div className="text-center py-20 text-gray-500">Carregando usuários...</div>
-            ) : users.length === 0 ? (
+            ) : displayedUsers.length === 0 ? (
                 <div className="text-center py-20 text-gray-500">Nenhum usuário encontrado.</div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {users.map((user) => (
+                    {displayedUsers.map((user) => (
                         <Card
                             key={user.id}
                             className={`overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow bg-white cursor-pointer ${user.status === 'blocked' ? 'opacity-75 grayscale' : ''}`}

@@ -25,7 +25,9 @@ import {
     Settings,
     Shield,
     Zap,
-    Play
+    Play,
+    Building2,
+    MapPin
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Label } from '../ui/label';
@@ -43,6 +45,7 @@ import {
 import { toast } from 'sonner';
 import { moderationService, type ModerationItem } from '../../services/moderationService';
 import { useAuth } from '../../context/AuthContext';
+import { useScope } from '../../context/ScopeContext';
 import { useModerationStore } from '../../stores/moderationStore';
 import { ModerationCard } from './moderation/ModerationCard';
 import { ModerationFilters } from './moderation/ModerationFilters';
@@ -52,6 +55,7 @@ import type { Contribution } from '../../types/contribution';
 import { notificationService } from '../../services/notificationService';
 import { loggingService } from '../../services/loggingService';
 import { automationService } from '../../services/automationService';
+import { aiLearningService } from '../../services/aiLearningService';
 import { Switch } from '../ui/switch';
 
 interface SystemSettings {
@@ -130,6 +134,7 @@ const AdminModeration: React.FC = () => {
         setUseDefaultReply
     } = useModerationStore();
 
+    const { scope, isNational, resetToNational, dataMasking } = useScope();
     const [activeTab, setActiveTab] = useState('reports');
     const [collapsedFilters, setCollapsedFilters] = useState(true);
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
@@ -137,11 +142,17 @@ const AdminModeration: React.FC = () => {
 
     useEffect(() => {
         const settingsRef = doc(db, 'settings', 'global');
-        const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() } as SystemSettings);
+        const unsubscribe = onSnapshot(
+            settingsRef,
+            (docSnap) => {
+                if (docSnap.exists()) {
+                    setSettings({ ...DEFAULT_SETTINGS, ...docSnap.data() } as SystemSettings);
+                }
+            },
+            (error) => {
+                console.warn('Interrompido listener de settings global:', error);
             }
-        });
+        );
         return () => unsubscribe();
     }, []);
 
@@ -214,33 +225,46 @@ const AdminModeration: React.FC = () => {
                 // Settings
                 const settingsRef = doc(db, 'settings', 'moderation');
                 // Removed autoPublish listener from here
-                const unsubscribeSettings = onSnapshot(settingsRef, (_doc) => {
-                    // Logic moved to SystemControls
-                });
+                const unsubscribeSettings = onSnapshot(
+                    settingsRef,
+                    (_doc) => {
+                        // Logic moved to SystemControls
+                    },
+                    (error) => {
+                        console.warn('Interrompido listener de settings em moderação:', error);
+                    }
+                );
 
                 // Reports
                 const qReports = query(collection(db, 'reports'), where('status', '==', 'pending'));
-                const unsubscribeReports = onSnapshot(qReports, async (snapshot) => {
-                    const reportsData = await Promise.all(snapshot.docs.map(async (docSnap) => {
-                        const reportData = docSnap.data() as Report;
-                        const { id: _rId, ...reportFields } = reportData;
-                        try {
-                            const contribRef = doc(db, 'contributions', reportData.contributionId);
-                            const contribSnap = await getDoc(contribRef);
-                            let contribution: Contribution | undefined;
-                            if (contribSnap.exists()) {
-                                const contribData = contribSnap.data() as Contribution;
-                                const { id: _cId, ...contribFields } = contribData;
-                                contribution = { id: contribSnap.id, ...contribFields, status: contribData.status || 'Em Análise', userId: contribData.userId || 'unknown' };
+                const unsubscribeReports = onSnapshot(
+                    qReports,
+                    async (snapshot) => {
+                        const reportsData = await Promise.all(snapshot.docs.map(async (docSnap) => {
+                            const reportData = docSnap.data() as Report;
+                            const { id: _rId, ...reportFields } = reportData;
+                            try {
+                                const contribRef = doc(db, 'contributions', reportData.contributionId);
+                                const contribSnap = await getDoc(contribRef);
+                                let contribution: Contribution | undefined;
+                                if (contribSnap.exists()) {
+                                    const contribData = contribSnap.data() as Contribution;
+                                    const { id: _cId, ...contribFields } = contribData;
+                                    contribution = { id: contribSnap.id, ...contribFields, status: contribData.status || 'Em Análise', userId: contribData.userId || 'unknown' };
+                                }
+                                return { id: docSnap.id, ...reportFields, contribution };
+                            } catch {
+                                return { id: docSnap.id, ...reportFields };
                             }
-                            return { id: docSnap.id, ...reportFields, contribution };
-                        } catch (e) {
-                            return { id: docSnap.id, ...reportFields };
-                        }
-                    }));
-                    setReports(reportsData);
-                    setLoading(false);
-                });
+                        }));
+                        setReports(reportsData);
+                        setLoading(false);
+                    },
+                    (error) => {
+                        console.warn('Interrompido listener de denúncias:', error);
+                        setLoading(false);
+                    }
+                );
 
                 // Contributions Queues
                 const contributionsRef = collection(db, 'contributions');
@@ -462,6 +486,15 @@ const AdminModeration: React.FC = () => {
                 toast.success("Aprovado com sucesso!");
                 if (currentUser) loggingService.logAudit('CONTRIBUTION_APPROVE', currentUser.uid, contrib.id, { rating: approvalRating });
 
+                // Alimenta o motor de Machine Learning com a decisão humana aprovada
+                aiLearningService.recordDecisionPattern(
+                    contrib.category || 'geral',
+                    `${contrib.title} ${contrib.description || ''}`,
+                    contrib.riskLevel || 2,
+                    'APPROVED',
+                    'HUMAN_MODERATOR'
+                );
+
             } else if (action === 'reject_contrib' || action === 'reject_approved') {
                 const reason = rejectionReason || 'Sem motivo especificado';
                 await updateDoc(doc(db, 'contributions', contrib.id), {
@@ -472,6 +505,15 @@ const AdminModeration: React.FC = () => {
 
                 // Trigger Automation
                 await automationService.runAutomation('status_updated', { ...contrib, status: 'Rejeitado', rejectionReason: reason });
+
+                // Alimenta o motor de Machine Learning com a decisão humana rejeitada
+                aiLearningService.recordDecisionPattern(
+                    contrib.category || 'geral',
+                    `${contrib.title} ${contrib.description || ''}`,
+                    contrib.riskLevel || 4,
+                    'REJECTED',
+                    'HUMAN_MODERATOR'
+                );
 
 
                 // Notify User (Alert) - Rejected
@@ -555,21 +597,34 @@ const AdminModeration: React.FC = () => {
         }
     };
 
-    // Filter Logic
+    // Filter Logic com Escopo Federativo
     const filterList = (list: Contribution[]) => {
         return list.filter(item => {
+            // 1. Filtragem por Escopo Federativo (ScopeContext)
+            if (scope.level === 'STATE' && scope.state) {
+                if (item.state?.toUpperCase() !== scope.state.toUpperCase()) return false;
+            } else if (scope.level === 'MUNICIPAL' || scope.level === 'DEPARTMENT') {
+                const cCity = (item.city || '').toLowerCase();
+                const cCityId = ((item as any).cityId || '').toLowerCase();
+                const targetId = (scope.cityId || '').toLowerCase();
+                const targetName = (scope.cityName || '').toLowerCase();
+                const cityMatch = (targetId && cCityId === targetId) ||
+                                  (targetId && cCity === targetId) ||
+                                  (targetName && cCity === targetName);
+                if (!cityMatch) return false;
+            }
+
             const matchesSearch = searchTerm === '' ||
                 item.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 item.id.includes(searchTerm);
             const matchesCategory = categoryFilter === 'all' || item.category === categoryFilter;
 
-            // Location Filter (Client Side)
+            // Location Filter (Client Side manual)
             let matchesLocation = true;
             if (locationFilter.state) {
                 matchesLocation = matchesLocation && item.state === locationFilter.state;
             }
             if (locationFilter.city) {
-                // Normalize for comparison if needed, assuming exact match from DB for now
                 matchesLocation = matchesLocation && item.city === locationFilter.city;
             }
 
@@ -578,9 +633,6 @@ const AdminModeration: React.FC = () => {
     };
 
     // Render Helpers
-
-
-
     if (loading && !reports.length && !moderationQueue.length && !approvedList.length && !rejectedList.length && !trashList.length) {
         return (
             <div className="flex items-center justify-center h-screen"><Loader2 className="h-8 w-8 animate-spin" /></div>
@@ -593,13 +645,53 @@ const AdminModeration: React.FC = () => {
             <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}><ArrowLeft className="h-5 w-5" /></Button>
-                    <div><h1 className="text-2xl font-bold">Moderação</h1><p className="text-sm text-gray-500">Gestão de Conteúdo</p></div>
+                    <div><h1 className="text-2xl font-bold">Moderação</h1><p className="text-sm text-gray-500">Gestão de Conteúdo e Triagem</p></div>
                 </div>
-                {/* Settings removed (moved to System Controls) */}
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /></Button>
                 </div>
             </div>
+
+            {/* ─── Banner de Escopo Federativo Ativo ────────────────────────── */}
+            {!isNational && (
+                <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-blue-700/50">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 rounded-xl bg-blue-500/20 text-blue-200 border border-blue-400/30">
+                            {scope.level === 'STATE' ? <MapPin className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-sm">
+                                    {scope.level === 'STATE' && `Fila Restrita: Estado de ${scope.state}`}
+                                    {scope.level === 'MUNICIPAL' && `Fila Restrita: Município de ${scope.cityName || scope.cityId}`}
+                                    {scope.level === 'DEPARTMENT' && `Fila Restrita: Secretaria (${scope.cityName || scope.cityId})`}
+                                </span>
+                                {scope.isEmulated && (
+                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-400/30 text-[10px]">
+                                        Modo Emulação
+                                    </Badge>
+                                )}
+                                {dataMasking && (
+                                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
+                                        LGPD Protegida
+                                    </Badge>
+                                )}
+                            </div>
+                            <p className="text-xs text-blue-200/80 mt-0.5">
+                                Apenas denúncias e ocorrências desta jurisdição são listadas para aprovação ou rejeição.
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={resetToNational}
+                        className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs shrink-0"
+                    >
+                        Voltar à Moderação Nacional
+                    </Button>
+                </div>
+            )}
 
             {/* Filters */}
             <ModerationFilters

@@ -33,6 +33,7 @@ export interface HeatmapPoint {
 export interface IntelligenceFilters {
     status?: string;
     category?: string;
+    categories?: string[];
     startDate?: Date;
     endDate?: Date;
 }
@@ -62,7 +63,13 @@ function applyFilters(baseQuery: any, filters: IntelligenceFilters) {
         q = query(q, where('status', 'in', ['Aprovado', 'Em Análise', 'Resolvido', 'Concluído']));
     }
 
-    if (filters.category && filters.category !== 'all') {
+    if (filters.categories && filters.categories.length > 0 && !filters.categories.includes('all')) {
+        if (filters.categories.length === 1) {
+            q = query(q, where('category', '==', filters.categories[0]));
+        } else if (filters.categories.length <= 10) {
+            q = query(q, where('category', 'in', filters.categories));
+        }
+    } else if (filters.category && filters.category !== 'all') {
         q = query(q, where('category', '==', filters.category));
     }
 

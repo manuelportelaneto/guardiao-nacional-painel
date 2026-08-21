@@ -72,17 +72,28 @@ const AdminIntegrations: React.FC = () => {
 
     useEffect(() => {
         const qKeys = query(collection(db, 'api_consumers'), orderBy('createdAt', 'desc'));
-        const unsubKeys = onSnapshot(qKeys, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ApiConsumer));
-            setConsumers(data);
-        });
+        const unsubKeys = onSnapshot(
+            qKeys,
+            (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ApiConsumer));
+                setConsumers(data);
+            },
+            (error) => {
+                console.warn('Interrompido listener de chaves de API:', error);
+            }
+        );
 
         const qWebhooks = query(collection(db, 'webhooks'), orderBy('createdAt', 'desc'));
-        const unsubWebhooks = onSnapshot(qWebhooks, (snapshot) => {
-            const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WebhookData));
-            setWebhooks(data);
-            // setLoading(false);
-        });
+        const unsubWebhooks = onSnapshot(
+            qWebhooks,
+            (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as WebhookData));
+                setWebhooks(data);
+            },
+            (error) => {
+                console.warn('Interrompido listener de webhooks:', error);
+            }
+        );
 
         return () => { unsubKeys(); unsubWebhooks(); };
     }, []);
