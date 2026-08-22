@@ -51,6 +51,15 @@ export const AdminJurisdictions: React.FC = () => {
     const [departments, setDepartments] = useState<GovernmentDepartment[]>([]);
     const [loadingDeps, setLoadingDeps] = useState(false);
 
+    // Modal Rápido de Nova Secretaria
+    const [isQuickAddDeptOpen, setIsQuickAddDeptOpen] = useState(false);
+    const [quickDeptName, setQuickDeptName] = useState('');
+    const [quickDeptCode, setQuickDeptCode] = useState('');
+    const [quickDeptResponsibleName, setQuickDeptResponsibleName] = useState('');
+    const [quickDeptResponsibleEmail, setQuickDeptResponsibleEmail] = useState('');
+    const [quickDeptSla, setQuickDeptSla] = useState(48);
+    const [savingQuickDept, setSavingQuickDept] = useState(false);
+
     // ─── ESTADO DO WIZARD DE ONBOARDING ───────────────────────────────────────
     const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
     const [onboardingStep, setOnboardingStep] = useState<1 | 2 | 3>(1);
@@ -128,6 +137,60 @@ export const AdminJurisdictions: React.FC = () => {
             (updated[index] as any)[field] = value;
             return updated;
         });
+    };
+
+    // Adiciona secretaria avulsa no município selecionado
+    const handleQuickAddDepartment = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!quickDeptName.trim() || !currentUser) {
+            toast.error('Informe o nome da secretaria.');
+            return;
+        }
+
+        setSavingQuickDept(true);
+        try {
+            await governmentService.addDepartment(
+                selectedMunicipalityForDeps,
+                {
+                    name: quickDeptName.trim(),
+                    code: quickDeptCode.trim() || undefined,
+                    responsibleName: quickDeptResponsibleName.trim() || undefined,
+                    responsibleEmail: quickDeptResponsibleEmail.trim() || undefined,
+                    categoriesManaged: ['zeladoria_geral'],
+                    defaultSlaHours: quickDeptSla || 48,
+                    active: true,
+                    slug: quickDeptName.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-')
+                },
+                currentUser.uid
+            );
+
+            toast.success(`Secretaria ${quickDeptName} adicionada com sucesso!`);
+            setIsQuickAddDeptOpen(false);
+            setQuickDeptName('');
+            setQuickDeptCode('');
+            setQuickDeptResponsibleName('');
+            setQuickDeptResponsibleEmail('');
+            setQuickDeptSla(48);
+            loadDepartments(selectedMunicipalityForDeps);
+        } catch (e) {
+            toast.error('Erro ao adicionar secretaria.');
+        } finally {
+            setSavingQuickDept(false);
+        }
+    };
+
+    // Desativa secretaria
+    const handleDeleteDepartment = async (depId: string, depName: string) => {
+        if (!currentUser) return;
+        if (!window.confirm(`Deseja desativar a secretaria ${depName}?`)) return;
+
+        try {
+            await governmentService.deleteDepartment(depId, selectedMunicipalityForDeps, currentUser.uid);
+            toast.success(`Secretaria ${depName} desativada.`);
+            loadDepartments(selectedMunicipalityForDeps);
+        } catch (e) {
+            toast.error('Erro ao desativar secretaria.');
+        }
     };
 
     // Submissão do Onboarding
@@ -374,6 +437,14 @@ export const AdminJurisdictions: React.FC = () => {
                             Estrutura administrativa e triagem direta de ocorrências por departamento.
                         </p>
                     </div>
+
+                    <Button
+                        size="sm"
+                        onClick={() => setIsQuickAddDeptOpen(true)}
+                        className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 font-semibold shadow-sm"
+                    >
+                        <Plus className="w-3.5 h-3.5" /> Nova Secretaria
+                    </Button>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -383,7 +454,7 @@ export const AdminJurisdictions: React.FC = () => {
                         </div>
                     ) : departments.length === 0 ? (
                         <div className="col-span-3 bg-white p-6 rounded-xl border border-slate-200 text-center text-xs text-slate-500">
-                            Nenhuma secretaria customizada cadastrada ainda para este município.
+                            Nenhuma secretaria customizada cadastrada ainda para este município. Clique em "Nova Secretaria" para adicionar.
                         </div>
                     ) : (
                         departments.map((dep) => (
@@ -393,11 +464,22 @@ export const AdminJurisdictions: React.FC = () => {
                                         <CardTitle className="text-sm font-semibold text-slate-900">
                                             {dep.name}
                                         </CardTitle>
-                                        {dep.code && <Badge variant="secondary" className="text-[10px]">{dep.code}</Badge>}
+                                        <div className="flex items-center gap-1">
+                                            {dep.code && <Badge variant="secondary" className="text-[10px]">{dep.code}</Badge>}
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => handleDeleteDepartment(dep.id, dep.name)}
+                                                className="h-6 w-6 text-slate-400 hover:text-red-600"
+                                                title="Desativar Secretaria"
+                                            >
+                                                <Trash2 className="w-3 h-3" />
+                                            </Button>
+                                        </div>
                                     </div>
                                     {dep.responsibleName && (
                                         <CardDescription className="text-xs text-slate-500">
-                                            Responsável: {dep.responsibleName}
+                                            Responsável: {dep.responsibleName} {dep.responsibleEmail && `(${dep.responsibleEmail})`}
                                         </CardDescription>
                                     )}
                                 </CardHeader>
@@ -415,6 +497,87 @@ export const AdminJurisdictions: React.FC = () => {
                     )}
                 </div>
             </div>
+
+            {/* ─── MODAL: NOVA SECRETARIA RÁPIDA (MUNICÍPIO ATUAL) ─── */}
+            <Dialog open={isQuickAddDeptOpen} onOpenChange={setIsQuickAddDeptOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-slate-900">
+                            <Briefcase className="w-5 h-5 text-indigo-600" />
+                            Adicionar Nova Secretaria Municipal
+                        </DialogTitle>
+                        <DialogDescription>
+                            Configure o departamento para {availableCities.find(c => c.id === selectedMunicipalityForDeps)?.name || selectedMunicipalityForDeps}.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleQuickAddDepartment} className="space-y-3 py-2">
+                        <div>
+                            <Label className="text-xs">Nome da Secretaria *</Label>
+                            <Input
+                                required
+                                placeholder="Ex: Secretaria Municipal de Meio Ambiente"
+                                value={quickDeptName}
+                                onChange={e => setQuickDeptName(e.target.value)}
+                                className="text-xs mt-1"
+                            />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <Label className="text-xs">Sigla / Código</Label>
+                                <Input
+                                    placeholder="Ex: SMMA"
+                                    value={quickDeptCode}
+                                    onChange={e => setQuickDeptCode(e.target.value)}
+                                    className="text-xs mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs">SLA de Atendimento (horas)</Label>
+                                <Input
+                                    type="number"
+                                    min={1}
+                                    value={quickDeptSla}
+                                    onChange={e => setQuickDeptSla(parseInt(e.target.value, 10) || 48)}
+                                    className="text-xs mt-1"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <Label className="text-xs">Nome do Titular/Secretário</Label>
+                                <Input
+                                    placeholder="Ex: Dr. Roberto Mendes"
+                                    value={quickDeptResponsibleName}
+                                    onChange={e => setQuickDeptResponsibleName(e.target.value)}
+                                    className="text-xs mt-1"
+                                />
+                            </div>
+                            <div>
+                                <Label className="text-xs">E-mail Institucional</Label>
+                                <Input
+                                    type="email"
+                                    placeholder="meioambiente@cidade.sp.gov.br"
+                                    value={quickDeptResponsibleEmail}
+                                    onChange={e => setQuickDeptResponsibleEmail(e.target.value)}
+                                    className="text-xs mt-1"
+                                />
+                            </div>
+                        </div>
+
+                        <DialogFooter className="pt-2">
+                            <Button type="button" variant="outline" onClick={() => setIsQuickAddDeptOpen(false)} className="text-xs">
+                                Cancelar
+                            </Button>
+                            <Button type="submit" disabled={savingQuickDept} className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold">
+                                {savingQuickDept ? 'Salvando...' : 'Criar Secretaria'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* ─── MODAL WIZARD: CADASTRO DE NOVO MUNICÍPIO CONVENIADO (DO ZERO) ─── */}
             <Dialog open={isOnboardingOpen} onOpenChange={setIsOnboardingOpen}>

@@ -77,6 +77,7 @@ const AdminWebhooksControl = lazy(() => import('./components/screens/AdminWebhoo
 const AdminExecutiveReports = lazy(() => import('./components/screens/AdminExecutiveReports'));
 const AdminJurisdictions = lazy(() => import('./components/screens/AdminJurisdictions'));
 const AdminGovernmentStaff = lazy(() => import('./components/screens/AdminGovernmentStaff'));
+const ActivateOfficialScreen = lazy(() => import('./components/screens/ActivateOfficialScreen'));
 
 // Full-page loading fallback for lazy-loaded routes
 const PageLoader = () => (
@@ -139,6 +140,18 @@ function App() {
                                 <PublicRoute>
                                     <AuthScreen />
                                 </PublicRoute>
+                            } />
+
+                            {/* Rota Pública para Ativação de Servidor Governamental */}
+                            <Route path="/activate-official" element={
+                                <Suspense fallback={<PageLoader />}>
+                                    <ActivateOfficialScreen />
+                                </Suspense>
+                            } />
+                            <Route path="/ativar-convite" element={
+                                <Suspense fallback={<PageLoader />}>
+                                    <ActivateOfficialScreen />
+                                </Suspense>
                             } />
 
                             {/* HUB - Acessível para todos os autorizados */}

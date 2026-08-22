@@ -57,4 +57,14 @@ describe('Governança Federativa, Servidores Públicos e LGPD (governmentService
 
         expect(Math.round(diffDays)).toBe(7);
     });
+
+    it('deve retornar null para token de convite inexistente', async () => {
+        const result = await governmentService.getInviteByToken('token_inexistente_123');
+        expect(result).toBeNull();
+    });
+
+    it('deve retornar null para busca de servidor inexistente', async () => {
+        const result = await governmentService.getOfficialByUidOrEmail('uid_fake_999', 'fake@prefeitura.sp.gov.br');
+        expect(result).toBeNull();
+    });
 });

@@ -8,6 +8,7 @@
 import {
     collection,
     doc,
+    getDoc,
     getDocs,
     setDoc,
     updateDoc,
@@ -205,6 +206,264 @@ export const governmentService = {
         return invite;
     },
 
+    /**
+     * Busca um convite governamental pelo Token / ID.
+     */
+    async getInviteByToken(token: string): Promise<GovernmentInvite | null> {
+        try {
+            const inviteDoc = await getDoc(doc(db, INVITES_COLLECTION, token));
+            if (inviteDoc.exists()) {
+                return { id: inviteDoc.id, ...inviteDoc.data() } as GovernmentInvite;
+            }
+        } catch (e) {
+            console.warn('Erro ao consultar convite por token:', e);
+        }
+        return null;
+    },
+
+    /**
+     * Reenvia o e-mail de ativação do convite governamental.
+     */
+    async resendInviteEmail(inviteId: string, actorUid: string): Promise<void> {
+        const invite = await this.getInviteByToken(inviteId);
+        if (!invite) throw new Error('Convite não encontrado.');
+        if (invite.used) throw new Error('Este convite já foi utilizado.');
+
+        const activationLink = `${window.location.origin}/activate-official?token=${invite.id}&email=${encodeURIComponent(invite.email)}`;
+        await addDoc(collection(db, MAIL_COLLECTION), {
+            to: [invite.email],
+            message: {
+                subject: `[Reenvio] [Guardião Nacional] Convite Institucional - ${invite.officialTitle} (${invite.cityName})`,
+                html: `
+                    <div style="font-family: sans-serif; max-width: 600px; margin: auto; padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px;">
+                        <h2 style="color: #0f172a;">Guardião Nacional - Acesso Governamental</h2>
+                        <p>Olá, <strong>${invite.name}</strong>,</p>
+                        <p>Este é o reenvio do seu convite para assumir o cargo de <strong>${invite.officialTitle}</strong> na jurisdição de <strong>${invite.cityName} - ${invite.state}</strong>.</p>
+                        <p style="margin: 24px 0;">
+                            <a href="${activationLink}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">
+                                Ativar Minha Conta de Servidor
+                            </a>
+                        </p>
+                        <p style="color: #64748b; font-size: 12px;">Este convite é de uso pessoal e intransferível.</p>
+                    </div>
+                `
+            },
+            createdAt: serverTimestamp()
+        }).catch(err => console.warn('Erro ao enfileirar reenvio de e-mail:', err));
+
+        await loggingService.logAudit(
+            'USER_PROMOTE',
+            actorUid,
+            invite.email,
+            { action: 'RESENT_GOVERNMENT_INVITE', inviteId }
+        );
+    },
+
+    /**
+     * Ativa a conta de um servidor governamental a partir do convite e cria seu usuário.
+     */
+    async activateOfficialAccount(
+        token: string,
+        authUid: string,
+        userData: {
+            name?: string;
+            phone?: string;
+            registrationNumber?: string;
+        }
+    ): Promise<GovernmentOfficial> {
+        const invite = await this.getInviteByToken(token);
+        if (!invite) throw new Error('Convite inválido ou não encontrado.');
+        if (invite.used) throw new Error('Este convite já foi ativado anteriormente.');
+
+        const now = new Date().toISOString();
+        if (new Date(invite.expiresAt).getTime() < Date.now()) {
+            throw new Error('Este convite expirou. Solicite um novo convite ao administrador do município.');
+        }
+
+        // 1. Marca o convite como utilizado
+        await updateDoc(doc(db, INVITES_COLLECTION, token), {
+            used: true,
+            usedAt: now,
+            usedByUid: authUid
+        });
+
+        // 2. Atualiza ou cria o registro oficial do servidor com status ATIVO
+        const officialId = 'off_' + token;
+        const officialRef = doc(db, OFFICIALS_COLLECTION, officialId);
+        const officialDoc = await getDoc(officialRef);
+
+        const officialData: GovernmentOfficial = {
+            id: officialId,
+            uid: authUid,
+            name: userData.name || invite.name,
+            email: invite.email,
+            phone: userData.phone || '',
+            registrationNumber: userData.registrationNumber || invite.registrationNumber || '',
+            role: invite.role,
+            officialTitle: invite.officialTitle,
+            state: invite.state,
+            cityId: invite.cityId,
+            cityName: invite.cityName,
+            departmentId: invite.departmentId,
+            departmentName: invite.departmentName,
+            permissions: invite.permissions,
+            status: 'ATIVO',
+            invitedByUid: invite.createdByUid,
+            invitedAt: invite.createdAt,
+            activatedAt: now,
+            lastLoginAt: now
+        };
+
+        if (officialDoc.exists()) {
+            await updateDoc(officialRef, {
+                uid: authUid,
+                name: officialData.name,
+                phone: officialData.phone,
+                registrationNumber: officialData.registrationNumber,
+                status: 'ATIVO',
+                activatedAt: now,
+                lastLoginAt: now
+            });
+        } else {
+            await setDoc(officialRef, officialData);
+        }
+
+        // 3. Atualiza a contagem de servidores ativos no município
+        try {
+            const munRef = doc(db, MUNICIPALITIES_COLLECTION, invite.cityId);
+            const munSnap = await getDoc(munRef);
+            if (munSnap.exists()) {
+                const currentCount = munSnap.data()?.activeOfficialsCount || 0;
+                await updateDoc(munRef, { activeOfficialsCount: currentCount + 1, updatedAt: now });
+            }
+        } catch (e) {
+            console.warn('Não foi possível incrementar activeOfficialsCount:', e);
+        }
+
+        await loggingService.logAudit(
+            'USER_ROLE_CHANGE',
+            authUid,
+            authUid,
+            { action: 'ACTIVATED_GOVERNMENT_OFFICIAL_ACCOUNT', cityId: invite.cityId, role: invite.role, title: invite.officialTitle }
+        );
+
+        return officialData;
+    },
+
+    /**
+     * Busca o registro oficial de um servidor governamental por UID ou E-mail.
+     */
+    async getOfficialByUidOrEmail(uid: string, email?: string | null): Promise<GovernmentOfficial | null> {
+        try {
+            // Busca direta por UID
+            const qUid = query(collection(db, OFFICIALS_COLLECTION), where('uid', '==', uid), limit(1));
+            const snapUid = await getDocs(qUid);
+            if (!snapUid.empty) {
+                return { id: snapUid.docs[0].id, ...snapUid.docs[0].data() } as GovernmentOfficial;
+            }
+
+            // Fallback por E-mail
+            if (email) {
+                const normalized = email.toLowerCase().trim();
+                const qEmail = query(collection(db, OFFICIALS_COLLECTION), where('email', '==', normalized), limit(1));
+                const snapEmail = await getDocs(qEmail);
+                if (!snapEmail.empty) {
+                    return { id: snapEmail.docs[0].id, ...snapEmail.docs[0].data() } as GovernmentOfficial;
+                }
+            }
+        } catch (e) {
+            console.warn('Erro ao consultar servidor governamental:', e);
+        }
+        return null;
+    },
+
+    /**
+     * Adiciona uma nova secretaria a um município existente.
+     */
+    async addDepartment(
+        cityId: string,
+        department: Omit<GovernmentDepartment, 'id' | 'cityId' | 'state' | 'createdAt' | 'updatedAt'>,
+        actorUid: string
+    ): Promise<GovernmentDepartment> {
+        const depSlug = department.slug || department.name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '-');
+        const depId = `${cityId}_${depSlug}_${Date.now().toString(36)}`;
+
+        // Busca o estado do município
+        let state = 'SP';
+        try {
+            const munDoc = await getDoc(doc(db, MUNICIPALITIES_COLLECTION, cityId));
+            if (munDoc.exists()) {
+                state = munDoc.data()?.state || 'SP';
+            }
+        } catch (e) { }
+
+        const newDep: GovernmentDepartment = {
+            ...department,
+            id: depId,
+            cityId,
+            state,
+            slug: depSlug,
+            active: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        await setDoc(doc(db, DEPARTMENTS_COLLECTION, depId), newDep);
+
+        // Atualiza contagem de secretarias no município
+        try {
+            const munRef = doc(db, MUNICIPALITIES_COLLECTION, cityId);
+            const munSnap = await getDoc(munRef);
+            if (munSnap.exists()) {
+                const cur = munSnap.data()?.departmentsCount || 0;
+                await updateDoc(munRef, { departmentsCount: cur + 1, updatedAt: new Date().toISOString() });
+            }
+        } catch (e) { }
+
+        await loggingService.logAudit(
+            'SETTINGS_UPDATE',
+            actorUid,
+            depId,
+            { action: 'ADDED_DEPARTMENT', cityId, name: department.name, code: department.code }
+        );
+
+        return newDep;
+    },
+
+    /**
+     * Atualiza dados e brasão de um município.
+     */
+    async updateMunicipality(cityId: string, data: Partial<GovernmentMunicipality>, actorUid: string): Promise<void> {
+        await updateDoc(doc(db, MUNICIPALITIES_COLLECTION, cityId), {
+            ...data,
+            updatedAt: new Date().toISOString()
+        });
+
+        await loggingService.logAudit(
+            'SETTINGS_UPDATE',
+            actorUid,
+            cityId,
+            { action: 'UPDATED_MUNICIPALITY', ...data }
+        );
+    },
+
+    /**
+     * Exclui ou desativa uma secretaria municipal.
+     */
+    async deleteDepartment(departmentId: string, cityId: string, actorUid: string): Promise<void> {
+        await updateDoc(doc(db, DEPARTMENTS_COLLECTION, departmentId), {
+            active: false,
+            updatedAt: new Date().toISOString()
+        });
+
+        await loggingService.logAudit(
+            'SETTINGS_UPDATE',
+            actorUid,
+            departmentId,
+            { action: 'DEACTIVATED_DEPARTMENT', cityId }
+        );
+    },
+
     // ─── 3. MUNICÍPIOS E SECRETARIAS PERSONALIZADAS DO ZERO ─────────────────────
 
     /**
@@ -287,7 +546,8 @@ export const governmentService = {
             const q = query(collection(db, DEPARTMENTS_COLLECTION), where('cityId', '==', cityId));
             const snap = await getDocs(q);
             if (!snap.empty) {
-                return snap.docs.map(d => ({ id: d.id, ...d.data() })) as GovernmentDepartment[];
+                const deps = snap.docs.map(d => ({ id: d.id, ...d.data() })) as GovernmentDepartment[];
+                return deps.filter(d => d.active !== false);
             }
         } catch (e) {
             console.warn('Erro ao buscar secretarias de ' + cityId, e);

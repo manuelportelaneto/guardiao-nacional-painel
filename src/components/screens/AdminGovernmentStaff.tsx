@@ -359,14 +359,52 @@ export const AdminGovernmentStaff: React.FC = () => {
                                         </TableCell>
 
                                         <TableCell className="text-right">
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleToggleStatus(off)}
-                                                className="text-xs h-7"
-                                            >
-                                                {off.status === 'ATIVO' ? 'Suspender' : 'Ativar'}
-                                            </Button>
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                {off.status === 'PENDENTE_CONVITE' && (
+                                                    <>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() => {
+                                                                const invToken = off.id.startsWith('off_') ? off.id.replace('off_', '') : off.id;
+                                                                const link = `${window.location.origin}/activate-official?token=${invToken}&email=${encodeURIComponent(off.email)}`;
+                                                                navigator.clipboard.writeText(link);
+                                                                toast.success('Link de ativação copiado para a área de transferência!');
+                                                            }}
+                                                            className="text-xs h-7 gap-1 text-blue-700 bg-blue-50/60 hover:bg-blue-100 border-blue-200 font-medium"
+                                                            title="Copiar link seguro para envio via WhatsApp ou mensagem direta"
+                                                        >
+                                                            Copiar Link
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={async () => {
+                                                                if (!currentUser) return;
+                                                                const invToken = off.id.startsWith('off_') ? off.id.replace('off_', '') : off.id;
+                                                                try {
+                                                                    await governmentService.resendInviteEmail(invToken, currentUser.uid);
+                                                                    toast.success(`E-mail de convite reenviado para ${off.email}!`);
+                                                                } catch (e: any) {
+                                                                    toast.error(e.message || 'Erro ao reenviar e-mail.');
+                                                                }
+                                                            }}
+                                                            className="text-xs h-7 gap-1 text-slate-600 hover:text-slate-900 border-slate-200"
+                                                            title="Reenviar e-mail oficial de ativação"
+                                                        >
+                                                            Reenviar
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => handleToggleStatus(off)}
+                                                    className={`text-xs h-7 ${off.status === 'ATIVO' ? 'hover:text-amber-600' : 'hover:text-emerald-600'}`}
+                                                >
+                                                    {off.status === 'ATIVO' ? 'Suspender' : off.status === 'SUSPENSO' ? 'Reativar' : 'Cancelar'}
+                                                </Button>
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))

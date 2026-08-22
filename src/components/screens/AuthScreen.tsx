@@ -25,6 +25,7 @@ import {
 } from '../ui/dialog';
 import { useAuth } from '../../context/AuthContext';
 import { loggingService } from '../../services/loggingService';
+import { governmentService } from '../../services/governmentService';
 
 // Roles that have access to the admin panel
 const AUTHORIZED_ROLES = [
@@ -83,30 +84,42 @@ const AuthScreen: React.FC = () => {
         return;
       }
 
-      if (!userDoc.exists()) {
-        await signOut(auth);
-        setShowAccessDeniedModal(true);
+      // 1. Checa na base de administradores/usuários
+      if (userDoc.exists()) {
+        const data = userDoc.data();
+        const role = data?.role || 'citizen';
+        if (AUTHORIZED_ROLES.includes(role)) {
+          await loggingService.logAudit(
+            'LOGIN_SUCCESS',
+            uid,
+            uid,
+            { role, agent: navigator.userAgent, method: 'auth/login' }
+          ).catch(e => console.warn('Failed to log login action', e));
+
+          toast.success('Login realizado com sucesso!');
+          navigate('/hub');
+          return;
+        }
+      }
+
+      // 2. Checa na base de servidores públicos institucionais (LGPD)
+      const official = await governmentService.getOfficialByUidOrEmail(uid, userEmail);
+      if (official && official.status === 'ATIVO') {
+        await loggingService.logAudit(
+          'LOGIN_SUCCESS',
+          uid,
+          uid,
+          { role: official.role, cityId: official.cityId, title: official.officialTitle, agent: navigator.userAgent, method: 'auth/login' }
+        ).catch(e => console.warn('Failed to log login action', e));
+
+        toast.success(`Bem-vindo, ${official.name}!`);
+        navigate(official.cityId ? `/city/${official.cityId}/dashboard` : '/hub');
         return;
       }
 
-      const data = userDoc.data();
-      const role = data?.role || 'citizen';
-
-      if (!AUTHORIZED_ROLES.includes(role)) {
-        await signOut(auth);
-        setShowAccessDeniedModal(true);
-        return;
-      }
-
-      await loggingService.logAudit(
-        'LOGIN_SUCCESS',
-        uid,
-        uid,
-        { role, agent: navigator.userAgent, method: 'auth/login' }
-      ).catch(e => console.warn('Failed to log login action', e));
-
-      toast.success('Login realizado com sucesso!');
-      navigate('/hub');
+      // 3. Se for cidadão comum, bloqueia acesso ao painel administrativo
+      await signOut(auth);
+      setShowAccessDeniedModal(true);
     } catch (err) {
       console.error('Error checking access:', err);
       await signOut(auth);

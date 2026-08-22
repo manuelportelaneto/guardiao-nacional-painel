@@ -4,6 +4,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import type { UserData } from '../types/user';
 import { loggingService } from '../services/loggingService';
+import { governmentService } from '../services/governmentService';
 
 /**
  * @interface AuthContextType
@@ -57,15 +58,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         try {
-          // Busca o perfil estendido do usuário na coleção Firestore "users"
+          // 1. Busca o perfil na coleção Firestore "users"
           const userDocRef = doc(db, 'users', user.uid);
           const userDoc = await getDoc(userDocRef);
 
           if (userDoc.exists()) {
             const data = userDoc.data() as UserData;
-            setUserData(data);
+            if (['super_admin', 'admin', 'presidente', 'city_admin'].includes(data.role)) {
+              setUserData(data);
+              setLoading(false);
+              return;
+            }
+          }
+
+          // 2. Se não for admin central, busca na base institucional "government_officials" (LGPD segregation)
+          const official = await governmentService.getOfficialByUidOrEmail(user.uid, user.email);
+          if (official && official.status === 'ATIVO') {
+            setUserData({
+              uid: user.uid,
+              email: user.email,
+              role: official.role === 'prefeito' ? 'prefeito' : 'servidor',
+              displayName: official.name || user.displayName || official.officialTitle,
+              cityId: official.cityId,
+              state: official.state,
+              accessLevel: official.role === 'prefeito' ? 2 : 1
+            });
+            setLoading(false);
+            return;
+          }
+
+          if (userDoc.exists()) {
+            setUserData(userDoc.data() as UserData);
           } else {
-            // Cidadãos comuns que tentarem logar no painel administrativo recebem perfil padrão restrito
+            // Cidadãos comuns recebem perfil padrão restrito
             setUserData({ uid: user.uid, email: user.email, role: 'citizen' });
           }
         } catch (error) {
