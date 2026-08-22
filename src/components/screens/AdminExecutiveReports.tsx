@@ -384,6 +384,94 @@ export const AdminExecutiveReports: React.FC = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* ─── Módulo B2B: Intelligence as a Service (IaaS) & ESG ─── */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                {/* Card 1: Relatório de Risco para Seguradoras & Logística */}
+                <Card className="border-slate-200 bg-white rounded-2xl shadow-sm">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-blue-700">
+                                    <Building2 className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-sm font-bold text-slate-900">Intelligence as a Service (IaaS Seguradoras)</CardTitle>
+                                    <CardDescription className="text-xs">Índices de vulnerabilidade e sinistros territoriais.</CardDescription>
+                                </div>
+                            </div>
+                            <Badge className="bg-blue-600 text-white text-[10px]">B2B Analytics</Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-xs">
+                        <div className="grid grid-cols-3 gap-2">
+                            <div className="p-2.5 bg-blue-50/50 rounded-xl border border-blue-100 text-center">
+                                <div className="text-[10px] text-slate-500 font-bold uppercase">Risco de Alagamento</div>
+                                <div className="text-base font-black text-blue-700 mt-0.5">42 / 100</div>
+                                <div className="text-[9px] text-slate-400">Bacias monitoradas</div>
+                            </div>
+                            <div className="p-2.5 bg-amber-50/50 rounded-xl border border-amber-100 text-center">
+                                <div className="text-[10px] text-slate-500 font-bold uppercase">Danos Asfálticos</div>
+                                <div className="text-base font-black text-amber-700 mt-0.5">28 / 100</div>
+                                <div className="text-[9px] text-slate-400">Sinistro de frotas</div>
+                            </div>
+                            <div className="p-2.5 bg-emerald-50/50 rounded-xl border border-emerald-100 text-center">
+                                <div className="text-[10px] text-slate-500 font-bold uppercase">Segurança Noturna</div>
+                                <div className="text-base font-black text-emerald-700 mt-0.5">18 / 100</div>
+                                <div className="text-[9px] text-slate-400">Iluminação pública</div>
+                            </div>
+                        </div>
+
+                        <p className="text-slate-600 text-[11px] leading-relaxed">
+                            Relatório automatizado formatado para precificação de apólices residenciais, frotas corporativas e seguros patrimoniais.
+                        </p>
+                    </CardContent>
+                </Card>
+
+                {/* Card 2: Patrocínios Cívicos ESG & Certificados */}
+                <Card className="border-slate-200 bg-white rounded-2xl shadow-sm">
+                    <CardHeader className="pb-3">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-700">
+                                    <Sparkles className="w-4 h-4" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-sm font-bold text-slate-900">Patrocínio Cívico & Certificados ESG</CardTitle>
+                                    <CardDescription className="text-xs">Adoção de praças e zeladoria por empresas privadas.</CardDescription>
+                                </div>
+                            </div>
+                            <Badge className="bg-emerald-600 text-white text-[10px]">Sustentabilidade</Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-xs">
+                        <div className="space-y-2">
+                            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                                <div>
+                                    <div className="font-bold text-slate-800">Porto Seguro S.A.</div>
+                                    <div className="text-[10px] text-slate-500">Praça Presidente Kennedy • 14.500 munícipes/dia</div>
+                                </div>
+                                <Badge variant="outline" className="text-[9px] font-mono text-emerald-700 bg-emerald-50 border-emerald-200">
+                                    ESG-SA-2026-99182B
+                                </Badge>
+                            </div>
+                            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-between">
+                                <div>
+                                    <div className="font-bold text-slate-800">Bradesco Seguros</div>
+                                    <div className="text-[10px] text-slate-500">Bacia Córrego dos Couros • 32.000 munícipes/dia</div>
+                                </div>
+                                <Badge variant="outline" className="text-[9px] font-mono text-emerald-700 bg-emerald-50 border-emerald-200">
+                                    ESG-SBC-2026-14029C
+                                </Badge>
+                            </div>
+                        </div>
+
+                        <p className="text-slate-600 text-[11px] leading-relaxed">
+                            Certificados com hash criptográfico auditável para prestação de contas no Relatório de Sustentabilidade Corporativa (GRI / ESG).
+                        </p>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 };

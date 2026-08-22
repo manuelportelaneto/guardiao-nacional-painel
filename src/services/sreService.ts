@@ -153,6 +153,11 @@ export const sreService = {
             console.warn('Erro ao calcular métricas de SRE:', error);
         }
 
+        const totalLatency = services.reduce((acc, s) => acc + s.latencyMs, 0);
+        const avgLatency = services.length > 0 ? Math.round(totalLatency / services.length) : 50;
+        const healthyCount = services.filter(s => s.status === 'healthy').length;
+        const uptimePercent = services.length > 0 ? Math.round((healthyCount / services.length) * 100) : 100;
+
         return {
             services,
             errorRate24h: errorCount,
@@ -161,6 +166,8 @@ export const sreService = {
             unresolvedCrashes: crashCount,
             storageUsageGB: 2.14,
             storageQuotaGB: 5.0,
+            averageLatencyMs: avgLatency,
+            uptimePercent
         };
     },
 
