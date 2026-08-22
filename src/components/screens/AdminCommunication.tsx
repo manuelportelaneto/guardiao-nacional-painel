@@ -93,23 +93,8 @@ const AdminCommunication: React.FC = () => {
                     </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="compose" className="pt-4 grid gap-6 grid-cols-1 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                        <MessageComposer />
-                    </div>
-                    <div className="lg:col-span-1">
-                        <div className="bg-blue-50 border border-blue-100 rounded-lg p-6 space-y-4">
-                            <h3 className="font-semibold text-blue-900 flex items-center gap-2">
-                                <MessageSquare className="w-5 h-5" /> Dicas de Engajamento
-                            </h3>
-                            <ul className="text-sm text-blue-800 space-y-2 list-disc list-inside">
-                                <li>Use títulos curtos e diretos.</li>
-                                <li>Adicione imagens para aumentar a taxa de cliques em 40%.</li>
-                                <li>Segmente por localização para evitar spam.</li>
-                                <li>Horários de pico: 11h e 18h.</li>
-                            </ul>
-                        </div>
-                    </div>
+                <TabsContent value="compose" className="pt-4">
+                    <MessageComposer />
                 </TabsContent>
 
                 <TabsContent value="history" className="pt-4">

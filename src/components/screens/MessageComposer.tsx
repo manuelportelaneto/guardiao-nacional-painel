@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
@@ -8,13 +8,21 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Send, Smartphone, Bell, Mail, MessageSquare, Users, Target, ClipboardList, ScrollText, Plus, Trash2 } from 'lucide-react';
+import { Badge } from '../ui/badge';
+import {
+    Send, Smartphone, Bell, Mail, MessageSquare, Users, Target, ClipboardList,
+    ScrollText, Plus, Trash2, ShieldAlert, Sparkles, Building2, MapPin, CheckCircle2,
+    X, AlertTriangle, Eye, Layers, Wifi, BatteryCharging, Radio, Siren
+} from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { StandardLocationFilter } from '../common/StandardLocationFilter';
 import type { LocationFilterState } from '../common/StandardLocationFilter';
 import { toast } from 'sonner';
 import ReactQuill from 'react-quill-new';
 import 'react-quill-new/dist/quill.snow.css';
+import { useScope } from '../../context/ScopeContext';
+import { OFFICIAL_COMMUNICATION_TEMPLATES, type OfficialTemplate } from '../../data/officialCommunicationTemplates';
+import { getCityNeighborhoods, MUNICIPAL_NEIGHBORHOODS_DB } from '../../data/municipalNeighborhoods';
 
 const QUILL_MODULES = {
     toolbar: [
@@ -29,7 +37,11 @@ const QUILL_MODULES = {
 const QUILL_FORMATS = ['bold', 'italic', 'underline', 'color', 'list', 'link'];
 
 const MessageComposer: React.FC = () => {
+    const { scope } = useScope();
     const [loading, setLoading] = useState(false);
+
+    // Template Selecionado
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
 
     // Content State
     const [title, setTitle] = useState('');
@@ -37,6 +49,7 @@ const MessageComposer: React.FC = () => {
     const [imageUrl, setImageUrl] = useState('');
     const [imageLink, setImageLink] = useState('');
     const [isEmergency, setIsEmergency] = useState(false);
+    const [categoryTag, setCategoryTag] = useState<string>('Geral');
 
     // Message Type: info | poll | petition
     const [messageType, setMessageType] = useState<'info' | 'poll' | 'petition'>('info');
@@ -59,9 +72,11 @@ const MessageComposer: React.FC = () => {
         sms: false
     });
 
-    // Targeting
+    // Targeting & Bairros
     const [isTargetAll, setIsTargetAll] = useState(true);
     const [locationFilter, setLocationFilter] = useState<LocationFilterState>({});
+    const [selectedNeighborhoods, setSelectedNeighborhoods] = useState<string[]>([]);
+    const [customNeighborhoodInput, setCustomNeighborhoodInput] = useState('');
     const [targetUserIds, setTargetUserIds] = useState('');
     const [targetAudience, setTargetAudience] = useState({
         minAge: '',
@@ -74,7 +89,89 @@ const MessageComposer: React.FC = () => {
     const [manualSmsList, setManualSmsList] = useState('');
     const [manualListExclusive, setManualListExclusive] = useState(false);
 
+    // Preview Mockup State (push vs inapp)
+    const [previewTab, setPreviewTab] = useState<'push' | 'feed'>('push');
+
+    // Identificação de Bairros da Cidade Atual do Escopo
+    const activeCityId = scope.cityId || 'santo-andre';
+    const activeCityName = scope.cityName || 'Santo André';
+    const cityNeighborhoodData = useMemo(() => {
+        return getCityNeighborhoods(activeCityId) || getCityNeighborhoods(activeCityName);
+    }, [activeCityId, activeCityName]);
+
+    // Aplicação de Template em 1 Clique
+    const handleApplyTemplate = (template: OfficialTemplate) => {
+        setSelectedTemplateId(template.id);
+        setTitle(template.defaultSubject);
+        setBody(template.defaultBody);
+        setIsEmergency(!!template.isEmergency);
+        setCategoryTag(template.badgeText);
+        setMessageType('info');
+        setChannels(template.defaultChannels);
+        toast.success(`Modelo "${template.title}" aplicado!`, {
+            description: 'Você pode personalizar os dados antes de disparar.'
+        });
+    };
+
+    // Alternar Bairro Selecionado
+    const toggleNeighborhood = (neighborhood: string) => {
+        setSelectedNeighborhoods(prev => 
+            prev.includes(neighborhood) 
+                ? prev.filter(n => n !== neighborhood)
+                : [...prev, neighborhood]
+        );
+    };
+
+    // Ações Rápidas de Bairros
+    const handleSelectAllNeighborhoods = () => {
+        if (cityNeighborhoodData?.neighborhoods) {
+            setSelectedNeighborhoods(cityNeighborhoodData.neighborhoods);
+        }
+    };
+
+    const handleSelectBasinNeighborhoods = () => {
+        if (cityNeighborhoodData?.criticalBasinNeighborhoods) {
+            setSelectedNeighborhoods(cityNeighborhoodData.criticalBasinNeighborhoods);
+            toast.info(`Selecionados ${cityNeighborhoodData.criticalBasinNeighborhoods.length} bairros em bacias críticas.`);
+        }
+    };
+
+    const handleSelectSlopeNeighborhoods = () => {
+        if (cityNeighborhoodData?.criticalSlopeNeighborhoods) {
+            setSelectedNeighborhoods(cityNeighborhoodData.criticalSlopeNeighborhoods);
+            toast.info(`Selecionados ${cityNeighborhoodData.criticalSlopeNeighborhoods.length} bairros de encosta monitorada.`);
+        }
+    };
+
+    const handleClearNeighborhoods = () => {
+        setSelectedNeighborhoods([]);
+    };
+
+    const handleAddCustomNeighborhood = (e: React.KeyboardEvent | React.MouseEvent) => {
+        if ('key' in e && e.key !== 'Enter') return;
+        if (!customNeighborhoodInput.trim()) return;
+        const name = customNeighborhoodInput.trim();
+        if (!selectedNeighborhoods.includes(name)) {
+            setSelectedNeighborhoods(prev => [...prev, name]);
+        }
+        setCustomNeighborhoodInput('');
+    };
+
     const charCount = useMemo(() => body.replace(/<[^>]*>/g, '').length, [body]);
+    const plainTextBody = useMemo(() => {
+        const tmp = document.createElement("DIV");
+        tmp.innerHTML = body;
+        return tmp.textContent || tmp.innerText || "";
+    }, [body]);
+
+    // Estimativa de Munícipes Atingidos
+    const estimatedAudienceCount = useMemo(() => {
+        if (isTargetAll) return 18450; // População estimada com app instalado na base municipal
+        if (selectedNeighborhoods.length > 0) {
+            return selectedNeighborhoods.length * 1420;
+        }
+        return 1200;
+    }, [isTargetAll, selectedNeighborhoods.length]);
 
     const addPollOption = () => {
         if (pollOptions.length < 6) {
@@ -107,15 +204,6 @@ const MessageComposer: React.FC = () => {
             return;
         }
 
-        // Helper to strip HTML for push/summaries
-        const stripHtml = (html: string) => {
-            const tmp = document.createElement("DIV");
-            tmp.innerHTML = html;
-            return tmp.textContent || tmp.innerText || "";
-        };
-
-        const plainTextBody = stripHtml(body);
-
         if (messageType === 'poll') {
             const validOptions = pollOptions.filter(o => o.trim());
             if (validOptions.length < 2) {
@@ -143,42 +231,39 @@ const MessageComposer: React.FC = () => {
 
         setLoading(true);
         try {
-            let estimatedReach = 0;
-            if (isTargetAll) {
-                // Fetch real user count
-                const { getCountFromServer } = await import('firebase/firestore');
-                const snapshot = await getCountFromServer(collection(db, 'users'));
-                estimatedReach = snapshot.data().count;
-            } else {
-                estimatedReach = targetUserIds ? targetUserIds.split(',').length : 100;
-            }
-
             const messageData: Record<string, any> = {
                 title,
                 body,
-                plainText: plainTextBody, // Add plain text version for push/previews
+                plainText: plainTextBody,
                 segment: isTargetAll ? 'all' : 'targeted',
                 content: { title, body, imageUrl, imageLink },
                 imageLink,
-                tag: isEmergency ? 'Emergência' : 'Geral',
+                tag: isEmergency ? 'Emergência' : categoryTag,
+                categoryTag,
                 type: messageType === 'poll' ? 'poll' : messageType === 'petition' ? 'petition' : (isEmergency ? 'emergency' : 'info'),
                 channels: selectedChannels,
+                isEmergency,
+                jurisdiction: {
+                    cityId: activeCityId,
+                    cityName: activeCityName,
+                    state: scope.state || 'SP'
+                },
+                targetedNeighborhoods: selectedNeighborhoods,
                 filters: {
                     isTargetAll: manualListExclusive ? false : isTargetAll,
                     manualListExclusive,
-                    location: manualListExclusive ? {} : locationFilter,
+                    location: manualListExclusive ? {} : { ...locationFilter, neighborhoods: selectedNeighborhoods },
                     demographics: manualListExclusive ? {} : targetAudience,
                     targetUserIds: manualListExclusive ? [] : (targetUserIds ? targetUserIds.split(',').map(id => id.trim()).filter(Boolean) : []),
                     manualEmailList: manualEmailList ? manualEmailList.split(/[\s,;]+/).map(e => e.trim()).filter(Boolean) : [],
                     manualSmsList: manualSmsList ? manualSmsList.split(/[\s,;]+/).map(s => s.trim().replace(/\D/g, '')).filter(Boolean) : []
                 },
                 status: 'queued',
-                stats: { sent: 0, totalTarget: estimatedReach, viewed: 0, clicked: 0, failed: 0 },
+                stats: { sent: 0, totalTarget: estimatedAudienceCount, viewed: 0, clicked: 0, failed: 0 },
                 createdAt: serverTimestamp(),
-                createdBy: 'admin'
+                createdBy: 'admin_official'
             };
 
-            // Poll-specific data
             if (messageType === 'poll') {
                 const validOptions = pollOptions.filter(o => o.trim());
                 const votes: Record<string, number> = {};
@@ -195,7 +280,6 @@ const MessageComposer: React.FC = () => {
                 };
             }
 
-            // Petition-specific data
             if (messageType === 'petition') {
                 messageData.petition = {
                     externalUrl: getPetitionExternalUrl(),
@@ -208,8 +292,13 @@ const MessageComposer: React.FC = () => {
 
             await addDoc(collection(db, 'messages'), messageData);
 
-            const typeLabel = messageType === 'poll' ? 'Pesquisa' : messageType === 'petition' ? 'Abaixo-Assinado' : 'Mensagem';
-            toast.success(`${typeLabel} enviada! Alcance estimado: ${estimatedReach}`);
+            const typeLabel = isEmergency 
+                ? '🚨 Alerta de Emergência'
+                : (messageType === 'poll' ? 'Pesquisa' : messageType === 'petition' ? 'Abaixo-Assinado' : 'Comunicado Oficial');
+            
+            toast.success(`${typeLabel} publicado com sucesso!`, {
+                description: `Disparo agendado para ~${estimatedAudienceCount.toLocaleString('pt-BR')} cidadãos${selectedNeighborhoods.length > 0 ? ` em ${selectedNeighborhoods.length} bairros` : ''}.`
+            });
 
             // Reset
             setTitle('');
@@ -217,7 +306,9 @@ const MessageComposer: React.FC = () => {
             setImageUrl('');
             setImageLink('');
             setIsEmergency(false);
+            setSelectedTemplateId('');
             setMessageType('info');
+            setSelectedNeighborhoods([]);
             setPollOptions(['Sim', 'Não']);
             setPollDays(7);
             setPetitionUrl('');
@@ -229,366 +320,562 @@ const MessageComposer: React.FC = () => {
             setManualListExclusive(false);
         } catch (error) {
             console.error(error);
-            toast.error('Erro ao enviar');
+            toast.error('Erro ao enviar comunicado');
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Nova Mensagem</CardTitle>
-                <CardDescription>Envie notificações, pesquisas ou abaixo-assinados para os cidadãos.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-
-                {/* 0. Tipo de Mensagem */}
-                <div className="space-y-3">
-                    <Label className="text-base font-semibold">Tipo de Mensagem</Label>
-                    <div className="grid grid-cols-3 gap-3">
-                        <div
-                            className={`border p-3 rounded-lg flex items-center gap-2 cursor-pointer transition-colors ${messageType === 'info' ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-400' : 'hover:bg-gray-50'}`}
-                            onClick={() => setMessageType('info')}
-                        >
-                            <Bell className="w-4 h-4 text-blue-500" />
-                            <span className="text-sm font-medium">Mensagem</span>
-                        </div>
-                        <div
-                            className={`border p-3 rounded-lg flex items-center gap-2 cursor-pointer transition-colors ${messageType === 'poll' ? 'bg-indigo-50 border-indigo-300 ring-1 ring-indigo-400' : 'hover:bg-gray-50'}`}
-                            onClick={() => setMessageType('poll')}
-                        >
-                            <ClipboardList className="w-4 h-4 text-indigo-500" />
-                            <span className="text-sm font-medium">Pesquisa</span>
-                        </div>
-                        <div
-                            className={`border p-3 rounded-lg flex items-center gap-2 cursor-pointer transition-colors ${messageType === 'petition' ? 'bg-teal-50 border-teal-300 ring-1 ring-teal-400' : 'hover:bg-gray-50'}`}
-                            onClick={() => setMessageType('petition')}
-                        >
-                            <ScrollText className="w-4 h-4 text-teal-600" />
-                            <span className="text-sm font-medium">Abaixo-Assinado</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 1. Canais */}
-                <div className="space-y-3">
-                    <Label className="text-base font-semibold">Canais de Envio</Label>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className={`border p-3 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.push ? 'bg-blue-50 border-blue-200' : 'hover:bg-gray-50'}`}
-                            onClick={() => setChannels(c => ({ ...c, push: !c.push }))}>
-                            <Checkbox checked={channels.push} />
-                            <Smartphone className="w-4 h-4 text-blue-500" />
-                            <span className="text-sm font-medium">Push</span>
-                        </div>
-                        <div className={`border p-3 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.internal ? 'bg-indigo-50 border-indigo-200' : 'hover:bg-gray-50'}`}
-                            onClick={() => setChannels(c => ({ ...c, internal: !c.internal }))}>
-                            <Checkbox checked={channels.internal} />
-                            <Bell className="w-4 h-4 text-indigo-500" />
-                            <span className="text-sm font-medium">Interna (App)</span>
-                        </div>
-                        <div className={`border p-3 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.email ? 'bg-orange-50 border-orange-200' : 'hover:bg-gray-50'}`}
-                            onClick={() => setChannels(c => ({ ...c, email: !c.email }))}>
-                            <Checkbox checked={channels.email} />
-                            <Mail className="w-4 h-4 text-orange-500" />
-                            <span className="text-sm font-medium">Email</span>
-                        </div>
-                        <div className={`border p-3 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.sms ? 'bg-green-50 border-green-200' : 'hover:bg-gray-50'}`}
-                            onClick={() => setChannels(c => ({ ...c, sms: !c.sms }))}>
-                            <Checkbox checked={channels.sms} />
-                            <MessageSquare className="w-4 h-4 text-green-500" />
-                            <span className="text-sm font-medium">SMS</span>
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2. Conteúdo */}
-                <div className="space-y-4 border-t pt-4">
-                    <Label className="text-base font-semibold">Conteúdo da {messageType === 'poll' ? 'Pesquisa' : messageType === 'petition' ? 'Petição' : 'Mensagem'}</Label>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="title">Título</Label>
-                        <Input
-                            id="title"
-                            placeholder={messageType === 'poll' ? 'Ex: Você apoia a construção do novo parque?' : messageType === 'petition' ? 'Ex: Mais médicos para o posto de saúde' : 'Ex: Alerta de Tempestade'}
-                            value={title}
-                            className={isEmergency ? "border-red-400 focus-visible:ring-red-500" : ""}
-                            onChange={e => setTitle(e.target.value)}
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Mensagem (Editor Visual)</Label>
-                        <div className={`rounded-lg border ${isEmergency ? 'border-red-400' : 'border-input'}`}>
-                            <ReactQuill
-                                theme="snow"
-                                value={body}
-                                onChange={setBody}
-                                modules={QUILL_MODULES}
-                                formats={QUILL_FORMATS}
-                                placeholder="Escreva aqui... Use a barra de formatação para negrito, itálico, cores, links e listas."
-                                style={{ minHeight: '140px' }}
-                            />
-                        </div>
-                        <div className="text-xs text-muted-foreground flex justify-between">
-                            <span className="flex items-center gap-2">
-                                {messageType === 'info' && (
-                                    <>
-                                        <Switch id="emergency-mode" checked={isEmergency} onCheckedChange={setIsEmergency} />
-                                        <Label htmlFor="emergency-mode" className={`font-semibold cursor-pointer ${isEmergency ? 'text-red-600' : 'text-slate-600'}`}>
-                                            🚨 Alerta de Emergência
-                                        </Label>
-                                    </>
-                                )}
-                            </span>
-                            <span>{charCount} caracteres</span>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="image">URL da Imagem (Opcional)</Label>
-                            <Input id="image" placeholder="https://exemplo.com/imagem.jpg" value={imageUrl} onChange={e => setImageUrl(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="image-link">Link ao clicar na imagem (Opcional)</Label>
-                            <Input id="image-link" placeholder="https://cloudmatrix.com.br" value={imageLink} onChange={e => setImageLink(e.target.value)} />
-                        </div>
-                    </div>
-                </div>
-
-                {/* 2.5 Poll Options */}
-                {messageType === 'poll' && (
-                    <div className="space-y-4 border-t pt-4">
-                        <Label className="text-base font-semibold flex items-center gap-2">
-                            <ClipboardList className="w-4 h-4" /> Opções de Voto
-                        </Label>
-                        <div className="space-y-2">
-                            {pollOptions.map((opt, i) => (
-                                <div key={i} className="flex gap-2 items-center">
-                                    <span className="text-xs font-mono text-gray-400 w-6">{i + 1}.</span>
-                                    <Input
-                                        value={opt}
-                                        onChange={(e) => updatePollOption(i, e.target.value)}
-                                        placeholder={`Opção ${i + 1}`}
-                                        className="flex-1"
-                                    />
-                                    {pollOptions.length > 2 && (
-                                        <Button variant="ghost" size="icon" onClick={() => removePollOption(i)} className="text-red-400 hover:text-red-600">
-                                            <Trash2 className="w-4 h-4" />
-                                        </Button>
-                                    )}
-                                </div>
-                            ))}
-                            {pollOptions.length < 6 && (
-                                <Button variant="outline" size="sm" onClick={addPollOption} className="mt-2">
-                                    <Plus className="w-3 h-3 mr-1" /> Adicionar Opção
-                                </Button>
-                            )}
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold uppercase text-gray-500">Encerrar em (dias)</Label>
-                                <Input type="number" min={1} max={30} value={pollDays} onChange={e => setPollDays(Number(e.target.value))} />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold uppercase text-gray-500">Resultados Parciais?</Label>
-                                <div className="flex items-center gap-2 pt-1">
-                                    <Switch checked={showPartialResults} onCheckedChange={setShowPartialResults} />
-                                    <span className="text-sm">{showPartialResults ? 'Visíveis ao cidadão' : 'Ocultos até o fim'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* 2.6 Petition Setup */}
-                {messageType === 'petition' && (
-                    <div className="space-y-4 border-t pt-4">
-                        <Label className="text-base font-semibold flex items-center gap-2">
-                            <ScrollText className="w-4 h-4" /> Configuração do Abaixo-Assinado
-                        </Label>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold uppercase text-gray-500">Plataforma de Destino</Label>
-                            <div className="grid grid-cols-3 gap-2">
-                                <div
-                                    className={`border p-3 rounded-lg text-center cursor-pointer transition-colors text-sm ${petitionPlatform === 'custom' ? 'bg-teal-50 border-teal-300 ring-1 ring-teal-400' : 'hover:bg-gray-50'}`}
-                                    onClick={() => setPetitionPlatform('custom')}
-                                >
-                                    🔗 URL Própria
-                                </div>
-                                <div
-                                    className={`border p-3 rounded-lg text-center cursor-pointer transition-colors text-sm ${petitionPlatform === 'change' ? 'bg-red-50 border-red-300 ring-1 ring-red-400' : 'hover:bg-gray-50'}`}
-                                    onClick={() => setPetitionPlatform('change')}
-                                >
-                                    ✊ Change.org
-                                </div>
-                                <div
-                                    className={`border p-3 rounded-lg text-center cursor-pointer transition-colors text-sm ${petitionPlatform === 'avaaz' ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400' : 'hover:bg-gray-50'}`}
-                                    onClick={() => setPetitionPlatform('avaaz')}
-                                >
-                                    🌍 Avaaz
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Link do Abaixo-Assinado (Change.org, Avaaz ou Próprio)</Label>
-                            <Input
-                                placeholder={petitionPlatform === 'change' ? 'Ex: https://www.change.org/p/sua-causa' : petitionPlatform === 'avaaz' ? 'Ex: https://secure.avaaz.org/community_petitions/p/sua-causa' : 'https://sua-pagina.com/abaixo-assinado'}
-                                value={petitionUrl}
-                                onChange={e => setPetitionUrl(e.target.value)}
-                            />
-                            <p className="text-[10px] text-muted-foreground italic">
-                                * Se você já criou o abaixo-assinado, cole o link acima. Se ainda não criou, clique no botão da plataforma desejada abaixo e cole o link aqui depois.
-                            </p>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-xs font-semibold uppercase text-gray-500">Meta de Apoiadores</Label>
-                            <Input type="number" min={10} value={petitionGoal} onChange={e => setPetitionGoal(Number(e.target.value))} />
-                        </div>
-                    </div>
-                )}
-
-                {/* 3. Segmentação */}
-                <div className="space-y-4 border-t pt-4">
-                    <div className="flex items-center justify-between">
-                        <Label className="text-base font-semibold flex items-center gap-2">
-                            <Target className="w-4 h-4" /> Segmentação de Público
-                        </Label>
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-500">Enviar para todos (APP)?</span>
-                            <Checkbox
-                                checked={isTargetAll}
-                                onCheckedChange={(c) => setIsTargetAll(c as boolean)}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Manual External Lists - Always Visible */}
-                    <div className={`p-4 rounded-lg border space-y-4 ${manualListExclusive ? 'bg-amber-50/40 border-amber-200' : 'bg-blue-50/30 border-blue-100'}`}>
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            {/* Formulário Principal de Composição */}
+            <div className="xl:col-span-7 space-y-6">
+                <Card className="border-slate-200 shadow-sm">
+                    <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                            <Label className="text-xs font-semibold uppercase text-gray-600">Listas Externas (Email / SMS)</Label>
-                            <div className="flex items-center gap-2">
-                                <span className={`text-[11px] font-medium ${manualListExclusive ? 'text-amber-700' : 'text-gray-400'}`}>Envio exclusivo para listas</span>
-                                <Checkbox
-                                    checked={manualListExclusive}
-                                    onCheckedChange={(c) => setManualListExclusive(c as boolean)}
-                                />
+                            <div>
+                                <CardTitle className="text-xl flex items-center gap-2 text-slate-900">
+                                    <Building2 className="w-5 h-5 text-blue-600" />
+                                    Novo Comunicado Oficial & Alerta Municipal
+                                </CardTitle>
+                                <CardDescription>
+                                    Emissão de avisos de utilidade pública, campanhas e alertas da Defesa Civil com segmentação por bairro.
+                                </CardDescription>
+                            </div>
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-semibold px-2.5 py-1">
+                                {activeCityName} - {scope.state || 'SP'}
+                            </Badge>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+
+                        {/* ─── 0. Barra de Modelos Prontos em 1 Clique (Presets) ─── */}
+                        <div className="space-y-2.5">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-500" /> Modelos Rápidos para Prefeituras (1 Clique)
+                            </Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                {OFFICIAL_COMMUNICATION_TEMPLATES.map(tpl => {
+                                    const isSelected = selectedTemplateId === tpl.id;
+                                    return (
+                                        <button
+                                            key={tpl.id}
+                                            type="button"
+                                            onClick={() => handleApplyTemplate(tpl)}
+                                            className={`p-2 rounded-xl text-left border transition-all text-xs flex flex-col justify-between h-20 ${
+                                                isSelected 
+                                                    ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-400 text-blue-900 shadow-sm'
+                                                    : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:border-slate-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between w-full">
+                                                <span className="text-base">{tpl.icon}</span>
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                                                    {tpl.badgeText}
+                                                </span>
+                                            </div>
+                                            <span className="font-semibold line-clamp-2 leading-tight text-[11px]">
+                                                {tpl.title}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         </div>
-                        {manualListExclusive && (
-                            <p className="text-[11px] text-amber-700 bg-amber-100 px-3 py-1.5 rounded-md">⚠️ Modo exclusivo: a mensagem será enviada <strong>apenas</strong> para os emails/celulares abaixo. Nenhum usuário do app receberá.</p>
-                        )}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                        {/* ─── 1. Tipo de Mensagem & Destaque de Emergência ─── */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 border-t pt-4">
                             <div className="space-y-2">
-                                <Label className="text-xs font-semibold uppercase text-blue-800 flex items-center gap-1">
-                                    <Mail className="w-3 h-3" /> Lista de Emails
-                                </Label>
-                                <Textarea
-                                    placeholder="usuário1@email.com, usuário2@email.com..."
-                                    value={manualEmailList}
-                                    onChange={(e) => setManualEmailList(e.target.value)}
-                                    className="min-h-[60px] text-xs bg-white"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold uppercase text-green-800 flex items-center gap-1">
-                                    <MessageSquare className="w-3 h-3" /> Lista de Celulares
-                                </Label>
-                                <Textarea
-                                    placeholder="5511999999999, 5511888888888..."
-                                    value={manualSmsList}
-                                    onChange={(e) => setManualSmsList(e.target.value)}
-                                    className="min-h-[60px] text-xs font-mono bg-white"
-                                />
-                            </div>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground italic">* Separe por vírgula, ponto-e-vírgula ou espaço. Celulares no formato DDI+DDD+NÚMERO.</p>
-                    </div>
-
-                    {!isTargetAll && (
-                        <div className="bg-gray-50 p-4 rounded-lg space-y-4 animate-in fade-in slide-in-from-top-2">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold uppercase text-gray-500">Localização</Label>
-                                <StandardLocationFilter
-                                    value={locationFilter}
-                                    onChange={setLocationFilter}
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold uppercase text-gray-500 flex items-center gap-1">
-                                    <Users className="w-3 h-3" /> IDs de Usuários Específicos
-                                </Label>
-                                <Textarea
-                                    placeholder="Cole os IDs separados por vírgula. Ex: abc123, xyz789"
-                                    value={targetUserIds}
-                                    onChange={(e) => setTargetUserIds(e.target.value)}
-                                    className="min-h-[60px] text-xs font-mono"
-                                />
-                            </div>
-
-
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase text-gray-500">Perfil</Label>
-                                    <Select value={targetAudience.engagement} onValueChange={(v) => setTargetAudience(prev => ({ ...prev, engagement: v }))}>
-                                        <SelectTrigger><SelectValue placeholder="Engajamento" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Todos os Perfis</SelectItem>
-                                            <SelectItem value="active_30d">Ativos (30 dias)</SelectItem>
-                                            <SelectItem value="top_contributors">Top Contribuidores</SelectItem>
-                                            <SelectItem value="inactive">Inativos</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase text-gray-500">Faixa Etária</Label>
-                                    <div className="flex gap-2">
-                                        <Input type="number" placeholder="Min" value={targetAudience.minAge} onChange={(e) => setTargetAudience(prev => ({ ...prev, minAge: e.target.value }))} className="text-xs" />
-                                        <Input type="number" placeholder="Máx" value={targetAudience.maxAge} onChange={(e) => setTargetAudience(prev => ({ ...prev, maxAge: e.target.value }))} className="text-xs" />
+                                <Label className="text-xs font-semibold text-slate-700">Formato da Comunicação</Label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div
+                                        className={`border p-2.5 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors text-xs font-medium ${
+                                            messageType === 'info' ? 'bg-blue-50 border-blue-400 text-blue-900 ring-1 ring-blue-300 font-bold' : 'hover:bg-gray-50 text-slate-600'
+                                        }`}
+                                        onClick={() => setMessageType('info')}
+                                    >
+                                        <Bell className="w-3.5 h-3.5 text-blue-500" />
+                                        Comunicado
+                                    </div>
+                                    <div
+                                        className={`border p-2.5 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors text-xs font-medium ${
+                                            messageType === 'poll' ? 'bg-indigo-50 border-indigo-400 text-indigo-900 ring-1 ring-indigo-300 font-bold' : 'hover:bg-gray-50 text-slate-600'
+                                        }`}
+                                        onClick={() => setMessageType('poll')}
+                                    >
+                                        <ClipboardList className="w-3.5 h-3.5 text-indigo-500" />
+                                        Consulta
+                                    </div>
+                                    <div
+                                        className={`border p-2.5 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-colors text-xs font-medium ${
+                                            messageType === 'petition' ? 'bg-teal-50 border-teal-400 text-teal-900 ring-1 ring-teal-300 font-bold' : 'hover:bg-gray-50 text-slate-600'
+                                        }`}
+                                        onClick={() => setMessageType('petition')}
+                                    >
+                                        <ScrollText className="w-3.5 h-3.5 text-teal-600" />
+                                        Petição
                                     </div>
                                 </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold uppercase text-gray-500">Gênero</Label>
-                                    <Select value={targetAudience.gender} onValueChange={(v) => setTargetAudience(prev => ({ ...prev, gender: v }))}>
-                                        <SelectTrigger><SelectValue placeholder="Gênero" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">Todos</SelectItem>
-                                            <SelectItem value="male">Masculino</SelectItem>
-                                            <SelectItem value="female">Feminino</SelectItem>
-                                            <SelectItem value="other">Outros</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            </div>
+
+                            {/* Alerta Sirene / Defesa Civil */}
+                            <div className="space-y-2">
+                                <Label className="text-xs font-semibold text-slate-700">Prioridade de Entrega</Label>
+                                <div className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
+                                    isEmergency ? 'bg-red-50 border-red-300 text-red-900 shadow-sm' : 'bg-slate-50 border-slate-200'
+                                }`}>
+                                    <div className="flex items-center gap-2">
+                                        <Siren className={`w-4 h-4 ${isEmergency ? 'text-red-600 animate-pulse' : 'text-slate-400'}`} />
+                                        <div>
+                                            <div className="text-xs font-bold flex items-center gap-1">
+                                                Alerta de Emergência
+                                                {isEmergency && <Badge className="bg-red-600 text-white text-[9px] px-1 py-0">SIRENE</Badge>}
+                                            </div>
+                                            <p className="text-[10px] text-slate-500">Sobrescreve prioridade no celular</p>
+                                        </div>
+                                    </div>
+                                    <Switch
+                                        id="emergency-switch"
+                                        checked={isEmergency}
+                                        onCheckedChange={setIsEmergency}
+                                    />
                                 </div>
                             </div>
                         </div>
-                    )}
-                </div>
 
-                <Button
-                    className={`w-full ${isEmergency ? 'bg-red-600 hover:bg-red-700' : messageType === 'poll' ? 'bg-indigo-600 hover:bg-indigo-700' : messageType === 'petition' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-slate-900 hover:bg-slate-800'} text-white`}
-                    size="lg"
-                    onClick={handleSend}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        'Enviando...'
-                    ) : (
-                        <span className="flex items-center gap-2">
-                            <Send className="w-4 h-4" />
-                            {messageType === 'poll' ? 'Publicar Pesquisa' : messageType === 'petition' ? 'Publicar Abaixo-Assinado' : 'Enviar Mensagem'}
-                        </span>
-                    )}
-                </Button>
+                        {/* ─── 2. Canais de Saída ─── */}
+                        <div className="space-y-2">
+                            <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Canais de Notificação</Label>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                <div className={`border p-2.5 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.push ? 'bg-blue-50 border-blue-300 text-blue-900 font-semibold' : 'hover:bg-gray-50 text-slate-600'}`}
+                                    onClick={() => setChannels(c => ({ ...c, push: !c.push }))}>
+                                    <Checkbox checked={channels.push} />
+                                    <Smartphone className="w-4 h-4 text-blue-500" />
+                                    <span className="text-xs">Push Mobile</span>
+                                </div>
+                                <div className={`border p-2.5 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.internal ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'hover:bg-gray-50 text-slate-600'}`}
+                                    onClick={() => setChannels(c => ({ ...c, internal: !c.internal }))}>
+                                    <Checkbox checked={channels.internal} />
+                                    <Bell className="w-4 h-4 text-indigo-500" />
+                                    <span className="text-xs">Feed Cívico</span>
+                                </div>
+                                <div className={`border p-2.5 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.email ? 'bg-orange-50 border-orange-300 text-orange-900 font-semibold' : 'hover:bg-gray-50 text-slate-600'}`}
+                                    onClick={() => setChannels(c => ({ ...c, email: !c.email }))}>
+                                    <Checkbox checked={channels.email} />
+                                    <Mail className="w-4 h-4 text-orange-500" />
+                                    <span className="text-xs">E-mail Gabinete</span>
+                                </div>
+                                <div className={`border p-2.5 rounded-lg flex items-center space-x-2 cursor-pointer transition-colors ${channels.sms ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-semibold' : 'hover:bg-gray-50 text-slate-600'}`}
+                                    onClick={() => setChannels(c => ({ ...c, sms: !c.sms }))}>
+                                    <Checkbox checked={channels.sms} />
+                                    <MessageSquare className="w-4 h-4 text-emerald-600" />
+                                    <span className="text-xs">SMS Direto</span>
+                                </div>
+                            </div>
+                        </div>
 
-            </CardContent>
-        </Card>
+                        {/* ─── 3. Conteúdo da Mensagem ─── */}
+                        <div className="space-y-4 border-t pt-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="title" className="text-xs font-bold uppercase tracking-wider text-slate-600">Título do Comunicado</Label>
+                                <Input
+                                    id="title"
+                                    placeholder="Ex: Interdição Temporária da Av. dos Estados para Obras"
+                                    value={title}
+                                    className={`font-semibold ${isEmergency ? "border-red-400 focus-visible:ring-red-500 text-red-900 bg-red-50/20" : ""}`}
+                                    onChange={e => setTitle(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-600">Corpo do Comunicado (Formatação Visual)</Label>
+                                <div className={`rounded-xl border overflow-hidden ${isEmergency ? 'border-red-400' : 'border-slate-200'}`}>
+                                    <ReactQuill
+                                        theme="snow"
+                                        value={body}
+                                        onChange={setBody}
+                                        modules={QUILL_MODULES}
+                                        formats={QUILL_FORMATS}
+                                        placeholder="Digite as instruções e detalhes oficiais para a população..."
+                                        style={{ minHeight: '130px' }}
+                                    />
+                                </div>
+                                <div className="text-[11px] text-slate-500 flex justify-between pt-1">
+                                    <span>💡 Use negrito para datas, prazos e números de emergência (199 / 193).</span>
+                                    <span className="font-mono">{charCount} caracteres</span>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="image" className="text-xs font-medium text-slate-700">URL da Imagem / Banner (Opcional)</Label>
+                                    <Input 
+                                        id="image" 
+                                        placeholder="https://exemplo.com/mapa-desvio.jpg" 
+                                        value={imageUrl} 
+                                        onChange={e => setImageUrl(e.target.value)} 
+                                        className="text-xs"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="image-link" className="text-xs font-medium text-slate-700">Link ao Clicar (Site Oficial / Edital)</Label>
+                                    <Input 
+                                        id="image-link" 
+                                        placeholder="https://prefeitura.sp.gov.br/noticias" 
+                                        value={imageLink} 
+                                        onChange={e => setImageLink(e.target.value)} 
+                                        className="text-xs"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ─── 4. Segmentação Territorial & Bairros ─── */}
+                        <div className="space-y-4 border-t pt-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <Label className="text-sm font-bold flex items-center gap-1.5 text-slate-900">
+                                        <MapPin className="w-4 h-4 text-blue-600" /> Segmentação Territorial de Bairros
+                                    </Label>
+                                    <p className="text-xs text-slate-500">Escolha os bairros específicos ou envie para todo o município.</p>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Label htmlFor="target-all-switch" className="text-xs font-medium text-slate-700 cursor-pointer">
+                                        Toda a Cidade
+                                    </Label>
+                                    <Switch
+                                        id="target-all-switch"
+                                        checked={isTargetAll}
+                                        onCheckedChange={setIsTargetAll}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Seletor de Bairros quando NÃO for toda a cidade */}
+                            {!isTargetAll && (
+                                <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-3.5">
+                                    {/* Ações Rápidas */}
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase mr-1">Atalhos:</span>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleSelectAllNeighborhoods}
+                                            className="h-6 text-[10px] px-2 bg-white"
+                                        >
+                                            Todos ({cityNeighborhoodData?.neighborhoods.length || 0})
+                                        </Button>
+                                        {cityNeighborhoodData?.criticalBasinNeighborhoods && cityNeighborhoodData.criticalBasinNeighborhoods.length > 0 && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleSelectBasinNeighborhoods}
+                                                className="h-6 text-[10px] px-2 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                            >
+                                                🌊 Bacias de Alagamento ({cityNeighborhoodData.criticalBasinNeighborhoods.length})
+                                            </Button>
+                                        )}
+                                        {cityNeighborhoodData?.criticalSlopeNeighborhoods && cityNeighborhoodData.criticalSlopeNeighborhoods.length > 0 && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleSelectSlopeNeighborhoods}
+                                                className="h-6 text-[10px] px-2 bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                            >
+                                                ⛰️ Encostas ({cityNeighborhoodData.criticalSlopeNeighborhoods.length})
+                                            </Button>
+                                        )}
+                                        {selectedNeighborhoods.length > 0 && (
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={handleClearNeighborhoods}
+                                                className="h-6 text-[10px] px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                            >
+                                                Limpar
+                                            </Button>
+                                        )}
+                                    </div>
+
+                                    {/* Lista de Chips de Bairros Cadastrados */}
+                                    <div className="space-y-1.5">
+                                        <Label className="text-[11px] font-semibold text-slate-700">
+                                            Bairros Disponíveis em {activeCityName}:
+                                        </Label>
+                                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-white rounded-lg border border-slate-200">
+                                            {cityNeighborhoodData?.neighborhoods.map(neighborhood => {
+                                                const isChecked = selectedNeighborhoods.includes(neighborhood);
+                                                return (
+                                                    <button
+                                                        key={neighborhood}
+                                                        type="button"
+                                                        onClick={() => toggleNeighborhood(neighborhood)}
+                                                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                                                            isChecked
+                                                                ? 'bg-blue-600 text-white shadow-sm'
+                                                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                                        }`}
+                                                    >
+                                                        {isChecked && <CheckCircle2 className="w-3 h-3" />}
+                                                        {neighborhood}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Input de Bairro Customizado (para cidades sem lista completa) */}
+                                    <div className="flex gap-2 items-center pt-1">
+                                        <Input
+                                            placeholder="Digitar outro bairro e pressionar Enter..."
+                                            value={customNeighborhoodInput}
+                                            onChange={e => setCustomNeighborhoodInput(e.target.value)}
+                                            onKeyDown={handleAddCustomNeighborhood}
+                                            className="text-xs h-8 bg-white"
+                                        />
+                                        <Button
+                                            type="button"
+                                            variant="secondary"
+                                            size="sm"
+                                            onClick={handleAddCustomNeighborhood}
+                                            className="h-8 text-xs"
+                                        >
+                                            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar
+                                        </Button>
+                                    </div>
+
+                                    {/* Bairros Selecionados */}
+                                    {selectedNeighborhoods.length > 0 && (
+                                        <div className="pt-2 border-t border-slate-200">
+                                            <div className="text-[11px] text-slate-600 font-semibold mb-1">
+                                                🎯 {selectedNeighborhoods.length} bairro(s) selecionado(s):
+                                            </div>
+                                            <div className="flex flex-wrap gap-1">
+                                                {selectedNeighborhoods.map(n => (
+                                                    <Badge key={n} variant="secondary" className="bg-blue-100 text-blue-900 gap-1 text-[10px] pr-1">
+                                                        {n}
+                                                        <X 
+                                                            className="w-3 h-3 cursor-pointer hover:text-red-600" 
+                                                            onClick={() => toggleNeighborhood(n)} 
+                                                        />
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Botão de Disparo */}
+                        <Button
+                            className={`w-full text-base font-bold shadow-md py-6 ${
+                                isEmergency 
+                                    ? 'bg-red-600 hover:bg-red-700 text-white animate-none ring-2 ring-red-300' 
+                                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                            }`}
+                            size="lg"
+                            onClick={handleSend}
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                'Processando disparo...'
+                            ) : (
+                                <span className="flex items-center justify-center gap-2">
+                                    <Send className="w-5 h-5" />
+                                    {isEmergency ? '🚨 DISPARAR ALERTA DE EMERGÊNCIA' : 'Publicar e Disparar Comunicado'}
+                                </span>
+                            )}
+                        </Button>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Simulador / Mockup do Smartphone em Tempo Real */}
+            <div className="xl:col-span-5 space-y-4">
+                <Card className="border-slate-200 shadow-sm bg-slate-900 text-white overflow-hidden">
+                    <CardHeader className="pb-3 border-b border-slate-800">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Smartphone className="w-4 h-4 text-blue-400" />
+                                <span className="text-sm font-bold">Simulador Mobile em Tempo Real</span>
+                            </div>
+                            <div className="flex gap-1 bg-slate-800 p-0.5 rounded-lg text-xs">
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewTab('push')}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                                        previewTab === 'push' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    Push Notification
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewTab('feed')}
+                                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-colors ${
+                                        previewTab === 'feed' ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-white'
+                                    }`}
+                                >
+                                    Feed do Cidadão
+                                </button>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-6 flex flex-col items-center justify-center">
+                        
+                        {/* Moldura do Smartphone */}
+                        <div className="w-[300px] h-[540px] bg-slate-950 rounded-[40px] p-3 shadow-2xl border-[4px] border-slate-700 relative flex flex-col overflow-hidden">
+                            {/* Dynamic Island / Notch */}
+                            <div className="w-24 h-4 bg-slate-900 rounded-full mx-auto mb-2 flex items-center justify-end px-2">
+                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                            </div>
+
+                            {/* Status Bar */}
+                            <div className="flex justify-between items-center text-[10px] text-slate-400 px-3 mb-3">
+                                <span className="font-semibold">09:41</span>
+                                <div className="flex items-center gap-1.5">
+                                    <Wifi className="w-3 h-3" />
+                                    <BatteryCharging className="w-3 h-3 text-emerald-400" />
+                                </div>
+                            </div>
+
+                            {/* Modo 1: Push Notification na Tela de Bloqueio */}
+                            {previewTab === 'push' ? (
+                                <div className="flex-1 flex flex-col justify-start pt-6 space-y-4">
+                                    <div className="text-center text-slate-400 text-xs">
+                                        <div className="text-3xl font-light text-white mb-1">09:41</div>
+                                        <div>Quinta-feira, 22 de Agosto</div>
+                                    </div>
+
+                                    {/* Card de Push Notificação */}
+                                    <div className={`p-3.5 rounded-2xl backdrop-blur-md border shadow-lg transition-all ${
+                                        isEmergency
+                                            ? 'bg-red-950/80 border-red-500 text-white ring-2 ring-red-500/50 animate-pulse'
+                                            : 'bg-slate-900/90 border-slate-700 text-white'
+                                    }`}>
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold ${isEmergency ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}>
+                                                    🛡️
+                                                </div>
+                                                <span className="text-[10px] font-bold tracking-wide uppercase text-slate-300">
+                                                    GUARDIÃO • {activeCityName.toUpperCase()}
+                                                </span>
+                                            </div>
+                                            <span className="text-[9px] text-slate-400">agora</span>
+                                        </div>
+
+                                        <h5 className={`font-bold text-xs leading-snug mb-1 ${isEmergency ? 'text-red-300' : 'text-white'}`}>
+                                            {title || 'Título do Comunicado Oficial'}
+                                        </h5>
+
+                                        <p className="text-[11px] text-slate-300 line-clamp-3 leading-relaxed">
+                                            {plainTextBody || 'As instruções oficiais emitidas pela prefeitura serão exibidas aqui diretamente na tela de bloqueio do cidadão.'}
+                                        </p>
+
+                                        {imageUrl && (
+                                            <div className="mt-2 rounded-lg overflow-hidden border border-slate-700 h-20 bg-slate-800">
+                                                <img src={imageUrl} alt="Anexo" className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+
+                                        <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px]">
+                                            <span className="text-blue-400 font-semibold flex items-center gap-1">
+                                                Toque para ver no mapa →
+                                            </span>
+                                            {isEmergency && (
+                                                <span className="text-red-400 font-bold flex items-center gap-0.5">
+                                                    <Siren className="w-3 h-3" /> URGENTE
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                /* Modo 2: Card no Feed Cívico do Aplicativo */
+                                <div className="flex-1 flex flex-col overflow-y-auto space-y-3 bg-slate-900/50 p-2 rounded-2xl border border-slate-800">
+                                    <div className="flex items-center justify-between px-1">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Feed da Cidade</span>
+                                        <Badge variant="outline" className="text-[9px] border-slate-700 text-blue-400 py-0">
+                                            {activeCityName}
+                                        </Badge>
+                                    </div>
+
+                                    {/* Card do Feed */}
+                                    <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-7 h-7 rounded-full bg-blue-950 border border-blue-800 flex items-center justify-center text-xs">
+                                                🏛️
+                                            </div>
+                                            <div className="flex-1 leading-tight">
+                                                <div className="text-[11px] font-bold text-white flex items-center gap-1">
+                                                    Prefeitura de {activeCityName}
+                                                    <CheckCircle2 className="w-3 h-3 text-blue-400" />
+                                                </div>
+                                                <div className="text-[9px] text-slate-400">Canal Oficial de Transparência</div>
+                                            </div>
+                                            <Badge className={`text-[9px] px-1.5 py-0 ${isEmergency ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}>
+                                                {categoryTag}
+                                            </Badge>
+                                        </div>
+
+                                        <h4 className="text-xs font-bold text-white leading-snug">
+                                            {title || 'Título do Comunicado Oficial'}
+                                        </h4>
+
+                                        <div 
+                                            className="text-[11px] text-slate-300 leading-relaxed max-h-32 overflow-hidden"
+                                            dangerouslySetInnerHTML={{ __html: body || '<p>O conteúdo completo formatado aparecerá aqui no feed do cidadão...</p>' }}
+                                        />
+
+                                        {imageUrl && (
+                                            <div className="rounded-lg overflow-hidden border border-slate-800 h-28 bg-slate-900">
+                                                <img src={imageUrl} alt="Banner" className="w-full h-full object-cover" />
+                                            </div>
+                                        )}
+
+                                        {selectedNeighborhoods.length > 0 && (
+                                            <div className="text-[9px] text-blue-300 bg-blue-950/60 px-2 py-1 rounded border border-blue-900 flex items-center gap-1">
+                                                <MapPin className="w-2.5 h-2.5" />
+                                                Bairros: {selectedNeighborhoods.slice(0, 3).join(', ')}{selectedNeighborhoods.length > 3 ? ` +${selectedNeighborhoods.length - 3}` : ''}
+                                            </div>
+                                        )}
+
+                                        <div className="pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-400">
+                                            <span>👍 142 cidadãos cientes</span>
+                                            <span className="text-blue-400 font-semibold">Compartilhar</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Home Indicator */}
+                            <div className="w-24 h-1 bg-slate-600 rounded-full mx-auto mt-auto pt-0.5" />
+                        </div>
+
+                        {/* Estatística de Alcance Previsto */}
+                        <div className="w-full mt-4 bg-slate-800/60 p-3 rounded-xl border border-slate-700 text-center space-y-1">
+                            <div className="text-[11px] text-slate-400">Estimativa de Alcance Imediato:</div>
+                            <div className="text-lg font-extrabold text-emerald-400 flex items-center justify-center gap-1.5">
+                                <Users className="w-4 h-4" /> ~{estimatedAudienceCount.toLocaleString('pt-BR')} munícipes
+                            </div>
+                            <div className="text-[10px] text-slate-400">
+                                {isTargetAll 
+                                    ? `Cobertura em 100% da base ativa de ${activeCityName}` 
+                                    : `Segmentado em ${selectedNeighborhoods.length} bairro(s) selecionado(s)`}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     );
 };
 
 export default MessageComposer;
+
