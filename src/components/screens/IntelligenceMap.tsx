@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
-import { MapContainer, useMap, useMapEvents, Marker, Popup, CircleMarker, Circle, Tooltip as MapTooltip, Polyline } from 'react-leaflet';
+import { MapContainer, useMap, useMapEvents, Marker, Popup, CircleMarker, Circle, Tooltip as MapTooltip } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
 import L from 'leaflet';
 
@@ -29,7 +29,7 @@ import {
     Play, Pause, Award, Target, Building2, Lightbulb,
     ThermometerSun, Droplets, Wind, AlertCircle, ChevronDown, ChevronUp,
     ShieldAlert, CircleDot, Globe, Mountain, Waves, Send, CheckCircle2, Trash2,
-    Navigation, X, Filter, ShieldCheck, Car
+    Navigation, X, Filter, ShieldCheck
 } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
@@ -46,7 +46,7 @@ import { predictiveEngine } from '../../services/predictiveEngine';
 import { geocodingService, type GeocodingResult } from '../../services/geocodingService';
 import { civilDefenseService } from '../../services/civilDefenseService';
 import type { PredictiveRiskAssessment, PendingRiskAlert } from '../../types/intelligence';
-import type { OfficialCivilDefenseAlert, CriticalFloodPoint, GeologicalRiskArea, TrafficIncident, TrafficFlowSegment, RiskLayerToggles } from '../../types/civilDefense';
+import type { OfficialCivilDefenseAlert, CriticalFloodPoint, GeologicalRiskArea, TrafficIncident, RiskLayerToggles } from '../../types/civilDefense';
 import { useAuth } from '../../context/AuthContext';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -355,7 +355,6 @@ const IntelligenceMap: React.FC = () => {
     const [criticalFloodPoints, setCriticalFloodPoints] = useState<CriticalFloodPoint[]>([]);
     const [geologicalRiskAreas, setGeologicalRiskAreas] = useState<GeologicalRiskArea[]>([]);
     const [trafficIncidents, setTrafficIncidents] = useState<TrafficIncident[]>([]);
-    const [trafficFlowSegments, setTrafficFlowSegments] = useState<TrafficFlowSegment[]>([]);
 
     const [weather, setWeather] = useState<WeatherData | null>(null);
     const [expandedSection, setExpandedSection] = useState<string>('risk');
@@ -404,7 +403,6 @@ const IntelligenceMap: React.FC = () => {
             setCriticalFloodPoints(civilDefenseService.getCriticalFloodPoints(scope.cityId));
             setGeologicalRiskAreas(civilDefenseService.getGeologicalRiskAreas(scope.cityId));
             setTrafficIncidents(civilDefenseService.getLiveTrafficIncidents(scope.cityId));
-            setTrafficFlowSegments(civilDefenseService.getTrafficFlowSegments(scope.cityId));
         } catch (error) {
             toast.error('Erro ao carregar dados do mapa.');
             console.error(error);
@@ -1725,80 +1723,7 @@ const IntelligenceMap: React.FC = () => {
                                     </Marker>
                                 ))}
 
-                                {/* ─── Camada de Ruas com Cores de Tráfego / Fluxo Contínuo (Estilo Waze) ─── */}
-                                {riskLayers.liveTraffic && trafficFlowSegments.map(segment => {
-                                    const flowColor = segment.flowLevel === 'PARADO'
-                                        ? '#991b1b' // Vinho escuro (trânsito parado)
-                                        : (segment.flowLevel === 'INTENSO'
-                                            ? '#ef4444' // Vermelho (congestionamento)
-                                            : (segment.flowLevel === 'MODERADO'
-                                                ? '#eab308' // Amarelo (lentidão)
-                                                : '#22c55e')); // Verde (fluxo livre)
-
-                                    const flowLabel = segment.flowLevel === 'PARADO'
-                                        ? 'Trânsito Parado'
-                                        : (segment.flowLevel === 'INTENSO'
-                                            ? 'Tráfego Intenso / Lento'
-                                            : (segment.flowLevel === 'MODERADO'
-                                                ? 'Tráfego Moderado'
-                                                : 'Fluxo Livre'));
-
-                                    return (
-                                        <React.Fragment key={segment.id}>
-                                            {/* Linha de contraste escuro externa */}
-                                            <Polyline
-                                                positions={segment.coordinates}
-                                                pathOptions={{
-                                                    color: '#0f172a',
-                                                    weight: 8,
-                                                    opacity: 0.6,
-                                                    lineCap: 'round',
-                                                    lineJoin: 'round'
-                                                }}
-                                            />
-                                            {/* Linha de fluxo colorida estilo Waze */}
-                                            <Polyline
-                                                positions={segment.coordinates}
-                                                pathOptions={{
-                                                    color: flowColor,
-                                                    weight: 5,
-                                                    opacity: 0.95,
-                                                    lineCap: 'round',
-                                                    lineJoin: 'round'
-                                                }}
-                                            >
-                                                <Popup>
-                                                    <div className="p-1 min-w-[200px]">
-                                                        <div className="flex items-center gap-1.5 mb-1">
-                                                            <span
-                                                                className="w-2.5 h-2.5 rounded-full inline-block"
-                                                                style={{ backgroundColor: flowColor }}
-                                                            />
-                                                            <span className="font-bold text-xs text-slate-900">{segment.roadName}</span>
-                                                        </div>
-                                                        <div className="text-[11px] text-slate-700">
-                                                            Status: <strong style={{ color: flowColor }}>{flowLabel}</strong>
-                                                        </div>
-                                                        <div className="text-[11px] text-slate-600">
-                                                            Velocidade Média: <strong>{segment.speedKmh} km/h</strong> (Via: {segment.freeFlowSpeedKmh} km/h)
-                                                        </div>
-                                                        {segment.delayMinutes && segment.delayMinutes > 0 ? (
-                                                            <div className="text-[10px] text-red-600 font-bold mt-1">
-                                                                ⏱️ Atraso estimado: +{segment.delayMinutes} min
-                                                            </div>
-                                                        ) : (
-                                                            <div className="text-[10px] text-emerald-600 font-semibold mt-1">
-                                                                ✅ Sem retenções no trecho
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </Popup>
-                                            </Polyline>
-                                        </React.Fragment>
-                                    );
-                                })}
-
-                                {/* ─── Camada de Tráfego / Incidentes e Obras ─── */}
+                                {/* ─── Camada de Tráfego / Incidentes e Obras Reportadas ─── */}
                                 {riskLayers.liveTraffic && trafficIncidents.map(traffic => (
                                     <Marker
                                         key={traffic.id}
@@ -1826,21 +1751,6 @@ const IntelligenceMap: React.FC = () => {
                                     </Marker>
                                 ))}
                             </MapContainer>
-
-                            {/* Legenda de Fluxo Viário Estilo Waze */}
-                            {riskLayers.liveTraffic && (
-                                <div className="absolute bottom-4 left-4 bg-slate-950/90 backdrop-blur text-white px-3 py-2 rounded-xl border border-slate-800 shadow-xl text-xs z-[400] space-y-1">
-                                    <div className="flex items-center gap-1.5 font-bold text-[11px] text-slate-200">
-                                        <Car className="w-3.5 h-3.5 text-blue-400" /> Fluxo Viário (Estilo Waze)
-                                    </div>
-                                    <div className="flex items-center gap-2.5 text-[10px]">
-                                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block shadow-sm" /> Livre</span>
-                                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block shadow-sm" /> Moderado</span>
-                                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block shadow-sm" /> Intenso</span>
-                                        <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-900 inline-block shadow-sm" /> Parado</span>
-                                    </div>
-                                </div>
-                            )}
 
                             {/* Legenda do mapa de calor */}
                             {viewMode === 'heatmap' && (
