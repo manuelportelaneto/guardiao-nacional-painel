@@ -53,37 +53,86 @@ export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contributi
                                     )}
 
 
-                                    {/* Gemini Analysis (New Object) */}
-                                    {contribution.aiAnalysis && !Array.isArray(contribution.aiAnalysis) && (
-                                        <div className="mt-2 pt-2 border-t border-slate-700">
-                                            <p className="text-gray-400 mb-1 font-semibold uppercase tracking-wider text-[10px]">Análise Gemini 1.5 Flash:</p>
-                                            <div className="p-2 rounded bg-slate-800 space-y-2">
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">Recomendação IA:</span>
-                                                    <span className={`font-bold ${(contribution.aiAnalysis as any).autoAction === 'APPROVE' ? 'text-green-400' : (contribution.aiAnalysis as any).autoAction === 'REJECT' ? 'text-red-500' : 'text-yellow-400'}`}>
-                                                        {(contribution.aiAnalysis as any).autoAction}
-                                                    </span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">Categoria Detectada:</span>
-                                                    <span className="text-blue-300">{(contribution.aiAnalysis as any).detectedCategory}</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">Relevância:</span>
-                                                    <span>{((contribution.aiAnalysis as any).relevanceScore * 100).toFixed(0)}%</span>
-                                                </div>
-                                                <div className="flex justify-between">
-                                                    <span className="text-gray-400">Conflito Texto/Img:</span>
-                                                    <span className={(contribution.aiAnalysis as any).contentMismatch ? 'text-red-400' : 'text-green-400'}>
-                                                        {(contribution.aiAnalysis as any).contentMismatch ? 'DETECTADO' : 'Nenhum'}
-                                                    </span>
-                                                </div>
-                                                <p className="text-gray-300 italic text-xs border-t border-slate-700 pt-1 mt-1">
-                                                    "{(contribution.aiAnalysis as any).reason}"
-                                                </p>
+                                    {/* Scorecard de Triagem Multimodal IA */}
+                                    <div className="p-3.5 bg-slate-800 rounded-xl border border-slate-700 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                                                <span>🤖</span> Scorecard de Triagem & IA
+                                            </span>
+                                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${(contribution.aiAnalysis as any)?.autoAction === 'APPROVE' ? 'bg-emerald-900/60 text-emerald-300 border border-emerald-500/40' : (contribution.aiAnalysis as any)?.autoAction === 'REJECT' ? 'bg-red-900/60 text-red-300 border border-red-500/40' : 'bg-amber-900/60 text-amber-300 border border-amber-500/40'}`}>
+                                                Recomendação: {(contribution.aiAnalysis as any)?.autoAction || 'EM ANÁLISE'}
+                                            </span>
+                                        </div>
+
+                                        {/* Barra de Relevância */}
+                                        <div className="space-y-1">
+                                            <div className="flex justify-between text-xs">
+                                                <span className="text-slate-400">Nota de Relevância Cívica:</span>
+                                                <span className="font-bold text-blue-300">
+                                                    {(contribution.aiAnalysis as any)?.relevanceScore !== undefined
+                                                        ? `${Math.round((contribution.aiAnalysis as any).relevanceScore * ((contribution.aiAnalysis as any).relevanceScore <= 1 ? 100 : 1))}/100`
+                                                        : `${(contribution as any).priorityScore || 65}/100`}
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-slate-700 h-2 rounded-full overflow-hidden">
+                                                <div
+                                                    className="bg-gradient-to-r from-blue-500 to-emerald-400 h-full rounded-full transition-all"
+                                                    style={{
+                                                        width: `${(contribution.aiAnalysis as any)?.relevanceScore !== undefined
+                                                            ? Math.round((contribution.aiAnalysis as any).relevanceScore * ((contribution.aiAnalysis as any).relevanceScore <= 1 ? 100 : 1))
+                                                            : (contribution as any).priorityScore || 65}%`
+                                                    }}
+                                                />
                                             </div>
                                         </div>
-                                    )}
+
+                                        {/* Risco e Secretaria */}
+                                        <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-slate-700/60">
+                                            <div>
+                                                <span className="text-slate-400 block text-[10px]">Grau de Risco:</span>
+                                                <span className={`font-bold ${contribution.riskLevel && contribution.riskLevel >= 4 ? 'text-red-400' : contribution.riskLevel === 3 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                                    Nível {contribution.riskLevel || 2} de 5
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-slate-400 block text-[10px]">Secretaria Indicada:</span>
+                                                <span className="font-bold text-indigo-300">
+                                                    {(contribution.aiAnalysis as any)?.suggestedDepartmentCode || (contribution as any).suggestedDepartment || 'SMOSP (Obras)'}
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Mensagem Didática LGPD / Orientação ao Cidadão */}
+                                        {((contribution.aiAnalysis as any)?.isFaceOrPiiDetected || (contribution as any).regexAnalysis?.isSafe === false) && (
+                                            <div className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-lg space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[11px] font-bold text-amber-300 flex items-center gap-1">
+                                                        🛡️ Feedback Didático LGPD Sugerido pela IA:
+                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const text = (contribution.aiAnalysis as any)?.piiViolationReason || "Por motivos de privacidade e conformidade com a LGPD (Lei 13.709/2018), não é permitido incluir fotos com rostos de pessoas, placas de veículos, documentos ou telefones. Por favor, reenvie desfocando ou removendo os dados pessoais.";
+                                                            navigator.clipboard.writeText(text);
+                                                            alert('Mensagem didática copiada!');
+                                                        }}
+                                                        className="text-[10px] text-blue-400 hover:text-blue-300 underline font-mono"
+                                                    >
+                                                        Copiar Texto
+                                                    </button>
+                                                </div>
+                                                <p className="text-[11px] text-amber-200/90 leading-relaxed italic">
+                                                    "{(contribution.aiAnalysis as any)?.piiViolationReason || "Por motivos de privacidade e conformidade com a LGPD (Lei 13.709/2018), não é permitido incluir fotos com rostos de pessoas, placas de veículos, documentos ou telefones. Por favor, reenvie desfocando ou removendo os dados pessoais."}"
+                                                </p>
+                                            </div>
+                                        )}
+
+                                        {(contribution.aiAnalysis as any)?.reason && (
+                                            <p className="text-slate-300 italic text-xs border-t border-slate-700/60 pt-2">
+                                                Parecer IA: "{(contribution.aiAnalysis as any).reason}"
+                                            </p>
+                                        )}
+                                    </div>
 
                                     {/* Local Regex Analysis */}
                                     {(contribution as any).regexAnalysis && (

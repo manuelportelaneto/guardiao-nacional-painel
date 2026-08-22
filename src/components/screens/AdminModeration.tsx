@@ -209,11 +209,16 @@ const AdminModeration: React.FC = () => {
 
     const getReasonLabel = (reason: string) => {
         const reasons: Record<string, string> = {
-            'spam': 'Spam',
-            'inappropriate': 'Conteúdo Impróprio',
-            'false_info': 'Informação Falsa',
-            'harassment': 'Assédio',
-            'other': 'Outro'
+            'lgpd_pii': 'Violação de Privacidade / LGPD (Rosto, Placa de Veículo ou Dado Pessoal Identificável)',
+            'commercial': 'Finalidade Comercial / Propaganda Não Permitida',
+            'defamation': 'Difamação / Ataque Pessoal Sem Fundamentação',
+            'unclear_location': 'Localização Geográfica Incorreta ou Divergente',
+            'quality': 'Foto Ilegível ou Descrição Vaga / Insuficiente',
+            'duplicate': 'Ocorrência Duplicada',
+            'false_info': 'Informação Incorreta ou Trote',
+            'spam': 'Spam / Divulgação Repetitiva',
+            'inappropriate': 'Conteúdo Impróprio ou Ofensivo',
+            'other': 'Revisão Administrativa'
         };
         return reasons[reason] || reason;
     };
@@ -518,9 +523,10 @@ const AdminModeration: React.FC = () => {
 
                 // Notify User (Alert) - Rejected
                 if (contrib.userId) {
+                    const formattedReason = getReasonLabel(reason);
                     await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
-                        title: 'Contribuição Recusada',
-                        message: `Sua contribuição "${contrib.title}" não pôde ser aceita. Motivo: ${reason}`,
+                        title: 'Contribuição Recusada / Devolvida',
+                        message: `Sua contribuição "${contrib.title}" não pôde ser publicada. Motivo: ${formattedReason}`,
                         type: 'error',
                         link: '/history', // Link to history (Filtered by Rejected ideally, but history root is fine)
                         read: false,
@@ -540,7 +546,7 @@ const AdminModeration: React.FC = () => {
                                     userData.email,
                                     userData.name || 'Cidadão',
                                     contrib.title || 'Contribuição',
-                                    reason
+                                    formattedReason
                                 );
                             }
                         }

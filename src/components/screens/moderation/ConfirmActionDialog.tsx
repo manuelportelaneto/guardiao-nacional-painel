@@ -171,25 +171,54 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
                     )}
 
                     {content.showReason && setRejectionReason && (
-                        <div className="space-y-2">
-                            <Label>Motivo</Label>
+                        <div className="space-y-3">
+                            <Label className="text-xs font-semibold text-slate-700">Motivo da Recusa / Devolução</Label>
                             <Select
                                 value={rejectionReason}
                                 onValueChange={setRejectionReason}
                             >
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Selecione o motivo" />
+                                <SelectTrigger className="text-xs">
+                                    <SelectValue placeholder="Selecione o motivo oficial" />
                                 </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="duplicate">Conteúdo duplicado</SelectItem>
-                                    <SelectItem value="inappropriate">Conteúdo impróprio</SelectItem>
-                                    <SelectItem value="false_info">Informação falsa</SelectItem>
-                                    <SelectItem value="spam">Spam ou propaganda</SelectItem>
-                                    <SelectItem value="quality">Baixa qualidade</SelectItem>
-                                    <SelectItem value="off_topic">Fora do escopo</SelectItem>
-                                    <SelectItem value="other">Outro motivo</SelectItem>
+                                <SelectContent className="z-[9999]">
+                                    <SelectItem value="lgpd_pii">🛡️ Violação LGPD (Rosto, Placa, Telefone ou CPF na foto/texto)</SelectItem>
+                                    <SelectItem value="commercial">🏪 Comércio / Venda / Divulgação Comercial Não Permitida</SelectItem>
+                                    <SelectItem value="defamation">⚖️ Ataque Pessoal / Difamação ou Acusação Sem Provas</SelectItem>
+                                    <SelectItem value="unclear_location">📍 Localização ou Endereço Incorreto / Divergente</SelectItem>
+                                    <SelectItem value="quality">📷 Foto Ilegível / Texto Vago ou Insuficiente</SelectItem>
+                                    <SelectItem value="duplicate">📑 Ocorrência Duplicada / Já Cadastrada</SelectItem>
+                                    <SelectItem value="false_info">❌ Informação Incorreta ou Trote</SelectItem>
+                                    <SelectItem value="other">📝 Outro Motivo Específico</SelectItem>
                                 </SelectContent>
                             </Select>
+
+                            {/* Orientação Didática Explicativa */}
+                            {rejectionReason === 'lgpd_pii' && (
+                                <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
+                                    <span className="font-bold flex items-center gap-1">🛡️ Mensagem Didática LGPD ao Cidadão:</span>
+                                    <p className="text-[11px] leading-relaxed">
+                                        "Por motivos de conformidade com a LGPD (Lei 13.709/2018), não é permitido incluir fotos com rostos de pessoas, placas de veículos, documentos ou telefones. Por favor, reenvie desfocando ou removendo os dados pessoais."
+                                    </p>
+                                </div>
+                            )}
+
+                            {rejectionReason === 'commercial' && (
+                                <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 text-xs text-blue-900 space-y-1">
+                                    <span className="font-bold flex items-center gap-1">🏪 Orientação de Finalidade Cívica:</span>
+                                    <p className="text-[11px] leading-relaxed">
+                                        "O Guardião Nacional é exclusivo para demandas de zeladoria urbana, segurança e interesse público. Anúncios comerciais e vendas não são permitidos na plataforma."
+                                    </p>
+                                </div>
+                            )}
+
+                            {rejectionReason === 'unclear_location' && (
+                                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 space-y-1">
+                                    <span className="font-bold">📍 Orientação Geográfica:</span>
+                                    <p className="text-[11px] leading-relaxed">
+                                        "Não foi possível confirmar o endereço da ocorrência. Por favor, use o marcador do mapa ou informe o CEP e ponto de referência correto ao reenviar."
+                                    </p>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

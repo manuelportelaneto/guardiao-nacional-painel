@@ -25,50 +25,58 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
     };
 
     const renderRiskBadges = () => {
-        const analysis = item.aiAnalysis;
+        const analysis = item.aiAnalysis as any;
         const riskLevel = item.riskLevel;
         const elements = [];
 
-        if (riskLevel && riskLevel > 1) {
-            let color = "bg-gray-100 text-gray-800";
-            if (riskLevel === 2) color = "bg-yellow-100 text-yellow-800";
-            if (riskLevel === 3) color = "bg-orange-100 text-orange-800";
-            if (riskLevel >= 4) color = "bg-red-100 text-red-800";
+        // 1. NOTA DE RELEVÂNCIA IA (0 a 100)
+        const relevance = analysis?.relevanceScore !== undefined
+            ? Math.round(analysis.relevanceScore * (analysis.relevanceScore <= 1 ? 100 : 1))
+            : (item as any).priorityScore;
+
+        if (relevance !== undefined && relevance > 0) {
+            let relBadgeColor = "bg-emerald-50 text-emerald-700 border-emerald-300";
+            if (relevance < 40) relBadgeColor = "bg-slate-100 text-slate-600 border-slate-300";
+            else if (relevance < 70) relBadgeColor = "bg-blue-50 text-blue-700 border-blue-300";
+
             elements.push(
-                <Badge key="risk" variant="outline" className={`${color} border-none`}>
-                    Risco Nível {riskLevel}
+                <Badge key="relevance" variant="outline" className={`${relBadgeColor} text-[10px] font-bold`}>
+                    ✨ Relevância: {relevance}/100
                 </Badge>
             );
         }
 
-        if (analysis && Array.isArray(analysis)) {
-            // New logic for Cloud Vision (SafeSearch) results
-            const unsafeResults = analysis.filter((res: any) => !res.isSafe);
-            if (unsafeResults.length > 0) {
-                elements.push(
-                    <Badge key="ai-risk" variant="destructive" className="bg-red-600 text-[10px]">
-                        IA: {unsafeResults.length} Alerta(s) Visual
-                    </Badge>
-                );
-            }
+        // 2. NÍVEL DE RISCO (1 a 5)
+        if (riskLevel && riskLevel >= 1) {
+            let color = "bg-emerald-50 text-emerald-700 border-emerald-200";
+            if (riskLevel === 2) color = "bg-blue-50 text-blue-700 border-blue-200";
+            if (riskLevel === 3) color = "bg-amber-100 text-amber-800 border-amber-300";
+            if (riskLevel === 4) color = "bg-orange-100 text-orange-800 border-orange-300";
+            if (riskLevel >= 5) color = "bg-red-600 text-white border-red-700 font-bold animate-pulse";
+            elements.push(
+                <Badge key="risk" variant="outline" className={`${color} text-[10px]`}>
+                    🛡️ Risco Nível {riskLevel}
+                </Badge>
+            );
         }
 
-        // Priority Score Badge
-        if ('priorityScore' in item) {
-            const score = (item as any).priorityScore; // Cast because Contribution doesn't normally have it
-            if (score > 0) {
-                let scoreColor = "bg-blue-50 text-blue-700 border-blue-200";
-                if (score >= 50) scoreColor = "bg-red-50 text-red-700 border-red-200";
-                else if (score >= 30) scoreColor = "bg-orange-50 text-orange-700 border-orange-200";
+        // 3. SECRETARIA SUGERIDA PELA IA
+        const suggestedDept = analysis?.suggestedDepartmentCode || (item as any).suggestedDepartment;
+        if (suggestedDept) {
+            elements.push(
+                <Badge key="dept" variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-[10px]">
+                    🏛️ {suggestedDept}
+                </Badge>
+            );
+        }
 
-                const reasons = (item as any).priorityReasons?.join('\n') || 'Calculado automaticamente';
-
-                elements.push(
-                    <Badge key="priority" variant="outline" className={`${scoreColor} text-[10px] cursor-help`} title={reasons}>
-                        Prioridade: {score}
-                    </Badge>
-                );
-            }
+        // 4. ALERTA DE PRIVACIDADE / LGPD
+        if (analysis?.isFaceOrPiiDetected || (item as any).regexAnalysis?.isSafe === false) {
+            elements.push(
+                <Badge key="lgpd" className="bg-red-600 text-white text-[10px]">
+                    🛡️ Alerta LGPD / Dados Pessoais
+                </Badge>
+            );
         }
 
         return <div className="flex flex-wrap gap-1 mt-1">{elements}</div>;
