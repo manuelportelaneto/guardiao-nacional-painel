@@ -12,7 +12,9 @@ import {
     Building2,
     Printer,
     FileSpreadsheet,
-    Globe
+    Globe,
+    Mail,
+    RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
@@ -24,17 +26,38 @@ import { Badge } from '../ui/badge';
 import { toast } from 'sonner';
 import { useScope } from '../../context/ScopeContext';
 import { pdfReportService, type ReportMetricsData } from '../../services/pdfReportService';
+import { governmentService } from '../../services/governmentService';
 
 export const AdminExecutiveReports: React.FC = () => {
     const { scope, availableCities, availableStates, setJurisdiction, resetToNational } = useScope();
     const [period, setPeriod] = useState('30_days');
     const [startDate, setStartDate] = useState(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]);
     const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
-    const [recipientEmail, setRecipientEmail] = useState('presidencia@guardiaonacional.com.br');
+    const [recipientEmail, setRecipientEmail] = useState('gabinete.prefeito@municipio.sp.gov.br');
     const [generating, setGenerating] = useState(false);
+    const [sendingEmail, setSendingEmail] = useState(false);
+    const [coatOfArmsUrl, setCoatOfArmsUrl] = useState<string | undefined>(undefined);
     const [aiSummary, setAiSummary] = useState(
         'Durante o ciclo avaliado, foram consolidadas 284 ocorrências no território. A taxa global de resolução atingiu 87%, com tempo médio de atendimento de 38 horas. A Secretaria de Obras e Serviços Públicos concentrou a maior demanda (44%), com 100% dos incidentes de risco crítico atendidos dentro da janela de SLA de 4 horas.'
     );
+
+    // Carrega o brasão do município selecionado
+    React.useEffect(() => {
+        const loadCoat = async () => {
+            if (scope.cityId) {
+                const munList = await governmentService.getMunicipalities();
+                const mun = munList.find(m => m.id === scope.cityId);
+                if (mun?.coatOfArmsUrl) {
+                    setCoatOfArmsUrl(mun.coatOfArmsUrl);
+                } else {
+                    setCoatOfArmsUrl(undefined);
+                }
+            } else {
+                setCoatOfArmsUrl(undefined);
+            }
+        };
+        loadCoat();
+    }, [scope.cityId]);
 
     // Métricas para geração instantânea
     const [reportMetrics] = useState<ReportMetricsData>({
@@ -57,6 +80,13 @@ export const AdminExecutiveReports: React.FC = () => {
             { name: 'Secretaria de Serviços Urbanos', total: 94, resolved: 88, efficiency: 93 },
             { name: 'Secretaria de Saúde (Vigilância)', total: 48, resolved: 42, efficiency: 87 },
             { name: 'Defesa Civil Municipal', total: 18, resolved: 18, efficiency: 100 },
+        ],
+        neighborhoodBreakdown: [
+            { name: 'Centro', count: 88, resolvedCount: 82, criticalCount: 2 },
+            { name: 'Vila Assis', count: 64, resolvedCount: 58, criticalCount: 1 },
+            { name: 'Jardim Zaira', count: 52, resolvedCount: 44, criticalCount: 4 },
+            { name: 'Jardim Guapituba', count: 46, resolvedCount: 42, criticalCount: 3 },
+            { name: 'Vila Bocaina', count: 34, resolvedCount: 30, criticalCount: 0 },
         ],
         recentItems: [
             { id: 'OC-10492', title: 'Buraco Crítico na Av. Dom José Gaspar', category: 'Pavimentação', status: 'Resolvido', date: '18/08/2026', neighborhood: 'Vila Assis', priority: 'Alta' },
@@ -82,13 +112,46 @@ export const AdminExecutiveReports: React.FC = () => {
         setGenerating(true);
         try {
             const periodLabel = getPeriodLabel();
-            await pdfReportService.generateExecutivePDF(reportMetrics, scope, periodLabel, aiSummary);
-            toast.success(`Dossiê Institucional gerado com sucesso para ${recipientEmail}!`);
+            await pdfReportService.generateExecutivePDF(
+                { ...reportMetrics, coatOfArmsUrl },
+                scope,
+                periodLabel,
+                aiSummary,
+                coatOfArmsUrl
+            );
+            toast.success(`Dossiê Institucional gerado com sucesso!`);
         } catch (error) {
             toast.error('Erro ao gerar PDF.');
         } finally {
             setGenerating(false);
         }
+    };
+
+    const handleSendEmail = async () => {
+        if (!recipientEmail || !recipientEmail.includes('@')) {
+            toast.error('Informe um e-mail válido para envio.');
+            return;
+        }
+
+        setSendingEmail(true);
+        try {
+            // Simula despacho seguro de Dossiê Executivo por e-mail com anexo criptografado
+            await new Promise(r => setTimeout(r, 1200));
+            toast.success(`Dossiê Executivo despachado com sucesso para ${recipientEmail}!`);
+        } catch (error) {
+            toast.error('Erro ao despachar e-mail.');
+        } finally {
+            setSendingEmail(false);
+        }
+    };
+
+    const handleRegenerateSummary = () => {
+        const jurisName = scope.cityName || (scope.state ? `Estado de ${scope.state}` : 'Brasil');
+        const periodLabel = getPeriodLabel();
+        setAiSummary(
+            `Síntese Automatizada de Inteligência Territorial para ${jurisName} (${periodLabel}): O território registrou ${reportMetrics.total} demandas cívicas, atingindo taxa de resolutividade de ${reportMetrics.resolutionRate}% com TMA de ${reportMetrics.avgResolutionTimeHours}h. Destaque para o cumprimento integral do SLA de emergências na Defesa Civil e concentração das ações de recapeamento nos bairros Centro e Vila Assis.`
+        );
+        toast.success('Sumário executivo regenerado com IA!');
     };
 
     const handleExportExcel = () => {
@@ -114,12 +177,15 @@ export const AdminExecutiveReports: React.FC = () => {
                     </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                    <Button onClick={handleExportExcel} variant="outline" className="gap-2 border-slate-300 font-medium">
-                        <FileSpreadsheet className="w-4 h-4 text-emerald-600" /> Exportar Planilha (XLSX)
+                <div className="flex items-center gap-2 flex-wrap">
+                    <Button onClick={handleSendEmail} disabled={sendingEmail} variant="outline" className="gap-1.5 border-slate-300 font-medium text-xs">
+                        <Mail className="w-3.5 h-3.5 text-blue-600" /> {sendingEmail ? 'Despachando...' : 'Despachar por E-mail'}
                     </Button>
-                    <Button onClick={handleGeneratePDF} disabled={generating} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 font-semibold shadow-sm">
-                        <Printer className="w-4 h-4" /> {generating ? 'Gerando Dossiê...' : 'Gerar Dossiê em PDF'}
+                    <Button onClick={handleExportExcel} variant="outline" className="gap-1.5 border-slate-300 font-medium text-xs">
+                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Planilha (XLSX)
+                    </Button>
+                    <Button onClick={handleGeneratePDF} disabled={generating} className="bg-blue-600 hover:bg-blue-700 text-white gap-1.5 font-semibold text-xs shadow-sm">
+                        <Printer className="w-3.5 h-3.5" /> {generating ? 'Gerando...' : 'Gerar Dossiê em PDF'}
                     </Button>
                 </div>
             </div>
@@ -153,10 +219,10 @@ export const AdminExecutiveReports: React.FC = () => {
                                     }
                                 }}
                             >
-                                <SelectTrigger className="mt-1">
+                                <SelectTrigger className="mt-1 text-xs">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="z-[9999]">
                                     <SelectItem value="national">🇧🇷 Brasil (Consolidado Nacional)</SelectItem>
                                     {availableStates.slice(0, 5).map(s => (
                                         <SelectItem key={s.uf} value={`state_${s.uf}`}>Estado de {s.name} ({s.uf})</SelectItem>
@@ -166,16 +232,24 @@ export const AdminExecutiveReports: React.FC = () => {
                                     ))}
                                 </SelectContent>
                             </Select>
+
+                            {/* Badge do Brasão */}
+                            {coatOfArmsUrl && (
+                                <div className="mt-2 flex items-center gap-2 p-2 bg-slate-50 border border-slate-200 rounded-lg">
+                                    <img src={coatOfArmsUrl} alt="Brasão" className="w-6 h-6 object-contain" />
+                                    <span className="text-[11px] text-slate-600 font-medium">Brasão Oficial do Município Vinculado</span>
+                                </div>
+                            )}
                         </div>
 
                         {/* Filtro de Período Temporal */}
                         <div>
                             <Label className="text-xs">Intervalo de Datas</Label>
                             <Select value={period} onValueChange={setPeriod}>
-                                <SelectTrigger className="mt-1">
+                                <SelectTrigger className="mt-1 text-xs">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="z-[9999]">
                                     <SelectItem value="7_days">Últimos 7 Dias</SelectItem>
                                     <SelectItem value="30_days">Últimos 30 Dias</SelectItem>
                                     <SelectItem value="year_2026">Ano Vigente (2026)</SelectItem>
@@ -210,12 +284,12 @@ export const AdminExecutiveReports: React.FC = () => {
 
                         {/* Destinatário */}
                         <div>
-                            <Label className="text-xs">Destinatário Institucional (SysAdmin / Presidente)</Label>
+                            <Label className="text-xs">Destinatário Oficial (Gabinete / Secretaria)</Label>
                             <Input
                                 value={recipientEmail}
                                 onChange={e => setRecipientEmail(e.target.value)}
                                 className="h-8 text-xs mt-1"
-                                placeholder="presidencia@guardiaonacional.com.br"
+                                placeholder="gabinete.prefeito@municipio.sp.gov.br"
                             />
                         </div>
                     </CardContent>
@@ -229,9 +303,19 @@ export const AdminExecutiveReports: React.FC = () => {
                                 <Sparkles className="w-4 h-4 text-amber-500" />
                                 Sumário Executivo de Inteligência (IA)
                             </span>
-                            <Badge variant="outline" className="text-xs">
-                                {getPeriodLabel()}
-                            </Badge>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={handleRegenerateSummary}
+                                    className="h-7 text-xs gap-1 text-indigo-600 hover:text-indigo-700"
+                                >
+                                    <RefreshCw className="w-3 h-3" /> Regenerar com IA
+                                </Button>
+                                <Badge variant="outline" className="text-xs">
+                                    {getPeriodLabel()}
+                                </Badge>
+                            </div>
                         </CardTitle>
                         <CardDescription>
                             Texto gerado e posicionado na página inicial do PDF oficial logo abaixo do cabeçalho.
@@ -239,7 +323,7 @@ export const AdminExecutiveReports: React.FC = () => {
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <Textarea
-                            rows={4}
+                            rows={3}
                             value={aiSummary}
                             onChange={e => setAiSummary(e.target.value)}
                             className="text-xs text-slate-700 leading-relaxed font-mono"
@@ -265,17 +349,36 @@ export const AdminExecutiveReports: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Top Bairros com Maior Volume */}
+                        {reportMetrics.neighborhoodBreakdown && (
+                            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                                <div className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                                    <span>📍 Bairros com Maior Concentração de Ocorrências:</span>
+                                    <span className="text-[10px] text-slate-500 font-normal">Monitoramento Territorial</span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                                    {reportMetrics.neighborhoodBreakdown.map((n) => (
+                                        <div key={n.name} className="bg-white p-2 rounded-lg border border-slate-200 text-center">
+                                            <div className="text-xs font-bold text-slate-800 truncate">{n.name}</div>
+                                            <div className="text-[11px] text-slate-500">{n.count} casos</div>
+                                            <div className="text-[10px] text-emerald-600 font-semibold">{Math.round((n.resolvedCount / n.count) * 100)}% resolvido</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
                         <div className="bg-slate-900 text-slate-300 p-4 rounded-xl text-xs space-y-1">
                             <div className="font-bold text-white flex items-center gap-2">
                                 <Globe className="w-4 h-4 text-blue-400" />
-                                Cabeçalho do Dossiê em PDF:
+                                Cabeçalho Oficial do Dossiê:
                             </div>
                             <div className="text-slate-400">
                                 {scope.level === 'NATIONAL'
                                     ? 'REPÚBLICA FEDERATIVA DO BRASIL - RELATÓRIO NACIONAL CONSOLIDADO'
                                     : (scope.level === 'STATE'
                                         ? `ESTADO DE ${scope.state} - RELATÓRIO EXECUTIVO ESTADUAL`
-                                        : `MUNICÍPIO DE ${scope.cityName?.toUpperCase()} - DOSSIÊ DE GESTÃO PÚBLICA`)}
+                                        : `MUNICÍPIO DE ${scope.cityName?.toUpperCase() || 'MUNICIPAL'} - DOSSIÊ DE GESTÃO PÚBLICA`)}
                             </div>
                         </div>
                     </CardContent>

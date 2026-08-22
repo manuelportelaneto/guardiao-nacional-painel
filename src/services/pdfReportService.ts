@@ -18,8 +18,10 @@ export interface ReportMetricsData {
     rejected: number;
     resolutionRate: number; // Porcentagem
     avgResolutionTimeHours: number;
+    coatOfArmsUrl?: string;
     categoryBreakdown: { name: string; count: number; resolvedCount: number; avgHours: number }[];
     departmentBreakdown: { name: string; total: number; resolved: number; efficiency: number }[];
+    neighborhoodBreakdown?: { name: string; count: number; resolvedCount: number; criticalCount: number }[];
     recentItems: {
         id: string;
         title: string;
@@ -33,13 +35,14 @@ export interface ReportMetricsData {
 
 export const pdfReportService = {
     /**
-     * Gera e dispara o download de um Dossiê Executivo Oficial em PDF com o logotipo oficial.
+     * Gera e dispara o download de um Dossiê Executivo Oficial em PDF com o logotipo oficial e brasão.
      */
     async generateExecutivePDF(
         metrics: ReportMetricsData,
         scope: JurisdictionScope,
         periodLabel: string,
-        aiSummaryText?: string
+        aiSummaryText?: string,
+        customCoatOfArmsUrl?: string
     ): Promise<void> {
         const doc = new jsPDF({
             orientation: 'portrait',
@@ -73,15 +76,35 @@ export const pdfReportService = {
             // Em caso de falha no carregamento da imagem, prossegue sem travar o PDF
         }
 
+        // Carrega Brasão Municipal (se fornecido) no topo esquerdo do cabeçalho
+        const coatUrl = customCoatOfArmsUrl || metrics.coatOfArmsUrl;
+        if (coatUrl && coatUrl.startsWith('http')) {
+            try {
+                const coatImg = new Image();
+                coatImg.src = coatUrl;
+                await new Promise((resolve) => {
+                    coatImg.onload = resolve;
+                    coatImg.onerror = resolve;
+                });
+                if (coatImg.complete && coatImg.naturalWidth > 0) {
+                    doc.addImage(coatImg, 'PNG', 14, 4, 18, 20);
+                }
+            } catch {
+                // Se falhar o brasão externo, continua
+            }
+        }
+
+        const textLeftMargin = (coatUrl && coatUrl.startsWith('http')) ? 36 : 14;
+
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text('SISTEMA INTEGRADO GUARDIÃO NACIONAL', 14, 12);
+        doc.setFontSize(13);
+        doc.text('SISTEMA INTEGRADO GUARDIÃO NACIONAL', textLeftMargin, 11);
 
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setFont('helvetica', 'normal');
-        doc.text(jurisdictionTitle, 14, 18);
-        doc.text(`Período de Referência: ${periodLabel} | Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, 14, 23);
+        doc.text(jurisdictionTitle, textLeftMargin, 17);
+        doc.text(`Período: ${periodLabel} | Emissão: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}`, textLeftMargin, 23);
 
         // Faixa de destaque verde e amarela nacional
         doc.setFillColor(34, 197, 94); // Verde
@@ -197,8 +220,56 @@ export const pdfReportService = {
 
         currentY = (doc as any).lastAutoTable.finalY + 10;
 
+        // ─── 4. Concentração de Demandas por Bairro / Região ─────────────────
+        if (metrics.neighborhoodBreakdown && metrics.neighborhoodBreakdown.length > 0) {
+            if (currentY > 220) {
+                doc.addPage();
+                currentY = 20;
+            }
+
+            doc.setTextColor(30, 41, 59);
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(12);
+            doc.text('4. MAPA DE DEMANDA POR BAIRROS & LOGRADOUROS', 14, currentY);
+            currentY += 4;
+
+            const neighData = metrics.neighborhoodBreakdown.map(n => [
+                n.name,
+                n.count.toString(),
+                n.resolvedCount.toString(),
+                `${Math.round((n.resolvedCount / (n.count || 1)) * 100)}%`,
+                n.criticalCount.toString(),
+                n.criticalCount > 0 ? 'Atenção Operacional' : 'Normal'
+            ]);
+
+            autoTable(doc, {
+                startY: currentY,
+                head: [['Bairro / Região', 'Total Demandas', 'Resolvidas', 'Taxa Resolução', 'Casos Críticos', 'Alerta']],
+                body: neighData,
+                theme: 'grid',
+                headStyles: {
+                    fillColor: [51, 65, 85],
+                    textColor: [255, 255, 255],
+                    fontSize: 8.5,
+                    fontStyle: 'bold',
+                },
+                styles: { fontSize: 8, cellPadding: 2.5 },
+                alternateRowStyles: { fillColor: [248, 250, 252] },
+                columnStyles: {
+                    0: { fontStyle: 'bold' },
+                    1: { halign: 'center' },
+                    2: { halign: 'center' },
+                    3: { halign: 'center' },
+                    4: { halign: 'center' },
+                    5: { halign: 'center' },
+                }
+            });
+
+            currentY = (doc as any).lastAutoTable.finalY + 10;
+        }
+
         // Se passar do limite da página, adiciona nova página
-        if (currentY > 230) {
+        if (currentY > 220) {
             doc.addPage();
             currentY = 20;
         }
@@ -208,7 +279,7 @@ export const pdfReportService = {
             doc.setTextColor(30, 41, 59);
             doc.setFont('helvetica', 'bold');
             doc.setFontSize(12);
-            doc.text('4. EFICIÊNCIA DAS SECRETARIAS RESPONSÁVEIS', 14, currentY);
+            doc.text('5. EFICIÊNCIA DAS SECRETARIAS RESPONSÁVEIS', 14, currentY);
             currentY += 4;
 
             const deptData = metrics.departmentBreakdown.map(dept => [
@@ -284,7 +355,23 @@ export const pdfReportService = {
         const wsCat = XLSX.utils.aoa_to_sheet(catData);
         XLSX.utils.book_append_sheet(wb, wsCat, 'Por Categoria');
 
-        // Aba 3: Listagem Detalhada
+        // Aba 3: Por Bairro (se disponível)
+        if (metrics.neighborhoodBreakdown && metrics.neighborhoodBreakdown.length > 0) {
+            const neighData = [
+                ['Bairro / Região', 'Total Demandas', 'Resolvidas', 'Taxa Resolução (%)', 'Casos Críticos'],
+                ...metrics.neighborhoodBreakdown.map(n => [
+                    n.name,
+                    n.count,
+                    n.resolvedCount,
+                    `${Math.round((n.resolvedCount / (n.count || 1)) * 100)}%`,
+                    n.criticalCount
+                ])
+            ];
+            const wsNeigh = XLSX.utils.aoa_to_sheet(neighData);
+            XLSX.utils.book_append_sheet(wb, wsNeigh, 'Por Bairro');
+        }
+
+        // Aba 4: Listagem Detalhada
         if (metrics.recentItems && metrics.recentItems.length > 0) {
             const listData = [
                 ['ID', 'Título', 'Categoria', 'Status', 'Data', 'Bairro', 'Prioridade'],
