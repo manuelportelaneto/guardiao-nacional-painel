@@ -11,9 +11,332 @@ import type {
     GeologicalRiskArea,
     TrafficIncident,
     FieldTeam,
-    FieldTeamStatus
+    FieldTeamStatus,
+    TrafficFlowSegment
 } from '../types/civilDefense';
 import type { JurisdictionScope } from '../types/scope';
+
+// Base de Segmentos de Fluxo Viário (Estilo Waze / Cores nas Ruas em Tempo Real)
+const ABC_SP_TRAFFIC_FLOW_SEGMENTS: TrafficFlowSegment[] = [
+    // ─── Santo André ───
+    {
+        id: 'flow_sa_01',
+        roadName: 'Av. dos Estados (Craisa / Rio Tamanduateí)',
+        cityId: 'santo-andre',
+        cityName: 'Santo André',
+        flowLevel: 'INTENSO',
+        speedKmh: 12,
+        freeFlowSpeedKmh: 60,
+        delayMinutes: 18,
+        coordinates: [
+            [-23.6350, -46.5220],
+            [-23.6425, -46.5298],
+            [-23.6510, -46.5360],
+            [-23.6580, -46.5390]
+        ]
+    },
+    {
+        id: 'flow_sa_02',
+        roadName: 'Av. dos Estados (Trecho Centro ➔ Mauá)',
+        cityId: 'santo-andre',
+        cityName: 'Santo André',
+        flowLevel: 'MODERADO',
+        speedKmh: 32,
+        freeFlowSpeedKmh: 60,
+        delayMinutes: 6,
+        coordinates: [
+            [-23.6580, -46.5390],
+            [-23.6650, -46.5320],
+            [-23.6680, -46.5180],
+            [-23.6670, -46.4980]
+        ]
+    },
+    {
+        id: 'flow_sa_03',
+        roadName: 'Av. Pereira Barreto (Santo André ➔ SBC)',
+        cityId: 'santo-andre',
+        cityName: 'Santo André',
+        flowLevel: 'INTENSO',
+        speedKmh: 15,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 12,
+        coordinates: [
+            [-23.6675, -46.5390],
+            [-23.6760, -46.5450],
+            [-23.6840, -46.5510]
+        ]
+    },
+    {
+        id: 'flow_sa_04',
+        roadName: 'Av. Capitão Mário Toledo de Camargo',
+        cityId: 'santo-andre',
+        cityName: 'Santo André',
+        flowLevel: 'LIVRE',
+        speedKmh: 50,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 0,
+        coordinates: [
+            [-23.6705, -46.5380],
+            [-23.6820, -46.5270],
+            [-23.6950, -46.5180]
+        ]
+    },
+    {
+        id: 'flow_sa_05',
+        roadName: 'Av. Giovanni Battista Pirelli',
+        cityId: 'santo-andre',
+        cityName: 'Santo André',
+        flowLevel: 'MODERADO',
+        speedKmh: 28,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 5,
+        coordinates: [
+            [-23.6621, -46.5085],
+            [-23.6560, -46.5020],
+            [-23.6490, -46.4950]
+        ]
+    },
+
+    // ─── São Bernardo do Campo ───
+    {
+        id: 'flow_sbc_01',
+        roadName: 'Av. Lions (Rudge Ramos ➔ Corredor ABD)',
+        cityId: 'sao-bernardo',
+        cityName: 'São Bernardo do Campo',
+        flowLevel: 'PARADO',
+        speedKmh: 6,
+        freeFlowSpeedKmh: 60,
+        delayMinutes: 24,
+        coordinates: [
+            [-23.6648, -46.5682],
+            [-23.6680, -46.5740],
+            [-23.6720, -46.5790]
+        ]
+    },
+    {
+        id: 'flow_sbc_02',
+        roadName: 'Rodovia Anchieta (Trecho Urbano SBC)',
+        cityId: 'sao-bernardo',
+        cityName: 'São Bernardo do Campo',
+        flowLevel: 'LIVRE',
+        speedKmh: 75,
+        freeFlowSpeedKmh: 80,
+        delayMinutes: 0,
+        coordinates: [
+            [-23.6550, -46.5780],
+            [-23.6700, -46.5620],
+            [-23.6900, -46.5500],
+            [-23.7100, -46.5400]
+        ]
+    },
+    {
+        id: 'flow_sbc_03',
+        roadName: 'Av. Piraporinha / Corredor ABD',
+        cityId: 'sao-bernardo',
+        cityName: 'São Bernardo do Campo',
+        flowLevel: 'MODERADO',
+        speedKmh: 24,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 8,
+        coordinates: [
+            [-23.6845, -46.5821],
+            [-23.6890, -46.5730],
+            [-23.6930, -46.5640]
+        ]
+    },
+    {
+        id: 'flow_sbc_04',
+        roadName: 'Av. Senador Vergueiro / Kennedy',
+        cityId: 'sao-bernardo',
+        cityName: 'São Bernardo do Campo',
+        flowLevel: 'LIVRE',
+        speedKmh: 45,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 1,
+        coordinates: [
+            [-23.6720, -46.5600],
+            [-23.6810, -46.5520],
+            [-23.6910, -46.5450]
+        ]
+    },
+
+    // ─── São Caetano do Sul ───
+    {
+        id: 'flow_scs_01',
+        roadName: 'Av. Guido Aliberti (Marginal Tamanduateí)',
+        cityId: 'sao-caetano',
+        cityName: 'São Caetano do Sul',
+        flowLevel: 'INTENSO',
+        speedKmh: 14,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 14,
+        coordinates: [
+            [-23.6120, -46.5860],
+            [-23.6214, -46.5785],
+            [-23.6320, -46.5690],
+            [-23.6410, -46.5600]
+        ]
+    },
+    {
+        id: 'flow_scs_02',
+        roadName: 'Av. Goiás (Eixo Central)',
+        cityId: 'sao-caetano',
+        cityName: 'São Caetano do Sul',
+        flowLevel: 'LIVRE',
+        speedKmh: 46,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 0,
+        coordinates: [
+            [-23.6150, -46.5750],
+            [-23.6230, -46.5650],
+            [-23.6310, -46.5550]
+        ]
+    },
+
+    // ─── Diadema ───
+    {
+        id: 'flow_dia_01',
+        roadName: 'Av. Cupecê / Divisa SP (Corredor Diadema)',
+        cityId: 'diadema',
+        cityName: 'Diadema',
+        flowLevel: 'INTENSO',
+        speedKmh: 16,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 11,
+        coordinates: [
+            [-23.6720, -46.6210],
+            [-23.6810, -46.6150],
+            [-23.6890, -46.6080]
+        ]
+    },
+    {
+        id: 'flow_dia_02',
+        roadName: 'Corredor ABD / Av. Fábio Eduardo Ramos',
+        cityId: 'diadema',
+        cityName: 'Diadema',
+        flowLevel: 'MODERADO',
+        speedKmh: 28,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 6,
+        coordinates: [
+            [-23.6890, -46.6080],
+            [-23.6950, -46.5980],
+            [-23.7020, -46.5890]
+        ]
+    },
+
+    // ─── Mauá ───
+    {
+        id: 'flow_mau_01',
+        roadName: 'Av. João Ramalho (Centro Mauá ➔ Rodoanel)',
+        cityId: 'maua',
+        cityName: 'Mauá',
+        flowLevel: 'INTENSO',
+        speedKmh: 15,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 13,
+        coordinates: [
+            [-23.6685, -46.4612],
+            [-23.6650, -46.4520],
+            [-23.6620, -46.4410]
+        ]
+    },
+    {
+        id: 'flow_mau_02',
+        roadName: 'Av. Papa João XXIII',
+        cityId: 'maua',
+        cityName: 'Mauá',
+        flowLevel: 'LIVRE',
+        speedKmh: 55,
+        freeFlowSpeedKmh: 60,
+        delayMinutes: 0,
+        coordinates: [
+            [-23.6700, -46.4550],
+            [-23.6800, -46.4480],
+            [-23.6900, -46.4400]
+        ]
+    },
+
+    // ─── São Paulo Capital ───
+    {
+        id: 'flow_sp_01',
+        roadName: 'Marginal Tietê (Ponte das Bandeiras ao Tatuapé)',
+        cityId: 'sao-paulo',
+        cityName: 'São Paulo',
+        flowLevel: 'INTENSO',
+        speedKmh: 18,
+        freeFlowSpeedKmh: 70,
+        delayMinutes: 22,
+        coordinates: [
+            [-23.5180, -46.6350],
+            [-23.5210, -46.6150],
+            [-23.5250, -46.5920],
+            [-23.5310, -46.5700]
+        ]
+    },
+    {
+        id: 'flow_sp_02',
+        roadName: 'Marginal Pinheiros (Cidade Jardim a Santo Amaro)',
+        cityId: 'sao-paulo',
+        cityName: 'São Paulo',
+        flowLevel: 'MODERADO',
+        speedKmh: 34,
+        freeFlowSpeedKmh: 70,
+        delayMinutes: 9,
+        coordinates: [
+            [-23.5850, -46.6960],
+            [-23.6050, -46.7020],
+            [-23.6280, -46.7080],
+            [-23.6500, -46.7150]
+        ]
+    },
+    {
+        id: 'flow_sp_03',
+        roadName: 'Av. 23 de Maio (Corredor Norte-Sul)',
+        cityId: 'sao-paulo',
+        cityName: 'São Paulo',
+        flowLevel: 'LIVRE',
+        speedKmh: 60,
+        freeFlowSpeedKmh: 60,
+        delayMinutes: 0,
+        coordinates: [
+            [-23.5550, -46.6410],
+            [-23.5700, -46.6430],
+            [-23.5880, -46.6480]
+        ]
+    },
+    {
+        id: 'flow_sp_04',
+        roadName: 'Av. Paulista (Consolação ao Paraíso)',
+        cityId: 'sao-paulo',
+        cityName: 'São Paulo',
+        flowLevel: 'MODERADO',
+        speedKmh: 25,
+        freeFlowSpeedKmh: 40,
+        delayMinutes: 6,
+        coordinates: [
+            [-23.5560, -46.6620],
+            [-23.5630, -46.6540],
+            [-23.5710, -46.6450]
+        ]
+    },
+    {
+        id: 'flow_sp_05',
+        roadName: 'Av. do Estado (Centro ➔ Ipiranga)',
+        cityId: 'sao-paulo',
+        cityName: 'São Paulo',
+        flowLevel: 'INTENSO',
+        speedKmh: 14,
+        freeFlowSpeedKmh: 50,
+        delayMinutes: 16,
+        coordinates: [
+            [-23.5420, -46.6260],
+            [-23.5580, -46.6180],
+            [-23.5780, -46.6080],
+            [-23.6020, -46.5950]
+        ]
+    }
+];
 
 // Base de Equipes de Campo Pré-Mapeadas (Defesa Civil, GCM, Trânsito e Obras)
 const ABC_SP_FIELD_TEAMS: FieldTeam[] = [
@@ -591,6 +914,19 @@ class CivilDefenseService {
         if (!cityId || cityId === 'all') return incidents;
         const normalizedTarget = this.normalizeText(cityId);
         return incidents.filter(i => this.normalizeText(i.city).includes(normalizedTarget));
+    }
+
+    /**
+     * Retorna os segmentos de ruas com fluxo de tráfego colorido (estilo Waze/Google Maps).
+     */
+    public getTrafficFlowSegments(cityId?: string): TrafficFlowSegment[] {
+        if (!cityId || cityId === 'all') return ABC_SP_TRAFFIC_FLOW_SEGMENTS;
+        const normalizedTarget = this.normalizeText(cityId);
+        const filtered = ABC_SP_TRAFFIC_FLOW_SEGMENTS.filter(s => 
+            this.normalizeText(s.cityId).includes(normalizedTarget) ||
+            this.normalizeText(s.cityName).includes(normalizedTarget)
+        );
+        return filtered.length > 0 ? filtered : ABC_SP_TRAFFIC_FLOW_SEGMENTS;
     }
 
     private normalizeText(str: string = ''): string {

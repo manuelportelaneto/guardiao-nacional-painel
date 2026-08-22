@@ -82,6 +82,20 @@ export interface TrafficIncident {
     reportedAt: string;
 }
 
+export type TrafficFlowLevel = 'LIVRE' | 'MODERADO' | 'INTENSO' | 'PARADO';
+
+export interface TrafficFlowSegment {
+    id: string;
+    roadName: string;
+    cityId: string;
+    cityName: string;
+    flowLevel: TrafficFlowLevel;
+    speedKmh: number;
+    freeFlowSpeedKmh: number;
+    delayMinutes?: number;
+    coordinates: [number, number][]; // Polylines traçando as ruas no mapa
+}
+
 export interface RiskLayerToggles {
     officialAlerts: boolean;
     criticalFloods: boolean;
