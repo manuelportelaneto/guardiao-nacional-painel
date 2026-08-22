@@ -88,3 +88,26 @@ export interface RiskLayerToggles {
     geologicalSlopes: boolean;
     liveTraffic: boolean;
 }
+
+export type CrisisReadinessLevel = 'VIGILANCIA' | 'ATENCAO' | 'ALERTA' | 'EMERGENCIA_CALAMIDADE';
+
+export type FieldTeamType = 'DEFESA_CIVIL' | 'GCM' | 'TRANSITO' | 'OBRAS_DESOBSTRUCAO' | 'SAMU_RESGATE';
+export type FieldTeamStatus = 'DISPONIVEL' | 'DESLOCANDO' | 'EM_ATENDIMENTO' | 'RETORNANDO';
+
+export interface FieldTeam {
+    id: string;
+    name: string;
+    code: string;
+    cityId: string;
+    cityName: string;
+    type: FieldTeamType;
+    status: FieldTeamStatus;
+    leaderName: string;
+    operatorCount: number;
+    assignedLocation?: string;
+    assignedIncidentId?: string;
+    equipment: string[];
+    lastStatusUpdate: string;
+    latitude?: number;
+    longitude?: number;
+}
