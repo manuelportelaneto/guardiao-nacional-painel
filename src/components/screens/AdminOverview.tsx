@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../firebaseConfig';
 import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
 import {
@@ -8,123 +7,84 @@ import {
     XAxis, YAxis,
     CartesianGrid, Tooltip,
     ResponsiveContainer,
-    PieChart, Pie, Cell, Legend
+    PieChart, Pie, Cell, Legend,
+    LineChart, Line
 } from 'recharts';
 import {
     CircleCheck, TriangleAlert, FileText, Users as UsersIcon,
     Building2, ThumbsUp, Clock, TrendingUp, Activity,
-    Calendar as CalendarIcon, RefreshCw, Sword, Shield, Zap, MapPin
+    Calendar as CalendarIcon, RefreshCw, Shield, MapPin,
+    Trophy, Sparkles, AlertCircle, Compass, Zap, CheckCircle2,
+    BarChart3, PieChart as PieIcon, LineChart as LineIcon
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Calendar } from '../ui/calendar';
 import { format, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import InsightsWidget from '../widgets/InsightsWidget';
-
 import type { Contribution } from '../../types/contribution';
 import { useAuth } from '../../context/AuthContext';
 import { useScope } from '../../context/ScopeContext';
+import { analyticsIntelligenceService } from '../../services/analyticsIntelligenceService';
 
-// ─── Stat Card — improved version ────────────────────────────────────────────
-interface StatCardProps {
-    title: string;
-    value: string | number;
-    icon: React.ElementType;
-    description?: string;
-    trend?: number;
-    gradient: string;
-    iconBg: string;
-}
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899'];
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, description, trend, gradient, iconBg }) => (
-    <Card className={`overflow-hidden border-0 shadow-md hover:shadow-lg transition-shadow ${gradient}`}>
-        <CardContent className="p-5">
-            <div className="flex items-start justify-between">
-                <div className="text-white space-y-1">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-white/80">{title}</p>
-                    <p className="text-3xl font-extrabold tracking-tight">{value}</p>
-                    {description && <p className="text-xs text-white/70">{description}</p>}
-                </div>
-                <div className={`p-3 rounded-2xl ${iconBg}`}>
-                    <Icon className="w-6 h-6 text-white" />
-                </div>
-            </div>
-            {trend !== undefined && (
-                <div className="mt-3 flex items-center text-xs text-white/80 font-medium">
-                    <TrendingUp className="w-3.5 h-3.5 mr-1 text-emerald-300" />
-                    <span>{trend > 0 ? `+${trend}%` : `${trend}%`} em relação ao mês anterior</span>
-                </div>
-            )}
-        </CardContent>
-    </Card>
-);
-
-// ─── Timeline mini chart ──────────────────────────────────────────────────────
-interface TimelineData { date: string; count: number; }
-
-// ─── Main Component ───────────────────────────────────────────────────────────
 const AdminOverview: React.FC = () => {
     const { userData } = useAuth();
     const { scope, isNational, resetToNational, dataMasking } = useScope();
     const isPresidente = userData?.role === 'presidente' || userData?.role === 'super_admin';
 
-    const [recentContributions, setRecentContributions] = useState<Contribution[]>([]);
+    const [activeTab, setActiveTab] = useState<'overview' | 'territory' | 'trends' | 'efficiency'>('overview');
     const [allContributions, setAllContributions] = useState<Contribution[]>([]);
+    const [allUsers, setAllUsers] = useState<any[]>([]);
     const [userCount, setUserCount] = useState(0);
     const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
     const [regionFilter, setRegionFilter] = useState('all');
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-
-    // ── Graal Stats ──────────────────────────────────────────────────────────
-    const [graalReports, setGraalReports] = useState<any[]>([]);
-    const [graalKnightCount, setGraalKnightCount] = useState(0);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        setLoading(true);
         const unsubContribs = onSnapshot(
             collection(db, 'contributions'),
             (snap) => {
                 const all = snap.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
                 setAllContributions(all);
+                setLoading(false);
             },
             (error) => {
                 console.warn('Interrompido listener de contribuições:', error);
+                setLoading(false);
             }
         );
+
         const unsubUsers = onSnapshot(
             collection(db, 'users'),
             (snap) => {
+                const usersList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setAllUsers(usersList);
                 setUserCount(snap.size);
-                // Count users with knight badge
-                const knights = snap.docs.filter(d => d.data().badges?.includes('cavaleiro-do-graal'));
-                setGraalKnightCount(knights.length);
             },
             (error) => {
                 console.warn('Interrompido listener de usuários:', error);
             }
         );
-        // Graal reports listener — last 20 graals
-        const graalQ = query(collection(db, 'graal_reports'), orderBy('processedAt', 'desc'), limit(20));
-        const unsubGraal = onSnapshot(
-            graalQ,
-            (snap) => {
-                setGraalReports(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            },
-            (error) => {
-                console.warn('Interrompido listener do Graal:', error);
-            }
-        );
-        return () => { unsubContribs(); unsubUsers(); unsubGraal(); };
+
+        return () => {
+            unsubContribs();
+            unsubUsers();
+        };
     }, []);
 
-    // Filtered contributions by Scope & Date
-    const contribs = React.useMemo(() => {
+    // Filtragem de dados por Escopo Federativo e Data
+    const contribs = useMemo(() => {
         let data = [...allContributions];
 
-        // 1. Filtragem por Escopo Federativo (ScopeContext)
         if (scope.level === 'STATE' && scope.state) {
             data = data.filter(c => c.state?.toUpperCase() === scope.state?.toUpperCase());
         } else if (scope.level === 'MUNICIPAL' || scope.level === 'DEPARTMENT') {
@@ -139,12 +99,10 @@ const AdminOverview: React.FC = () => {
             });
         }
 
-        // 2. Filtro de região manual (se selecionado no dropdown)
         if (regionFilter !== 'all') {
             data = data.filter(c => c.state?.toLowerCase() === regionFilter || c.city?.toLowerCase() === regionFilter);
         }
 
-        // 3. Filtro de intervalo de datas
         if (dateRange.from) {
             data = data.filter(c => {
                 if (!c.createdAt) return false;
@@ -156,93 +114,84 @@ const AdminOverview: React.FC = () => {
         return data;
     }, [allContributions, scope, regionFilter, dateRange]);
 
-    useEffect(() => { setRecentContributions(contribs); }, [contribs]);
+    // Motor de Inteligência Analítica Real
+    const analytics = useMemo(() => {
+        return analyticsIntelligenceService.computeAnalytics(contribs, allUsers);
+    }, [contribs, allUsers]);
 
-    // ─── KPI computation ─────────────────────────────────────────────────────
+    // Métricas para a Visão Geral
     const today = startOfDay(new Date());
     const total = contribs.length;
     const approved = contribs.filter(c => c.status === 'Aprovado' || c.status === 'in_progress').length;
-    const rejected = contribs.filter(c => c.status === 'Rejeitado' || c.status === 'Lixo').length;
-    const resolved = contribs.filter(c => ['Resolvido', 'Concluído'].includes(c.status)).length;
-    const underReview = contribs.filter(c => c.status === 'Em Análise').length;
+    const underReview = contribs.filter(c => c.status === 'Em Análise' || c.status === 'pending').length;
+    const resolved = contribs.filter(c => ['Resolvido', 'Concluído', 'completed'].includes(c.status || '')).length;
     const newToday = contribs.filter(c => {
         if (!c.createdAt) return false;
         const d = (c.createdAt as any).toDate ? (c.createdAt as any).toDate() : new Date(c.createdAt);
         return d >= today;
     }).length;
     const cities = new Set(contribs.map(c => c.city).filter(Boolean)).size;
-    const totalLikes = contribs.reduce((a, c) => a + (c.likes || 0), 0);
-    const approvalRate = total > 0 ? Math.round((approved / total) * 100) : 0;
 
-    // Rating stats (Substituted by Endorsements and Boosts)
-    const totalEndorsements = contribs.reduce((a, c) => a + (c.endorsementCount || 0), 0);
-    const totalBoosts = contribs.reduce((a, c) => a + (c.boostCount || 0), 0);
+    // Linha do tempo dos últimos 14 dias
+    const timelineData = useMemo(() => {
+        return Array.from({ length: 14 }, (_, i) => {
+            const date = subDays(new Date(), 13 - i);
+            const dayStr = format(date, 'dd/MM', { locale: ptBR });
+            const count = contribs.filter(c => {
+                if (!c.createdAt) return false;
+                const d = (c.createdAt as any).toDate ? (c.createdAt as any).toDate() : new Date(c.createdAt);
+                return format(d, 'dd/MM') === dayStr;
+            }).length;
+            return { date: dayStr, count };
+        });
+    }, [contribs]);
 
-    // ─── Chart data ──────────────────────────────────────────────────────────
-    // Last 14 days timeline
-    const timelineData: TimelineData[] = Array.from({ length: 14 }, (_, i) => {
-        const date = subDays(new Date(), 13 - i);
-        const dayStr = format(date, 'dd/MM', { locale: ptBR });
-        const count = contribs.filter(c => {
-            if (!c.createdAt) return false;
-            const d = (c.createdAt as any).toDate ? (c.createdAt as any).toDate() : new Date(c.createdAt);
-            return format(d, 'dd/MM') === dayStr;
-        }).length;
-        return { date: dayStr, count };
-    });
+    // Distribuição de Status
+    const statusData = useMemo(() => {
+        const statusMap: Record<string, number> = {};
+        contribs.forEach(c => {
+            let s = c.status || 'Em Análise';
+            if (s === 'pending') s = 'Em Análise';
+            if (s === 'completed') s = 'Resolvido';
+            if (s === 'Publicado') s = 'Aprovado';
+            statusMap[s] = (statusMap[s] || 0) + 1;
+        });
+        const statusColors: Record<string, string> = {
+            'Aprovado': '#10b981', 'Em Análise': '#3b82f6',
+            'Rejeitado': '#ef4444', 'Resolvido': '#10b981', 'Lixo': '#6b7280'
+        };
+        return Object.entries(statusMap).map(([name, value]) => ({
+            name, value, fill: statusColors[name] || '#94a3b8'
+        }));
+    }, [contribs]);
 
-    // Status distribution
-    const statusMap: Record<string, number> = {};
-    contribs.forEach(c => {
-        let s = c.status || 'Em Análise';
-        if (s === 'pending') s = 'Em Análise';
-        if (s === 'Publicado') s = 'Aprovado';
-        statusMap[s] = (statusMap[s] || 0) + 1;
-    });
-    const statusColors: Record<string, string> = {
-        'Aprovado': '#10b981', 'Em Análise': '#3b82f6',
-        'Rejeitado': '#ef4444', 'Resolvido': '#10b981', 'Lixo': '#6b7280'
-    };
-    const statusData = Object.entries(statusMap).map(([name, value]) => ({
-        name, value, fill: statusColors[name] || '#94a3b8'
-    }));
-
-    // City ranking
-    const cityMap: Record<string, number> = {};
-    contribs.forEach(c => { const ct = c.city || 'Desconhecido'; cityMap[ct] = (cityMap[ct] || 0) + 1; });
-    const cityRanking = Object.entries(cityMap).sort((a, b) => b[1] - a[1]).slice(0, 8)
-        .map(([name, value]) => ({ name, value }));
-
-    // Category distribution
-    const catMap: Record<string, number> = {};
-    contribs.forEach(c => { const ct = c.category || 'Outros'; catMap[ct] = (catMap[ct] || 0) + 1; });
-    const catData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 6)
-        .map(([name, value]) => ({ name, value }));
-
-    const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#10b981', '#06b6d4'];
+    // Categorias
+    const catData = useMemo(() => {
+        const catMap: Record<string, number> = {};
+        contribs.forEach(c => { const ct = c.category || 'Outros'; catMap[ct] = (catMap[ct] || 0) + 1; });
+        return Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 6)
+            .map(([name, value]) => ({ name, value }));
+    }, [contribs]);
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
-
-            {/* ─── Header ──────────────────────────────────────────────────────── */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* ─── 0. Cabeçalho e Filtros ─── */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-gray-900">
-                        {isPresidente ? '🇧🇷 Visão Estratégica Nacional' : '📊 Dashboard Geral'}
+                    <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 flex items-center gap-2">
+                        <Activity className="h-7 w-7 text-blue-600" />
+                        {isPresidente ? '🇧🇷 Inteligência Estratégica & Analytics' : '📊 Dashboard Analítico Territorial'}
                     </h1>
-                    <p className="text-sm text-muted-foreground mt-0.5">
-                        {isPresidente
-                            ? 'Indicadores consolidados para tomada de decisão estratégica.'
-                            : `Atualizado ${format(lastRefresh, "HH:mm 'de' dd/MM", { locale: ptBR })}`}
+                    <p className="text-xs text-slate-500 mt-1">
+                        Cruzamento multidimensional de demandas urbanas, previsões e eficiência governamental com dados 100% reais.
                     </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                    {/* Date range */}
                     <Popover>
                         <PopoverTrigger asChild>
-                            <Button variant="outline" className="h-9 text-xs font-normal border-gray-200">
-                                <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                            <Button variant="outline" className="h-8 text-xs font-normal border-slate-200 bg-white">
+                                <CalendarIcon className="mr-1.5 h-3.5 w-3.5 text-slate-500" />
                                 {dateRange.from
                                     ? dateRange.to
                                         ? `${format(dateRange.from, 'P', { locale: ptBR })} – ${format(dateRange.to, 'P', { locale: ptBR })}`
@@ -256,28 +205,13 @@ const AdminOverview: React.FC = () => {
                         </PopoverContent>
                     </Popover>
 
-                    {/* Region */}
-                    <Select value={regionFilter} onValueChange={setRegionFilter}>
-                        <SelectTrigger className="w-[140px] h-9 text-xs border-gray-200">
-                            <SelectValue placeholder="Região" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Todas as Regiões</SelectItem>
-                            <SelectItem value="sp">São Paulo</SelectItem>
-                            <SelectItem value="rj">Rio de Janeiro</SelectItem>
-                            <SelectItem value="mg">Minas Gerais</SelectItem>
-                            <SelectItem value="ba">Bahia</SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    <Button variant="ghost" size="icon" className="h-9 w-9"
-                        onClick={() => setLastRefresh(new Date())}>
-                        <RefreshCw className="h-4 w-4" />
+                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLastRefresh(new Date())}>
+                        <RefreshCw className="h-4 w-4 text-slate-500" />
                     </Button>
                 </div>
             </div>
 
-            {/* ─── Banner de Escopo Federativo Ativo (se não for Nacional) ────── */}
+            {/* Banner de Escopo Federativo */}
             {!isNational && (
                 <div className="bg-gradient-to-r from-blue-900 to-indigo-900 rounded-2xl p-4 text-white flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-blue-700/50">
                     <div className="flex items-center gap-3">
@@ -285,25 +219,13 @@ const AdminOverview: React.FC = () => {
                             {scope.level === 'STATE' ? <MapPin className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
                         </div>
                         <div>
-                            <div className="flex items-center gap-2">
-                                <span className="font-bold text-sm">
-                                    {scope.level === 'STATE' && `Escopo Estadual: ${scope.state}`}
-                                    {scope.level === 'MUNICIPAL' && `Escopo Municipal: ${scope.cityName || scope.cityId}`}
-                                    {scope.level === 'DEPARTMENT' && `Secretaria: ${scope.departmentName || scope.departmentId} (${scope.cityName || scope.cityId})`}
-                                </span>
-                                {scope.isEmulated && (
-                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-400/30 text-[10px]">
-                                        Modo Emulação
-                                    </Badge>
-                                )}
-                                {dataMasking && (
-                                    <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-400/30 text-[10px]">
-                                        LGPD Ativa
-                                    </Badge>
-                                )}
-                            </div>
+                            <span className="font-bold text-sm">
+                                {scope.level === 'STATE' && `Escopo Estadual: ${scope.state}`}
+                                {scope.level === 'MUNICIPAL' && `Escopo Municipal: ${scope.cityName || scope.cityId}`}
+                                {scope.level === 'DEPARTMENT' && `Secretaria: ${scope.departmentName || scope.departmentId} (${scope.cityName || scope.cityId})`}
+                            </span>
                             <p className="text-xs text-blue-200/80 mt-0.5">
-                                Métricas, gráficos e registros restritos à jurisdição selecionada ({contribs.length} ocorrências localizadas).
+                                Cruzamentos e predições restritos à jurisdição ativa ({total} ocorrências reais no banco).
                             </p>
                         </div>
                     </div>
@@ -313,343 +235,364 @@ const AdminOverview: React.FC = () => {
                         onClick={resetToNational}
                         className="bg-white/10 hover:bg-white/20 text-white border-white/20 text-xs shrink-0"
                     >
-                        Voltar à Visão Nacional (Brasil)
+                        Visão Nacional (Brasil)
                     </Button>
                 </div>
             )}
 
-            {/* ─── Alert banner se há muitas em análise ────────────────────────── */}
-            {underReview > 10 && (
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                    <TriangleAlert className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-                    <div>
-                        <p className="text-sm font-semibold text-amber-800">Fila de Moderação Alta</p>
-                        <p className="text-xs text-amber-700 mt-0.5">
-                            {underReview} contribuições aguardam revisão. Acesse a <strong>Moderação</strong> para processar.
-                        </p>
+            {/* ─── 1. Abas Analíticas ─── */}
+            <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+                <TabsList className="grid grid-cols-2 md:grid-cols-4 max-w-2xl bg-slate-100 p-1 rounded-xl">
+                    <TabsTrigger value="overview" className="text-xs gap-1.5 font-bold">
+                        <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
+                        Panorama Geral
+                    </TabsTrigger>
+                    <TabsTrigger value="territory" className="text-xs gap-1.5 font-bold">
+                        <Compass className="w-3.5 h-3.5 text-indigo-600" />
+                        Cruzamento & Bairros
+                    </TabsTrigger>
+                    <TabsTrigger value="trends" className="text-xs gap-1.5 font-bold">
+                        <LineIcon className="w-3.5 h-3.5 text-amber-600" />
+                        Tendências & Picos
+                    </TabsTrigger>
+                    <TabsTrigger value="efficiency" className="text-xs gap-1.5 font-bold">
+                        <Trophy className="w-3.5 h-3.5 text-emerald-600" />
+                        Rankings & Eficiência
+                    </TabsTrigger>
+                </TabsList>
+
+                {/* ─── ABA 1: Panorama Geral ─── */}
+                <TabsContent value="overview" className="space-y-6 pt-2">
+                    {/* Primary KPI Grid */}
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <Card className="bg-gradient-to-br from-blue-600 to-blue-800 text-white rounded-2xl shadow-sm border-0">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase text-blue-100">Total de Demandas</p>
+                                    <p className="text-3xl font-black mt-0.5">{total}</p>
+                                    <p className="text-[11px] text-blue-200 mt-1">+{newToday} registradas hoje</p>
+                                </div>
+                                <div className="p-3 bg-white/10 rounded-2xl">
+                                    <FileText className="w-6 h-6 text-white" />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-gradient-to-br from-indigo-600 to-indigo-800 text-white rounded-2xl shadow-sm border-0">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase text-indigo-100">Engajamento Cívico</p>
+                                    <p className="text-3xl font-black mt-0.5">{analytics.citizenEngagementIndex} / 100</p>
+                                    <p className="text-[11px] text-indigo-200 mt-1">Índice CEI do Território</p>
+                                </div>
+                                <div className="p-3 bg-white/10 rounded-2xl">
+                                    <Sparkles className="w-6 h-6 text-white" />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-gradient-to-br from-emerald-600 to-emerald-800 text-white rounded-2xl shadow-sm border-0">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase text-emerald-100">Taxa de Resolução</p>
+                                    <p className="text-3xl font-black mt-0.5">{analytics.resolutionRate}%</p>
+                                    <p className="text-[11px] text-emerald-200 mt-1">{resolved} ocorrências resolvidas</p>
+                                </div>
+                                <div className="p-3 bg-white/10 rounded-2xl">
+                                    <CheckCircle2 className="w-6 h-6 text-white" />
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="bg-gradient-to-br from-amber-600 to-amber-800 text-white rounded-2xl shadow-sm border-0">
+                            <CardContent className="p-4 flex items-center justify-between">
+                                <div>
+                                    <p className="text-[11px] font-bold uppercase text-amber-100">Tempo Médio (TMA)</p>
+                                    <p className="text-3xl font-black mt-0.5">{analytics.avgResolutionTimeHours}h</p>
+                                    <p className="text-[11px] text-amber-200 mt-1">Velocidade de atendimento</p>
+                                </div>
+                                <div className="p-3 bg-white/10 rounded-2xl">
+                                    <Clock className="w-6 h-6 text-white" />
+                                </div>
+                            </CardContent>
+                        </Card>
                     </div>
-                    <Badge variant="outline" className="ml-auto shrink-0 text-amber-700 border-amber-300">
-                        {underReview} pendentes
-                    </Badge>
-                </div>
-            )}
 
-            {/* ─── Primary KPI Grid ─────────────────────────────────────────────── */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <StatCard title="Total de Ocorrências" value={total}
-                    description={`+${newToday} hoje`}
-                    icon={FileText} gradient="bg-gradient-to-br from-blue-500 to-blue-700"
-                    iconBg="bg-blue-400/30" />
-                <StatCard title="Usuários Registrados" value={userCount}
-                    icon={UsersIcon} gradient="bg-gradient-to-br from-violet-500 to-violet-700"
-                    iconBg="bg-violet-400/30" />
-                <StatCard title="Municípios Atendidos" value={cities}
-                    description="Cidades com ocorrências"
-                    icon={Building2} gradient="bg-gradient-to-br from-emerald-500 to-emerald-700"
-                    iconBg="bg-emerald-400/30" />
-                <StatCard title="Taxa de Aprovação" value={`${approvalRate}%`}
-                    description={`${approved} aprovadas`}
-                    icon={TrendingUp} gradient="bg-gradient-to-br from-orange-500 to-orange-700"
-                    iconBg="bg-orange-400/30" />
-            </div>
-
-            {/* ─── Secondary metrics ───────────────────────────────────────────── */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {[
-                    { label: 'Em Análise', value: underReview, icon: Clock, bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' },
-                    { label: 'Aprovadas', value: approved, icon: CircleCheck, bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-100' },
-                    { label: 'Resolvidas', value: resolved, icon: Activity, bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-100' },
-                    { label: 'Curtidas Totais', value: totalLikes, icon: ThumbsUp, bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-100' },
-                ].map(({ label, value, icon: Icon, bg, text, border }) => (
-                    <Card key={label} className={`border ${border} ${bg} shadow-sm`}>
-                        <CardContent className="p-4 flex items-center gap-4">
-                            <div className={`p-2.5 rounded-xl bg-white shadow-sm`}>
-                                <Icon className={`w-5 h-5 ${text}`} />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-gray-900">{value}</p>
-                                <p className="text-xs text-gray-500">{label}</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-
-            {/* ─── Charts Row 1 ─────────────────────────────────────────────────── */}
-            <div className="grid gap-4 md:grid-cols-3">
-                {/* Activity timeline */}
-                <Card className="md:col-span-2 shadow-sm border-gray-200">
-                    <CardHeader className="pb-2">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="text-base font-bold">Atividade (Últimos 14 dias)</CardTitle>
-                            <Badge variant="secondary">{newToday} hoje</Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <AreaChart data={timelineData}>
-                                <defs>
-                                    <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                                <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2}
-                                    fill="url(#blueGrad)" name="Contribuições" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-
-                {/* Status pie */}
-                <Card className="shadow-sm border-gray-200">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base font-bold">Status das Contribuições</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={200}>
-                            <PieChart>
-                                <Pie data={statusData} cx="50%" cy="50%"
-                                    innerRadius={52} outerRadius={72}
-                                    paddingAngle={3} dataKey="value">
-                                    {statusData.map((entry, i) => (
-                                        <Cell key={i} fill={entry.fill} />
-                                    ))}
-                                </Pie>
-                                <Tooltip formatter={(v) => [v, '']}
-                                    contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                                <Legend iconType="circle" iconSize={8}
-                                    wrapperStyle={{ fontSize: 11 }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* ─── Charts Row 2 ─────────────────────────────────────────────────── */}
-            <div className="grid gap-4 md:grid-cols-3">
-                {/* AI Insights widget */}
-                <InsightsWidget contributions={recentContributions} className="h-full" />
-
-                {/* City ranking */}
-                <Card className="md:col-span-2 shadow-sm border-gray-200">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base font-bold">Top Municípios por Ocorrências</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={260}>
-                            <BarChart data={cityRanking} layout="vertical" margin={{ left: 8, right: 16 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                                <XAxis type="number" tick={{ fontSize: 10 }} tickLine={false} />
-                                <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 11 }} tickLine={false} />
-                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                                <Bar dataKey="value" radius={[0, 6, 6, 0]} name="Ocorrências">
-                                    {cityRanking.map((_, i) => (
-                                        <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                                    ))}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-            </div>
-
-            {/* ─── Charts Row 3 ─────────────────────────────────────────────────── */}
-            <div className="grid gap-4 md:grid-cols-2">
-                {/* Category bar */}
-                <Card className="shadow-sm border-gray-200">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base font-bold">Ocorrências por Categoria</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <ResponsiveContainer width="100%" height={220}>
-                            <BarChart data={catData}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                                <XAxis dataKey="name" tick={{ fontSize: 10 }} tickLine={false} />
-                                <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
-                                <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
-                                <Bar dataKey="value" radius={[6, 6, 0, 0]} name="Quantidade">
-                                    {catData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                                </Bar>
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </CardContent>
-                </Card>
-
-                {/* Rating & resolution */}
-                <Card className="shadow-sm border-gray-200">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-base font-bold">Métricas de Qualidade</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-5 pt-2">
-                            {[{
-                                label: 'Endossos Cívicos',
-                                value: totalEndorsements,
-                                sub: `Apoiadores independentes`,
-                                icon: Activity,
-                                color: 'text-yellow-500',
-                                bar: Math.min(100, totalEndorsements),
-                                barColor: 'bg-yellow-400'
-                            },
-                            {
-                                label: 'Taxa de Resolução',
-                                value: `${total > 0 ? Math.round((resolved / total) * 100) : 0}%`,
-                                sub: `${resolved} resolvidas de ${total}`,
-                                icon: CircleCheck,
-                                color: 'text-green-500',
-                                bar: total > 0 ? Math.round((resolved / total) * 100) : 0,
-                                barColor: 'bg-green-400'
-                            },
-                            {
-                                label: 'Taxa de Rejeição',
-                                value: `${total > 0 ? Math.round((rejected / total) * 100) : 0}%`,
-                                sub: `${rejected} rejeitadas de ${total}`,
-                                icon: TriangleAlert,
-                                color: 'text-red-500',
-                                bar: total > 0 ? Math.round((rejected / total) * 100) : 0,
-                                barColor: 'bg-red-400'
-                            },
-                            {
-                                label: 'Impulsos (Boosts XP)',
-                                value: totalBoosts,
-                                sub: `Comunidade gastou XP para agir`,
-                                icon: Zap,
-                                color: 'text-pink-500',
-                                bar: Math.min(100, totalBoosts * 10),
-                                barColor: 'bg-pink-400'
-                            }].map(({ label, value, sub, icon: Icon, color, bar, barColor }) => (
-                                <div key={label}>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <div className="flex items-center gap-2">
-                                            <Icon className={`w-4 h-4 ${color}`} />
-                                            <span className="text-sm font-medium text-gray-700">{label}</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <span className="text-sm font-bold text-gray-900">{value}</span>
-                                            <p className="text-[10px] text-gray-400">{sub}</p>
-                                        </div>
-                                    </div>
-                                    <div className="w-full bg-gray-100 rounded-full h-1.5">
-                                        <div className={`${barColor} h-1.5 rounded-full transition-all`} style={{ width: `${bar}%` }} />
-                                    </div>
+                    {/* Gráficos de Atividade e Distribuição */}
+                    <div className="grid gap-4 md:grid-cols-3">
+                        <Card className="md:col-span-2 rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-2">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-sm font-bold text-slate-900">Histórico de Ocorrências (Últimos 14 Dias)</CardTitle>
+                                    <Badge variant="outline" className="text-xs bg-slate-50">{newToday} hoje</Badge>
                                 </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <AreaChart data={timelineData}>
+                                        <defs>
+                                            <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+                                        <Area type="monotone" dataKey="count" stroke="#3b82f6" strokeWidth={2} fill="url(#blueGrad)" name="Ocorrências" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
 
-            {/* ─── Seção Graal ──────────────────────────────────────────────────── */}
-            {(() => {
-                const graalTotal = graalReports.length;
-                const graalContributions = graalReports.reduce((a: number, r: any) => a + (r.processedCount || 0), 0);
-                const recentGraal = graalReports[0];
-                const isEmergency = recentGraal && (() => {
-                    const t = recentGraal.processedAt?.toDate ? recentGraal.processedAt.toDate() : new Date(recentGraal.processedAt || 0);
-                    return (Date.now() - t.getTime()) < 6 * 60 * 60 * 1000; // 6 hours
-                })();
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold text-slate-900">Status das Demandas</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <PieChart>
+                                        <Pie data={statusData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={3} dataKey="value">
+                                            {statusData.map((entry, i) => (
+                                                <Cell key={i} fill={entry.fill} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+                                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
 
-                return (
-                    <div className="space-y-4">
-                        {/* Emergency Banner */}
-                        {isEmergency && (
-                            <div className="bg-red-600 rounded-xl p-4 flex items-center gap-3 animate-pulse shadow-lg shadow-red-200">
-                                <Zap className="w-6 h-6 text-white shrink-0" />
-                                <div className="flex-1">
-                                    <p className="text-white font-bold text-sm">🚨 Graal Recebido — Estado de Emergência Possível</p>
-                                    <p className="text-red-100 text-xs mt-0.5">
-                                        Um arquivo Graal chegou nas últimas 6 horas. Verifique as contribuições imediatamente.
-                                    </p>
-                                </div>
-                                <Badge className="bg-white text-red-600 border-0 shrink-0">URGENTE</Badge>
-                            </div>
-                        )}
-
-                        {/* Graal Header */}
-                        <div className="flex items-center gap-2">
-                            <Sword className="w-5 h-5 text-amber-500" />
-                            <h2 className="text-lg font-bold text-gray-900">Rede Graal</h2>
-                            <Badge variant="outline" className="text-amber-600 border-amber-200 bg-amber-50 text-xs ml-2">
-                                {graalTotal} graals processados
-                            </Badge>
-                        </div>
-
-                        {/* Graal KPIs */}
-                        <div className="grid gap-4 sm:grid-cols-3">
-                            <StatCard
-                                title="Graals Recebidos"
-                                value={graalTotal}
-                                icon={Shield}
-                                description="Total de arquivos processados"
-                                gradient="bg-gradient-to-br from-amber-500 to-amber-700"
-                                iconBg="bg-amber-400/30"
-                            />
-                            <StatCard
-                                title="Contribuições via Graal"
-                                value={graalContributions}
-                                icon={FileText}
-                                description="Registros importados offline"
-                                gradient="bg-gradient-to-br from-slate-600 to-slate-800"
-                                iconBg="bg-slate-400/30"
-                            />
-                            <StatCard
-                                title="Cavaleiros do Graal"
-                                value={graalKnightCount}
-                                icon={Sword}
-                                description="Usuários portadores ativos"
-                                gradient="bg-gradient-to-br from-rose-500 to-rose-700"
-                                iconBg="bg-rose-400/30"
-                            />
-                        </div>
-
-                        {/* Recent Graals list */}
-                        {graalReports.length > 0 && (
-                            <Card className="shadow-sm border-gray-200">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-base font-bold flex items-center gap-2">
-                                        <Sword className="w-4 h-4 text-amber-500" />
-                                        Graals Recentes
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="divide-y divide-gray-50">
-                                        {graalReports.slice(0, 5).map((r: any) => {
-                                            const processedAt = r.processedAt?.toDate
-                                                ? r.processedAt.toDate()
-                                                : new Date(r.processedAt || 0);
-                                            return (
-                                                <div key={r.id} className="flex items-center justify-between py-2.5">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-full bg-amber-50 flex items-center justify-center">
-                                                            <Sword className="w-4 h-4 text-amber-500" />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-sm font-semibold text-gray-800">
-                                                                {r.processedCount || 0} contribuições
-                                                            </p>
-                                                            <p className="text-xs text-gray-400">
-                                                                {r.transporters?.length || 0} cavaleiro(s) · {format(processedAt, "dd/MM 'às' HH:mm", { locale: ptBR })}
-                                                            </p>
-                                                        </div>
+                {/* ─── ABA 2: Cruzamento Territorial & Bairros ─── */}
+                <TabsContent value="territory" className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Tabela de Cruzamento Bairro x Demandas */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <MapPin className="w-4 h-4 text-blue-600" />
+                                    Cruzamento Territorial de Bairros & Severidade
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Volume de incidentes e taxa de resolução por localidade.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {analytics.neighborhoodCross.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 text-xs">
+                                        Nenhum dado territorial registrado no período.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {analytics.neighborhoodCross.map((item, i) => (
+                                            <div key={item.neighborhood} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold flex items-center justify-center">
+                                                            {i + 1}
+                                                        </span>
+                                                        <span className="font-bold text-xs text-slate-800">{item.neighborhood}</span>
                                                     </div>
-                                                    <Badge variant="outline" className="text-xs text-emerald-600 border-emerald-100 bg-emerald-50">
-                                                        +{r.processedCount || 0}
+                                                    <Badge variant="outline" className="text-[10px] bg-white font-mono">
+                                                        {item.total} demandas ({item.resolutionRate}% resolvidas)
                                                     </Badge>
                                                 </div>
-                                            );
-                                        })}
+
+                                                {/* Categorias mais frequentes */}
+                                                <div className="flex flex-wrap gap-1">
+                                                    {Object.entries(item.categories).map(([cat, count]) => (
+                                                        <span key={cat} className="text-[10px] bg-white border border-slate-200 text-slate-600 px-1.5 py-0.5 rounded">
+                                                            {cat}: <strong>{count}</strong>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                </CardContent>
-                            </Card>
-                        )}
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Pontos Críticos de Reincidência */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <TriangleAlert className="w-4 h-4 text-amber-500" />
+                                    Pontos Críticos de Reincidência Urbana
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Locais com reabertura ou múltiplos chamados para o mesmo logradouro.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {analytics.criticalRecurrencePoints.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 text-xs">
+                                        Nenhum logradouro com reincidência crítica detectada no período.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {analytics.criticalRecurrencePoints.map(p => (
+                                            <div key={p.location} className="p-3 bg-amber-50/60 rounded-xl border border-amber-200/80 flex items-center justify-between">
+                                                <div>
+                                                    <div className="font-bold text-xs text-slate-900">{p.location}</div>
+                                                    <div className="text-[10px] text-amber-800">Categoria predominante: {p.category}</div>
+                                                </div>
+                                                <Badge className="bg-amber-600 text-white text-xs font-mono font-bold">
+                                                    {p.count} chamados
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
-                );
-            })()}
+                </TabsContent>
+
+                {/* ─── ABA 3: Tendências, Picos & Previsões ─── */}
+                <TabsContent value="trends" className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Projeção Linear para os Próximos 7 Dias */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <TrendingUp className="w-4 h-4 text-blue-600" />
+                                    Previsão Preditiva de Demandas (Próximos 7 Dias)
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Média móvel e projeção estatística calculada a partir do histórico recente.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <LineChart data={analytics.predictiveTrends}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10 }} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+                                        <Line type="monotone" dataKey="predicted" stroke="#3b82f6" strokeWidth={2.5} strokeDasharray="4 4" name="Previsão Estimada" dot={{ r: 4 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        {/* Distribuição Horária dos Chamados */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <Clock className="w-4 h-4 text-indigo-600" />
+                                    Picos de Incidência por Faixa Horária
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Concentração horária em que os munícipes mais enviam relatos.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3 pt-2">
+                                {analytics.hourlyDistribution.map(h => (
+                                    <div key={h.hourRange} className="space-y-1">
+                                        <div className="flex justify-between text-xs font-semibold text-slate-700">
+                                            <span>{h.hourRange}</span>
+                                            <span>{h.count} ocorrências ({h.percentage}%)</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                            <div className="h-full bg-indigo-600 rounded-full" style={{ width: `${h.percentage}%` }} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+                {/* ─── ABA 4: Rankings & Eficiência ─── */}
+                <TabsContent value="efficiency" className="space-y-4 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Ranking de Eficiência das Secretarias */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <Building2 className="w-4 h-4 text-blue-600" />
+                                    Eficiência Operacional por Secretaria
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Desempenho de resolução e tempo médio de atendimento (TMA).
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {analytics.departmentEfficiency.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 text-xs">
+                                        Nenhuma secretaria com demandas atribuídas.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {analytics.departmentEfficiency.map(dept => (
+                                            <div key={dept.department} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1.5">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-bold text-xs text-slate-800">{dept.department}</span>
+                                                    <Badge variant="outline" className="text-[10px] font-mono bg-white text-emerald-700 border-emerald-200">
+                                                        {dept.resolutionRate}% resolvidas
+                                                    </Badge>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                                                    <span>Total Atribuído: <strong>{dept.totalAssigned}</strong></span>
+                                                    <span>Tempo Médio: <strong>{dept.avgResolutionHours}h</strong></span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Ranking de Cidadãos Mais Ativos */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                                    <Trophy className="w-4 h-4 text-amber-500" />
+                                    Munícipes Mais Ativos (Gamificação Cívica)
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Colaboradores com maior volume de contribuições aprovadas e endossos.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {analytics.citizenRanking.length === 0 ? (
+                                    <div className="text-center py-8 text-slate-400 text-xs">
+                                        Nenhum registro de participação cívica no período.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2.5">
+                                        {analytics.citizenRanking.map((c, i) => (
+                                            <div key={c.userId} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                                                <div className="flex items-center gap-2.5">
+                                                    <span className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center ${
+                                                        i === 0 ? 'bg-amber-100 text-amber-800' : (i === 1 ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600')
+                                                    }`}>
+                                                        {i + 1}º
+                                                    </span>
+                                                    <div>
+                                                        <div className="font-bold text-xs text-slate-900">{c.name}</div>
+                                                        <div className="text-[10px] text-slate-400">
+                                                            {c.approvedContributions} aprovadas • {c.totalEndorsements} endossos
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <Badge className="bg-blue-600 text-white font-mono text-[10px]">
+                                                    {c.engagementScore} pts
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+            </Tabs>
         </div>
     );
 };
