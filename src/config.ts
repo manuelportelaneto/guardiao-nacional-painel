@@ -9,7 +9,7 @@
  */
 
 // Firebase Project Config
-export const FIREBASE_PROJECT_ID = 'procuradoria-cidada-72130';
+export const FIREBASE_PROJECT_ID = import.meta.env.VITE_FIREBASE_PROJECT_ID || 'guardiao-nacional-dev';
 export const FIREBASE_REGION = 'southamerica-east1';
 
 // App Identity
