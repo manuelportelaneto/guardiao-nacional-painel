@@ -232,35 +232,88 @@ class AnalyticsIntelligenceService {
             .sort((a, b) => b.totalAssigned - a.totalAssigned);
 
         // 5. Ranking de Cidadãos Engajados (Gamificação Cívica)
-        const citizenMap: Record<string, { name: string; total: number; approved: number; endorsements: number }> = {};
+        const citizenMap: Record<string, {
+            name: string;
+            total: number;
+            approved: number;
+            endorsements: number;
+            userXp: number;
+        }> = {};
 
+        // 5.1 Pre-carrega todos os munícipes cadastrados na base de dados
+        users.forEach((u: any) => {
+            const uid = u.id || u.uid;
+            if (!uid) return;
+
+            let name = u.displayName || u.name || u.nome;
+            if (!name && u.email) {
+                name = u.email.split('@')[0];
+            }
+            if (!name) {
+                if (uid === 'google_play_reviewer_account') {
+                    name = 'Revisor Google Play (Conta Teste)';
+                } else {
+                    name = `Cidadão Guardião #${uid.slice(0, 5)}`;
+                }
+            }
+
+            const xp = typeof u.xp === 'number' ? u.xp : (u.gamification?.activePoints || u.stats?.xp || 0);
+            const contribCount = typeof u.stats?.contributionCount === 'number' ? u.stats.contributionCount : (u.interactions?.posts || 0);
+            const boosts = typeof u.stats?.boostsGiven === 'number' ? u.stats.boostsGiven : (u.interactions?.shares || 0);
+
+            citizenMap[uid] = {
+                name,
+                total: contribCount,
+                approved: contribCount,
+                endorsements: boosts,
+                userXp: xp
+            };
+        });
+
+        // 5.2 Cruza com as contribuições reais carregadas (respeitando filtros se ativos)
         contributions.forEach(c => {
             const uid = c.userId || 'anonimo';
-            const authorName = (c as any).authorName || c.userName || 'Munícipe Colaborador';
+            const authorName = (c as any).authorName || c.userName;
             const isApproved = ['Aprovado', 'Publicado', 'approved'].includes(c.status || '');
             const endorsements = c.endorsementCount || c.likes || 0;
 
             if (!citizenMap[uid]) {
-                citizenMap[uid] = { name: authorName, total: 0, approved: 0, endorsements: 0 };
+                citizenMap[uid] = {
+                    name: authorName || (uid === 'anonimo' ? 'Cidadão Anônimo' : `Munícipe #${uid.slice(0, 5)}`),
+                    total: 0,
+                    approved: 0,
+                    endorsements: 0,
+                    userXp: 0
+                };
             }
 
             const citizen = citizenMap[uid];
+            if (authorName && (citizen.name.startsWith('Cidadão Guardião #') || citizen.name === 'Munícipe Colaborador')) {
+                citizen.name = authorName;
+            }
             citizen.total++;
             if (isApproved) citizen.approved++;
             citizen.endorsements += endorsements;
         });
 
+        // 5.3 Mapeia a pontuação ponderada de gamificação e ordena
         const citizenRanking: CitizenRankingItem[] = Object.entries(citizenMap)
-            .map(([userId, data]) => ({
-                userId,
-                name: data.name,
-                totalContributions: data.total,
-                approvedContributions: data.approved,
-                totalEndorsements: data.endorsements,
-                engagementScore: (data.approved * 10) + (data.endorsements * 2) + data.total
-            }))
+            .map(([userId, data]) => {
+                const calculatedScore = Math.max(
+                    data.userXp,
+                    (data.approved * 10) + (data.endorsements * 2) + data.total
+                );
+                return {
+                    userId,
+                    name: data.name,
+                    totalContributions: data.total,
+                    approvedContributions: data.approved,
+                    totalEndorsements: data.endorsements,
+                    engagementScore: Math.max(1, calculatedScore)
+                };
+            })
             .sort((a, b) => b.engagementScore - a.engagementScore)
-            .slice(0, 8);
+            .slice(0, 10);
 
         // 6. Projeção e Previsão de Tendências para os Próximos 7 Dias (Média Móvel Linear)
         const dailyCounts: number[] = [];

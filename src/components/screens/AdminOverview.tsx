@@ -363,30 +363,51 @@ const AdminOverview: React.FC = () => {
                 </div>
             )}
 
-            {/* ─── 1. Abas Analíticas ─── */}
+            {/* ─── 1. Abas Analíticas com Barra de Navegação Fluida e Responsiva ─── */}
             <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-                <TabsList className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 max-w-3xl bg-slate-100 p-1 rounded-xl">
-                    <TabsTrigger value="overview" className="text-xs gap-1.5 font-bold">
-                        <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
-                        Panorama Geral
-                    </TabsTrigger>
-                    <TabsTrigger value="causal" className="text-xs gap-1.5 font-bold text-purple-900 data-[state=active]:bg-purple-100 data-[state=active]:text-purple-950">
-                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
-                        Inteligência Causal (BI)
-                    </TabsTrigger>
-                    <TabsTrigger value="territory" className="text-xs gap-1.5 font-bold">
-                        <Compass className="w-3.5 h-3.5 text-indigo-600" />
-                        Cruzamento & Bairros
-                    </TabsTrigger>
-                    <TabsTrigger value="trends" className="text-xs gap-1.5 font-bold">
-                        <LineIcon className="w-3.5 h-3.5 text-amber-600" />
-                        Tendências & Picos
-                    </TabsTrigger>
-                    <TabsTrigger value="efficiency" className="text-xs gap-1.5 font-bold">
-                        <Trophy className="w-3.5 h-3.5 text-emerald-600" />
-                        Rankings & Eficiência
-                    </TabsTrigger>
-                </TabsList>
+                <div className="w-full overflow-x-auto pb-1 scrollbar-thin">
+                    <TabsList className="h-auto w-auto min-w-full sm:min-w-0 inline-flex flex-wrap sm:flex-nowrap items-center gap-1.5 p-1.5 bg-slate-100/90 border border-slate-200/80 rounded-2xl">
+                        <TabsTrigger
+                            value="overview"
+                            className="h-9 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-blue-700 data-[state=active]:shadow-xs transition-all flex items-center gap-2 shrink-0 border border-transparent data-[state=active]:border-slate-200/60"
+                        >
+                            <BarChart3 className="w-4 h-4 text-blue-600 shrink-0" />
+                            <span>Panorama Geral</span>
+                        </TabsTrigger>
+
+                        <TabsTrigger
+                            value="causal"
+                            className="h-9 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 data-[state=active]:bg-purple-50 data-[state=active]:text-purple-900 data-[state=active]:shadow-xs transition-all flex items-center gap-2 shrink-0 border border-transparent data-[state=active]:border-purple-200"
+                        >
+                            <Sparkles className="w-4 h-4 text-purple-600 shrink-0" />
+                            <span>Inteligência Causal (BI)</span>
+                        </TabsTrigger>
+
+                        <TabsTrigger
+                            value="territory"
+                            className="h-9 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-indigo-700 data-[state=active]:shadow-xs transition-all flex items-center gap-2 shrink-0 border border-transparent data-[state=active]:border-slate-200/60"
+                        >
+                            <Compass className="w-4 h-4 text-indigo-600 shrink-0" />
+                            <span>Cruzamento & Bairros</span>
+                        </TabsTrigger>
+
+                        <TabsTrigger
+                            value="trends"
+                            className="h-9 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-amber-700 data-[state=active]:shadow-xs transition-all flex items-center gap-2 shrink-0 border border-transparent data-[state=active]:border-slate-200/60"
+                        >
+                            <LineIcon className="w-4 h-4 text-amber-600 shrink-0" />
+                            <span>Tendências & Picos</span>
+                        </TabsTrigger>
+
+                        <TabsTrigger
+                            value="efficiency"
+                            className="h-9 px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-600 data-[state=active]:bg-white data-[state=active]:text-emerald-700 data-[state=active]:shadow-xs transition-all flex items-center gap-2 shrink-0 border border-transparent data-[state=active]:border-slate-200/60"
+                        >
+                            <Trophy className="w-4 h-4 text-emerald-600 shrink-0" />
+                            <span>Rankings & Eficiência</span>
+                        </TabsTrigger>
+                    </TabsList>
+                </div>
 
                 {/* ─── ABA 1: Panorama Geral ─── */}
                 <TabsContent value="overview" className="space-y-6 pt-2">
@@ -869,27 +890,34 @@ const AdminOverview: React.FC = () => {
                                         Nenhum registro de participação cívica no período.
                                     </div>
                                 ) : (
-                                    <div className="space-y-2.5">
-                                        {analytics.citizenRanking.map((c, i) => (
-                                            <div key={c.userId} className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
-                                                <div className="flex items-center gap-2.5">
-                                                    <span className={`w-6 h-6 rounded-full text-xs font-black flex items-center justify-center ${
-                                                        i === 0 ? 'bg-amber-100 text-amber-800' : (i === 1 ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-600')
-                                                    }`}>
-                                                        {i + 1}º
-                                                    </span>
-                                                    <div>
-                                                        <div className="font-bold text-xs text-slate-900">{c.name}</div>
-                                                        <div className="text-[10px] text-slate-400">
-                                                            {c.approvedContributions} aprovadas • {c.totalEndorsements} endossos
+                                    <div className="space-y-2.5 max-h-[380px] overflow-y-auto pr-1 scrollbar-thin">
+                                        {analytics.citizenRanking.map((c, i) => {
+                                            const isGold = i === 0;
+                                            const isSilver = i === 1;
+                                            const isBronze = i === 2;
+                                            return (
+                                                <div key={c.userId} className="p-3 bg-slate-50/80 hover:bg-slate-100/80 rounded-xl border border-slate-100 flex items-center justify-between transition-colors">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`w-7 h-7 rounded-xl text-xs font-black flex items-center justify-center shadow-xs ${
+                                                            isGold ? 'bg-amber-400 text-amber-950 ring-2 ring-amber-300/60' : 
+                                                            (isSilver ? 'bg-slate-200 text-slate-800 ring-2 ring-slate-300/60' : 
+                                                            (isBronze ? 'bg-amber-700/20 text-amber-900 ring-2 ring-amber-600/30' : 'bg-white text-slate-600 border border-slate-200'))
+                                                        }`}>
+                                                            {i + 1}º
+                                                        </span>
+                                                        <div>
+                                                            <div className="font-bold text-xs text-slate-900">{c.name}</div>
+                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                                {c.approvedContributions} {c.approvedContributions === 1 ? 'ocorrência' : 'ocorrências'} • {c.totalEndorsements} {c.totalEndorsements === 1 ? 'endosso' : 'endossos'}
+                                                            </div>
                                                         </div>
                                                     </div>
+                                                    <Badge className="bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 font-mono text-xs px-2.5 py-0.5">
+                                                        {c.engagementScore} pts
+                                                    </Badge>
                                                 </div>
-                                                <Badge className="bg-blue-600 text-white font-mono text-[10px]">
-                                                    {c.engagementScore} pts
-                                                </Badge>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 )}
                             </CardContent>
