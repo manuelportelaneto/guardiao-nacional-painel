@@ -528,7 +528,7 @@ const AdminOverview: React.FC = () => {
 
                     {/* Grade de Cards de Diagnóstico Causal Detalhado */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                        {analytics.causalInsights.map((insight) => {
+                        {(analytics.causalInsights || []).map((insight) => {
                             const isCritical = insight.severity === 'CRITICA';
                             return (
                                 <Card key={insight.id} className="rounded-2xl border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col justify-between">
@@ -589,7 +589,7 @@ const AdminOverview: React.FC = () => {
                                                     Plano de Ação Sugerido às Secretarias:
                                                 </span>
                                                 <ul className="space-y-1 text-xs text-slate-700">
-                                                    {insight.recommendedActions.map((action, idx) => (
+                                                    {(insight.recommendedActions || []).map((action, idx) => (
                                                         <li key={idx} className="flex items-start gap-2">
                                                             <span className="text-emerald-600 font-bold text-xs mt-0.5">✓</span>
                                                             <span>{action}</span>
@@ -608,7 +608,7 @@ const AdminOverview: React.FC = () => {
                             );
                         })}
 
-                        {analytics.causalInsights.length === 0 && (
+                        {(!analytics.causalInsights || analytics.causalInsights.length === 0) && (
                             <div className="col-span-2 text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
                                 Nenhuma correlação crítica identificada para o conjunto de filtros ativo.
                             </div>
@@ -630,7 +630,7 @@ const AdminOverview: React.FC = () => {
                             </CardHeader>
                             <CardContent>
                                 <ResponsiveContainer width="100%" height={220}>
-                                    <LineChart data={analytics.bivariateFloodTrends}>
+                                    <LineChart data={analytics.bivariateFloodTrends || []}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                         <XAxis dataKey="period" tick={{ fontSize: 10 }} tickLine={false} />
                                         <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
@@ -656,7 +656,7 @@ const AdminOverview: React.FC = () => {
                             </CardHeader>
                             <CardContent>
                                 <ResponsiveContainer width="100%" height={220}>
-                                    <LineChart data={analytics.bivariateSecurityTrends}>
+                                    <LineChart data={analytics.bivariateSecurityTrends || []}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                                         <XAxis dataKey="period" tick={{ fontSize: 10 }} tickLine={false} />
                                         <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />

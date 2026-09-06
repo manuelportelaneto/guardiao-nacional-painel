@@ -111,7 +111,10 @@ class AnalyticsIntelligenceService {
                 departmentEfficiency: [],
                 citizenRanking: [],
                 predictiveTrends: [],
-                criticalRecurrencePoints: []
+                criticalRecurrencePoints: [],
+                causalInsights: [],
+                bivariateFloodTrends: [],
+                bivariateSecurityTrends: []
             };
         }
 
