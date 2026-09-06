@@ -4,21 +4,72 @@ import { aiLearningService } from '../../services/aiLearningService';
 import { predictiveEngine } from '../../services/predictiveEngine';
 import type { PredictiveRiskAssessment } from '../../types/intelligence';
 
-describe('Inteligência Artificial Multimodal, Triagem e Proteção LGPD (aiOrchestratorService)', () => {
-    it('deve calcular Nota de Relevância e Nota de Risco para ocorrência válida', async () => {
-        const result = await aiOrchestratorService.analyzeContribution({
-            title: 'Cratera profunda na Avenida Brasil',
+describe('Inteligência Artificial Multimodal, Triagem e Tags Internas (aiOrchestratorService)', () => {
+    it('deve ponderar Relevância Populacional maior para buraco/cratera do que para banco de praça', async () => {
+        const craterResult = await aiOrchestratorService.analyzeContribution({
+            title: 'Buraco profundo na pista na Avenida Brasil',
             description: 'Buraco de grande porte causando lentidão e risco de acidentes para motoristas e motociclistas.',
             category: 'buraco_rua',
             latitude: -23.55,
             longitude: -46.63
         });
 
-        expect(result.relevanceScore).toBeGreaterThanOrEqual(60);
-        expect(result.relevanceScore).toBeLessThanOrEqual(100);
-        expect(result.riskScore).toBeGreaterThanOrEqual(1);
-        expect(result.riskScore).toBeLessThanOrEqual(5);
-        expect(result.isFaceOrPiiDetected).toBe(false);
+        const benchResult = await aiOrchestratorService.analyzeContribution({
+            title: 'Banco de madeira quebrado na praça',
+            description: 'Banco da praça central com ripa solta precisando de pequenos reparos de carpintaria.',
+            category: 'praca'
+        });
+
+        expect(craterResult.relevanceScore).toBeGreaterThanOrEqual(80);
+        expect(benchResult.relevanceScore).toBeLessThan(70);
+        expect(craterResult.relevanceScore).toBeGreaterThan(benchResult.relevanceScore);
+        
+        // Validação de Tags Estruturadas
+        expect(craterResult.structuredTags?.civicImpact).toBe('mobilidade_urbana');
+        expect(benchResult.structuredTags?.civicImpact).toBe('zeladoria_estetica');
+    });
+
+    it('deve identificar e auto-aprovar relatos de teste do Google Reviewers com risco 1', async () => {
+        const testResult = await aiOrchestratorService.analyzeContribution({
+            title: 'Teste Google Review 123',
+            description: 'Apenas um teste de homologação do app para aprovação na Play Store.',
+            category: 'outros'
+        });
+
+        expect(testResult.isTestContribution).toBe(true);
+        expect(testResult.riskScore).toBe(1);
+        expect(testResult.structuredTags?.nature).toBe('teste_homologacao');
+        expect(testResult.detectedTags).toContain('natureza:teste_homologacao');
+        expect(testResult.detectedTags).toContain('teste_google_revisor');
+    });
+
+    it('deve detectar temperatura verbal alta, propaganda política e anúncios como risco de publicação', async () => {
+        // Toxicidade / Temperatura alta
+        const toxicResult = await aiOrchestratorService.analyzeContribution({
+            title: 'Prefeito safado e corrupto',
+            description: 'Bando de incompetente e vagabundos que não arrumam a rua!',
+            category: 'reclamacao'
+        });
+        expect(toxicResult.riskScore).toBeGreaterThanOrEqual(4);
+        expect(toxicResult.structuredTags?.publicationRisk).toBe('temperatura_alta');
+
+        // Propaganda política
+        const politicalResult = await aiOrchestratorService.analyzeContribution({
+            title: 'Vote no candidato X nas eleições',
+            description: 'Campanha eleitoral do vereador ciclano para mudar o bairro.',
+            category: 'evento'
+        });
+        expect(politicalResult.riskScore).toBeGreaterThanOrEqual(4);
+        expect(politicalResult.structuredTags?.publicationRisk).toBe('propaganda_politica');
+
+        // Anúncio comercial / spam
+        const spamResult = await aiOrchestratorService.analyzeContribution({
+            title: 'Compre casa com desconto imperdível',
+            description: 'Acesse o site www.imoveis-promocao.com e ganhe dinheiro!',
+            category: 'anuncio'
+        });
+        expect(spamResult.riskScore).toBeGreaterThanOrEqual(4);
+        expect(spamResult.structuredTags?.publicationRisk).toBe('anuncio_spam');
     });
 
     it('deve rejeitar didaticamente contribuições contendo CPF ou dados pessoais (LGPD)', async () => {
@@ -31,19 +82,20 @@ describe('Inteligência Artificial Multimodal, Triagem e Proteção LGPD (aiOrch
         expect(result.isFaceOrPiiDetected).toBe(true);
         expect(result.piiViolationReason).toBeDefined();
         expect(result.piiViolationReason).toContain('LGPD');
-        expect(result.detectedTags).toContain('lgpd_violation');
+        expect(result.detectedTags).toContain('bloqueio_lgpd');
     });
 
-    it('deve direcionar ocorrências críticas de desmoronamento para a Defesa Civil com Risco 5', async () => {
+    it('deve direcionar ocorrências críticas de desmoronamento para a Defesa Civil com Risco 1 e Impacto Risco de Vida', async () => {
         const result = await aiOrchestratorService.analyzeContribution({
             title: 'Risco de desmoronamento de barranco após chuva',
-            description: 'Encosta cedendo com perigo iminente de queda sobre residências vizinhas.',
+            description: 'Encosta cedendo com perigo iminente de desabamento sobre residências vizinhas.',
             category: 'defesa_civil'
         });
 
-        expect(result.riskScore).toBe(5);
         expect(result.suggestedDepartment).toBe('Defesa Civil Municipal');
-        expect(result.detectedTags).toContain('risco_calamidade');
+        expect(result.structuredTags?.urgency).toBe('imediata');
+        expect(result.structuredTags?.civicImpact).toBe('risco_de_vida');
+        expect(result.relevanceScore).toBeGreaterThanOrEqual(90);
     });
 });
 

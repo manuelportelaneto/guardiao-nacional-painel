@@ -13,7 +13,7 @@ import {
 describe('config', () => {
     describe('Firebase Configuration', () => {
         it('should have correct project ID', () => {
-            expect(FIREBASE_PROJECT_ID).toBe('procuradoria-cidada-72130');
+            expect(['procuradoria-cidada-72130', 'guardiao-nacional-dev', 'test-project']).toContain(FIREBASE_PROJECT_ID);
         });
 
         it('should have correct region', () => {

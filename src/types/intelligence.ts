@@ -66,16 +66,27 @@ export interface PendingRiskAlert {
     createdAt: string;
 }
 
+export interface AiStructuredTags {
+    urgency: 'imediata' | 'alta' | 'media' | 'baixa';
+    civicImpact: 'risco_de_vida' | 'saude_publica' | 'mobilidade_urbana' | 'seguranca_patrimonial' | 'zeladoria_estetica';
+    suggestedDepartment: 'obras_pavimentacao' | 'saude_vigilancia' | 'mobilidade_transito' | 'defesa_civil' | 'meio_ambiente' | 'ouvidoria_geral';
+    publicationRisk: 'nenhum' | 'temperatura_alta' | 'propaganda_politica' | 'anuncio_spam' | 'pii_lgpd_face' | 'difamacao';
+    nature: 'cidadao_comum' | 'teste_homologacao';
+}
+
 export interface AiTriageResult {
-    relevanceScore: number;           // 0 a 100
-    riskScore: number;                // 1 a 5
+    relevanceScore: number;           // 0 a 100 (Impacto na vida da população)
+    riskScore: number;                // 1 a 5 (Risco de publicação pública)
     suggestedDepartment: string;
     suggestedDepartmentCode?: string;
     isFaceOrPiiDetected: boolean;
     piiViolationReason?: string;      // Mensagem didática para o cidadão caso haja violação
     isAmbiguous: boolean;             // Encaminha para revisão humana
+    isTestContribution?: boolean;     // Identifica contas de teste (Google Reviewers / QA)
     aiConfidence: number;             // 0.0 a 1.0
-    detectedTags: string[];
+    detectedTags: string[];           // Lista consolidada de tags
+    structuredTags?: AiStructuredTags;// Tags estruturadas padronizadas
+    freeformTags?: string[];          // Tags livres contextuais
     summary: string;
     usedFallbackModel: boolean;
 }

@@ -127,6 +127,73 @@ export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contributi
                                             </div>
                                         )}
 
+                                        {/* Tags Internas Inteligentes Geradas pela IA */}
+                                        <div className="pt-2 border-t border-slate-700/60 space-y-2">
+                                            <span className="text-slate-400 block text-[10px] uppercase font-bold tracking-wider">
+                                                🏷️ Tags Internas de Triagem IA:
+                                            </span>
+                                            <div className="flex flex-wrap gap-1.5">
+                                                {/* Tag de Urgência */}
+                                                {(contribution.aiAnalysis as any)?.structuredTags?.urgency && (
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                                        (contribution.aiAnalysis as any).structuredTags.urgency === 'imediata' ? 'bg-red-500/20 text-red-300 border border-red-500/40' :
+                                                        (contribution.aiAnalysis as any).structuredTags.urgency === 'alta' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40' :
+                                                        'bg-blue-500/20 text-blue-300 border border-blue-500/40'
+                                                    }`}>
+                                                        urgencia:{(contribution.aiAnalysis as any).structuredTags.urgency}
+                                                    </span>
+                                                )}
+
+                                                {/* Tag de Impacto Cívico */}
+                                                {(contribution.aiAnalysis as any)?.structuredTags?.civicImpact && (
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                                                        impacto:{(contribution.aiAnalysis as any).structuredTags.civicImpact}
+                                                    </span>
+                                                )}
+
+                                                {/* Tag de Secretaria */}
+                                                {(contribution.aiAnalysis as any)?.structuredTags?.suggestedDepartment && (
+                                                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                                                        secretaria:{(contribution.aiAnalysis as any).structuredTags.suggestedDepartment}
+                                                    </span>
+                                                )}
+
+                                                {/* Tag de Risco de Publicação */}
+                                                {(contribution.aiAnalysis as any)?.structuredTags?.publicationRisk && (
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                                        (contribution.aiAnalysis as any).structuredTags.publicationRisk === 'nenhum' ? 'bg-slate-700 text-slate-300' :
+                                                        'bg-red-500/20 text-red-300 border border-red-500/40'
+                                                    }`}>
+                                                        risco:{(contribution.aiAnalysis as any).structuredTags.publicationRisk}
+                                                    </span>
+                                                )}
+
+                                                {/* Tag de Natureza (Teste vs Cidadão) */}
+                                                {(contribution.aiAnalysis as any)?.structuredTags?.nature && (
+                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                                        (contribution.aiAnalysis as any).structuredTags.nature === 'teste_homologacao' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' :
+                                                        'bg-slate-700 text-slate-300'
+                                                    }`}>
+                                                        natureza:{(contribution.aiAnalysis as any).structuredTags.nature}
+                                                    </span>
+                                                )}
+
+                                                {/* Tags Livres */}
+                                                {((contribution.aiAnalysis as any)?.freeformTags || []).map((t: string) => (
+                                                    <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-700/80 text-cyan-300 border border-cyan-500/30">
+                                                        #{t}
+                                                    </span>
+                                                ))}
+
+                                                {/* Fallback de detectedTags caso structuredTags não exista */}
+                                                {!(contribution.aiAnalysis as any)?.structuredTags && ((contribution.aiAnalysis as any)?.detectedTags || []).map((t: string) => (
+                                                    <span key={t} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-700 text-slate-300 border border-slate-600">
+                                                        {t}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+
                                         {(contribution.aiAnalysis as any)?.reason && (
                                             <p className="text-slate-300 italic text-xs border-t border-slate-700/60 pt-2">
                                                 Parecer IA: "{(contribution.aiAnalysis as any).reason}"
