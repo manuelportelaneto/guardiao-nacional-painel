@@ -18,8 +18,7 @@ describe('Serviço de Alertas SysAdmin e Pontuação Oculta de Risco', () => {
                 city: 'Mountain View',
                 state: 'CA',
                 reasons: ['Palavras-chave de teste de homologação detectadas'],
-                tags: ['natureza:teste_homologacao', 'teste_google_revisor'],
-                sysadminEmail: 'admin@guardiao.com.br'
+                tags: ['natureza:teste_homologacao', 'teste_google_revisor']
             });
 
             expect(result.success).toBe(true);
@@ -40,7 +39,7 @@ describe('Serviço de Alertas SysAdmin e Pontuação Oculta de Risco', () => {
                 state: 'SP',
                 reasons: ['Temperatura verbal agressiva e ofensiva', 'Linguagem imprópria'],
                 tags: ['risco:temperatura_alta', 'risco_critico'],
-                sysadminEmail: 'admin@guardiao.com.br'
+                sysadminEmail: 'manuelportela@guardiaonacional.com'
             });
 
             expect(result.success).toBe(true);

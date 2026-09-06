@@ -58,7 +58,7 @@ export const sysadminAlertService = {
         sysadminEmail?: string;
     }): Promise<{ success: boolean; alertId?: string }> {
         try {
-            const targetEmail = params.sysadminEmail || 'admin@guardiao.com.br';
+            const targetEmail = params.sysadminEmail || 'manuelportela@guardiaonacional.com';
             const alertDoc = {
                 contributionId: params.contributionId,
                 contributionTitle: params.title,
@@ -145,8 +145,8 @@ export const sysadminAlertService = {
                 </div>
 
                 <div style="background-color: #ffffff; padding: 24px; border: 1px solid #e2e8f0; border-top: none; border-radius: 0 0 12px 12px;">
-                    <p style="margin-top: 0;">Olá, <strong>SysAdmin</strong>,</p>
-                    <p>Uma nova contribuição necessita da sua atenção e conferência de segurança:</p>
+                    <p style="margin-top: 0;">Olá, <strong>Manuel Portela (SysAdmin)</strong>,</p>
+                    <p>Uma nova ocorrência necessita da sua atenção e conferência de segurança no painel:</p>
 
                     <div style="background-color: #f8fafc; border-left: 4px solid ${badgeColor}; padding: 16px; border-radius: 6px; margin: 16px 0;">
                         <p style="margin: 0 0 6px 0; font-size: 11px; text-transform: uppercase; color: #64748b; font-weight: bold;">Título do Relato:</p>
@@ -166,15 +166,20 @@ export const sysadminAlertService = {
 
                     <div style="background-color: #f1f5f9; padding: 14px; border-radius: 8px; font-size: 12px; color: #475569; margin-bottom: 20px;">
                         ${isTest 
-                            ? 'ℹ️ <strong>Importante:</strong> Este relato foi mantido aprovado no momento do envio para não bloquear a equipe do Google Reviewers durante a homologação do app.'
-                            : '⚠️ <strong>Atenção:</strong> Este relato foi classificado como alto risco devido a palavras agressivas, propaganda política ou anúncio comercial.'}
+                            ? 'ℹ️ <strong>Homologação Play Store:</strong> Este relato foi mantido aprovado no envio para não bloquear a avaliação do Google Reviewer. Você pode revisar e mantê-lo ou removê-lo a qualquer momento pelo painel.'
+                            : '⚠️ <strong>Risco de Publicação:</strong> Este relato foi classificado com alto risco devido a palavras agressivas, propaganda política, anúncios ou exposição indevida.'}
                     </div>
 
-                    <div style="text-align: center; margin: 24px 0;">
-                        <a href="${panelReviewUrl}" style="background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: bold; font-size: 13px; display: inline-block;">
-                            Revisar no Painel do SysAdmin ➔
+                    <div style="text-align: center; margin: 24px 0 12px 0;">
+                        <a href="${panelReviewUrl}" style="background-color: #2563eb; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-weight: bold; font-size: 14px; display: inline-block; box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);">
+                            Abrir Painel e Analisar Agora ➔
                         </a>
                     </div>
+
+                    <p style="text-align: center; margin: 12px 0 20px 0; font-size: 11px; color: #64748b;">
+                        Ou copie e cole o link direto no seu navegador:<br/>
+                        <a href="${panelReviewUrl}" style="color: #2563eb; word-break: break-all; text-decoration: underline;">${panelReviewUrl}</a>
+                    </p>
 
                     <p style="font-size: 11px; color: #94a3b8; text-align: center; margin-bottom: 0;">
                         Guardião Nacional • Fila de Auditoria de Segurança

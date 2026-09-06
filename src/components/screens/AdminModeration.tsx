@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { db } from '../../firebaseConfig';
 import { CLOUD_FUNCTIONS } from '../../config';
 import {
@@ -143,7 +143,17 @@ const AdminModeration: React.FC = () => {
     } = useModerationStore();
 
     const { scope, isNational, resetToNational, dataMasking } = useScope();
-    const [activeTab, setActiveTab] = useState('reports');
+    const [searchParams] = useSearchParams();
+    const tabFromUrl = searchParams.get('tab');
+    const [activeTab, setActiveTab] = useState(tabFromUrl || 'reports');
+
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && ['reports', 'queue', 'approved', 'rejected', 'trash', 'sysadmin', 'config'].includes(tab)) {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
+
     const [collapsedFilters, setCollapsedFilters] = useState(true);
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
     const [runningAnalysis, setRunningAnalysis] = useState(false);
