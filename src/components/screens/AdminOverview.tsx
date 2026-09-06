@@ -39,12 +39,13 @@ const AdminOverview: React.FC = () => {
     const { scope, isNational, resetToNational, dataMasking } = useScope();
     const isPresidente = userData?.role === 'presidente' || userData?.role === 'super_admin';
 
-    const [activeTab, setActiveTab] = useState<'overview' | 'territory' | 'trends' | 'efficiency'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'causal' | 'territory' | 'trends' | 'efficiency'>('overview');
     const [allContributions, setAllContributions] = useState<Contribution[]>([]);
     const [allUsers, setAllUsers] = useState<any[]>([]);
     const [userCount, setUserCount] = useState(0);
     const [dateRange, setDateRange] = useState<{ from?: Date; to?: Date }>({});
     const [regionFilter, setRegionFilter] = useState('all');
+    const [selectedCities, setSelectedCities] = useState<string[]>([]);
     const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
     const [loading, setLoading] = useState(true);
 
@@ -81,7 +82,21 @@ const AdminOverview: React.FC = () => {
         };
     }, []);
 
-    // Filtragem de dados por Escopo Federativo e Data
+    // Extração Dinâmica de Cidades com Ocorrências Reais
+    const availableCities = useMemo(() => {
+        const cityMap: Record<string, number> = {};
+        allContributions.forEach(c => {
+            const city = (c.city || '').trim();
+            if (city) {
+                cityMap[city] = (cityMap[city] || 0) + 1;
+            }
+        });
+        return Object.entries(cityMap)
+            .map(([name, count]) => ({ name, count }))
+            .sort((a, b) => b.count - a.count);
+    }, [allContributions]);
+
+    // Filtragem de dados por Escopo Federativo, Cidades Selecionadas e Data
     const contribs = useMemo(() => {
         let data = [...allContributions];
 
@@ -99,6 +114,14 @@ const AdminOverview: React.FC = () => {
             });
         }
 
+        // Filtro Multi-Cidades Selecionadas
+        if (selectedCities.length > 0) {
+            data = data.filter(c => {
+                const cCity = (c.city || '').toLowerCase().trim();
+                return selectedCities.some(sc => sc.toLowerCase().trim() === cCity);
+            });
+        }
+
         if (regionFilter !== 'all') {
             data = data.filter(c => c.state?.toLowerCase() === regionFilter || c.city?.toLowerCase() === regionFilter);
         }
@@ -112,7 +135,7 @@ const AdminOverview: React.FC = () => {
             });
         }
         return data;
-    }, [allContributions, scope, regionFilter, dateRange]);
+    }, [allContributions, scope, selectedCities, regionFilter, dateRange]);
 
     // Motor de Inteligência Analítica Real
     const analytics = useMemo(() => {
@@ -199,9 +222,49 @@ const AdminOverview: React.FC = () => {
                                     : 'Todos os períodos'}
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                            <Calendar initialFocus mode="range" defaultMonth={dateRange.from}
-                                selected={dateRange as any} onSelect={(r: any) => setDateRange(r)} numberOfMonths={2} />
+                        <PopoverContent className="w-auto p-3" align="end">
+                            <div className="flex items-center gap-1.5 pb-2 mb-2 border-b border-slate-100 flex-wrap">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 text-[11px] px-2 py-0"
+                                    onClick={() => setDateRange({ from: startOfDay(new Date()), to: new Date() })}
+                                >
+                                    Hoje
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 text-[11px] px-2 py-0"
+                                    onClick={() => setDateRange({ from: subDays(new Date(), 7), to: new Date() })}
+                                >
+                                    7 dias
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-6 text-[11px] px-2 py-0"
+                                    onClick={() => setDateRange({ from: subDays(new Date(), 30), to: new Date() })}
+                                >
+                                    30 dias
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="h-6 text-[11px] px-2 py-0 text-blue-600 font-semibold"
+                                    onClick={() => setDateRange({})}
+                                >
+                                    Todos
+                                </Button>
+                            </div>
+                            <Calendar
+                                initialFocus
+                                mode="range"
+                                defaultMonth={dateRange.from}
+                                selected={dateRange as any}
+                                onSelect={(r: any) => setDateRange(r || {})}
+                                numberOfMonths={2}
+                            />
                         </PopoverContent>
                     </Popover>
 
@@ -210,6 +273,66 @@ const AdminOverview: React.FC = () => {
                     </Button>
                 </div>
             </div>
+
+            {/* ─── Barra de Filtro Dinâmico Multi-Cidades ─── */}
+            {availableCities.length > 0 && (
+                <div className="bg-white p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mr-2">
+                        <Building2 className="w-4 h-4 text-blue-600" />
+                        <span>Filtrar Municípios:</span>
+                    </div>
+
+                    <Badge
+                        variant={selectedCities.length === 0 ? 'default' : 'outline'}
+                        onClick={() => setSelectedCities([])}
+                        className={`cursor-pointer text-xs px-3 py-1 transition-all ${
+                            selectedCities.length === 0
+                                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                                : 'text-slate-600 hover:bg-slate-100'
+                        }`}
+                    >
+                        Todas as Cidades ({allContributions.length})
+                    </Badge>
+
+                    {availableCities.map(city => {
+                        const isSelected = selectedCities.includes(city.name);
+                        return (
+                            <Badge
+                                key={city.name}
+                                variant={isSelected ? 'default' : 'outline'}
+                                onClick={() => {
+                                    if (isSelected) {
+                                        setSelectedCities(prev => prev.filter(c => c !== city.name));
+                                    } else {
+                                        setSelectedCities(prev => [...prev, city.name]);
+                                    }
+                                }}
+                                className={`cursor-pointer text-xs px-3 py-1 transition-all flex items-center gap-1.5 ${
+                                    isSelected
+                                        ? 'bg-indigo-600 text-white hover:bg-indigo-700 border-indigo-600 shadow-xs'
+                                        : 'text-slate-600 hover:bg-slate-100 hover:border-slate-300'
+                                }`}
+                            >
+                                <span>{city.name}</span>
+                                <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isSelected ? 'bg-indigo-800 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                                    {city.count}
+                                </span>
+                            </Badge>
+                        );
+                    })}
+
+                    {selectedCities.length > 0 && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setSelectedCities([])}
+                            className="h-6 text-[11px] text-slate-500 hover:text-red-600 ml-auto px-2"
+                        >
+                            Limpar seleção ({selectedCities.length})
+                        </Button>
+                    )}
+                </div>
+            )}
 
             {/* Banner de Escopo Federativo */}
             {!isNational && (
@@ -242,10 +365,14 @@ const AdminOverview: React.FC = () => {
 
             {/* ─── 1. Abas Analíticas ─── */}
             <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
-                <TabsList className="grid grid-cols-2 md:grid-cols-4 max-w-2xl bg-slate-100 p-1 rounded-xl">
+                <TabsList className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 max-w-3xl bg-slate-100 p-1 rounded-xl">
                     <TabsTrigger value="overview" className="text-xs gap-1.5 font-bold">
                         <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
                         Panorama Geral
+                    </TabsTrigger>
+                    <TabsTrigger value="causal" className="text-xs gap-1.5 font-bold text-purple-900 data-[state=active]:bg-purple-100 data-[state=active]:text-purple-950">
+                        <Sparkles className="w-3.5 h-3.5 text-purple-600" />
+                        Inteligência Causal (BI)
                     </TabsTrigger>
                     <TabsTrigger value="territory" className="text-xs gap-1.5 font-bold">
                         <Compass className="w-3.5 h-3.5 text-indigo-600" />
@@ -270,7 +397,9 @@ const AdminOverview: React.FC = () => {
                                 <div>
                                     <p className="text-[11px] font-bold uppercase text-blue-100">Total de Demandas</p>
                                     <p className="text-3xl font-black mt-0.5">{total}</p>
-                                    <p className="text-[11px] text-blue-200 mt-1">+{newToday} registradas hoje</p>
+                                    <p className="text-[11px] text-blue-200 mt-1">
+                                        +{newToday} {newToday === 1 ? 'registrada hoje' : 'registradas hoje'}
+                                    </p>
                                 </div>
                                 <div className="p-3 bg-white/10 rounded-2xl">
                                     <FileText className="w-6 h-6 text-white" />
@@ -308,8 +437,12 @@ const AdminOverview: React.FC = () => {
                             <CardContent className="p-4 flex items-center justify-between">
                                 <div>
                                     <p className="text-[11px] font-bold uppercase text-amber-100">Tempo Médio (TMA)</p>
-                                    <p className="text-3xl font-black mt-0.5">{analytics.avgResolutionTimeHours}h</p>
-                                    <p className="text-[11px] text-amber-200 mt-1">Velocidade de atendimento</p>
+                                    <p className="text-3xl font-black mt-0.5">
+                                        {analytics.avgResolutionTimeHours > 0 ? `${analytics.avgResolutionTimeHours}h` : '—'}
+                                    </p>
+                                    <p className="text-[11px] text-amber-200 mt-1">
+                                        {resolved > 0 ? 'Velocidade de atendimento' : 'Aguardando demandas concluídas'}
+                                    </p>
                                 </div>
                                 <div className="p-3 bg-white/10 rounded-2xl">
                                     <Clock className="w-6 h-6 text-white" />
@@ -367,7 +500,178 @@ const AdminOverview: React.FC = () => {
                     </div>
                 </TabsContent>
 
-                {/* ─── ABA 2: Cruzamento Territorial & Bairros ─── */}
+                {/* ─── ABA 2: Inteligência Causal & Preditiva (Looker / Power BI Style) ─── */}
+                <TabsContent value="causal" className="space-y-6 pt-2">
+                    {/* Header Institucional do Módulo de Inteligência Causal */}
+                    <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-purple-950 text-white p-5 rounded-2xl border border-purple-900/50 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3.5">
+                            <div className="p-3 bg-purple-500/20 text-purple-300 rounded-xl border border-purple-400/30">
+                                <Sparkles className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-base md:text-lg font-bold flex items-center gap-2">
+                                    Cruzamentos Preditivos e Correlações Causais Urbanas
+                                    <Badge className="bg-purple-600 text-white text-[10px] font-mono">Looker Studio Engine</Badge>
+                                </h2>
+                                <p className="text-xs text-purple-200/80 mt-0.5 max-w-3xl leading-relaxed">
+                                    Modelagem multivariada que conecta falhas em serviços básicos de zeladoria (como bueiros assoreados e postes apagados) com impactos críticos (enchentes e aumento da sensação de insegurança/furtos), fornecendo previsões de tendência antes que os problemas escalem.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                            <Badge variant="outline" className="bg-purple-900/40 text-purple-200 border-purple-500/40 text-xs px-3 py-1">
+                                Base 100% Real do Firestore
+                            </Badge>
+                        </div>
+                    </div>
+
+                    {/* Grade de Cards de Diagnóstico Causal Detalhado */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        {analytics.causalInsights.map((insight) => {
+                            const isCritical = insight.severity === 'CRITICA';
+                            return (
+                                <Card key={insight.id} className="rounded-2xl border-slate-200 bg-white shadow-sm overflow-hidden flex flex-col justify-between">
+                                    <div>
+                                        <CardHeader className="pb-3 border-b border-slate-100 bg-slate-50/50">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={
+                                                        isCritical
+                                                            ? 'bg-red-100 text-red-800 border-red-200'
+                                                            : 'bg-amber-100 text-amber-800 border-amber-200'
+                                                    }>
+                                                        {insight.severity === 'CRITICA' ? '⚠️ Risco Crítico' : '⚡ Risco Elevado'}
+                                                    </Badge>
+                                                    <span className="text-xs font-mono font-bold text-slate-500">
+                                                        Correlação: {insight.correlationScore}%
+                                                    </span>
+                                                </div>
+                                                <Badge variant="outline" className="text-[10px] text-slate-500">
+                                                    {insight.theme === 'DEFESA_CIVIL_INFRA' ? 'Defesa Civil & Drenagem' : (insight.theme === 'SEGURANCA_ILUMINACAO' ? 'Segurança & Iluminação' : 'Saneamento & Saúde')}
+                                                </Badge>
+                                            </div>
+                                            <CardTitle className="text-sm md:text-base font-bold text-slate-900 mt-2">
+                                                {insight.title}
+                                            </CardTitle>
+                                            <CardDescription className="text-xs text-slate-600 leading-relaxed mt-1">
+                                                {insight.hypothesis}
+                                            </CardDescription>
+                                        </CardHeader>
+
+                                        <CardContent className="pt-4 space-y-4">
+                                            {/* Comparativo de Dados Observados (Causa vs Efeito) */}
+                                            <div className="grid grid-cols-2 gap-2.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                                                <div className="border-r border-slate-200 pr-2">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-500 block">Causa Identificada:</span>
+                                                    <span className="text-xs font-bold text-slate-800 block mt-0.5">{insight.observedData.causeLabel}</span>
+                                                    <span className="text-lg font-black text-blue-600 block mt-0.5">{insight.observedData.causeCount} ocorrências</span>
+                                                </div>
+                                                <div className="pl-1">
+                                                    <span className="text-[10px] font-bold uppercase text-slate-500 block">Impacto Resultante:</span>
+                                                    <span className="text-xs font-bold text-slate-800 block mt-0.5">{insight.observedData.effectLabel}</span>
+                                                    <span className="text-lg font-black text-rose-600 block mt-0.5">{insight.observedData.effectCount} ocorrências</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Alerta Preditivo Proporcional */}
+                                            <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 text-amber-950 text-xs leading-relaxed flex items-start gap-2.5">
+                                                <TrendingUp className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                                <div>
+                                                    <strong className="font-bold text-amber-900 block mb-0.5">Previsão & Tendência de Agravamento:</strong>
+                                                    <span>{insight.predictiveWarning}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Ações Recomendadas para Secretarias */}
+                                            <div className="space-y-1.5">
+                                                <span className="text-[11px] font-bold uppercase text-slate-500 tracking-wider block">
+                                                    Plano de Ação Sugerido às Secretarias:
+                                                </span>
+                                                <ul className="space-y-1 text-xs text-slate-700">
+                                                    {insight.recommendedActions.map((action, idx) => (
+                                                        <li key={idx} className="flex items-start gap-2">
+                                                            <span className="text-emerald-600 font-bold text-xs mt-0.5">✓</span>
+                                                            <span>{action}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        </CardContent>
+                                    </div>
+
+                                    <div className="p-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                                        <span>Bairros com maior incidência:</span>
+                                        <span className="font-semibold text-slate-800">{insight.observedData.locationSummary}</span>
+                                    </div>
+                                </Card>
+                            );
+                        })}
+
+                        {analytics.causalInsights.length === 0 && (
+                            <div className="col-span-2 text-center py-12 bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs">
+                                Nenhuma correlação crítica identificada para o conjunto de filtros ativo.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Gráficos Bivariados de Linha Dupla Estilo Power BI */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        {/* Gráfico 1: Drenagem vs Alagamentos */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center justify-between">
+                                    <span>Evolução: Falhas de Drenagem vs Alagamentos</span>
+                                    <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700">Série 4 Semanas</Badge>
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Compara o surgimento de bueiros obstruídos com episódios de enchentes por semana.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <LineChart data={analytics.bivariateFloodTrends}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="period" tick={{ fontSize: 10 }} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+                                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                                        <Line type="monotone" dataKey="infrastructureDefects" stroke="#3b82f6" strokeWidth={2} name="Bueiros/Drenagem" />
+                                        <Line type="monotone" dataKey="resultingIncidents" stroke="#ef4444" strokeWidth={2} name="Alagamentos/Enchentes" />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        {/* Gráfico 2: Iluminação vs Ocorrências de Segurança */}
+                        <Card className="rounded-2xl border-slate-200 bg-white shadow-sm">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-bold text-slate-900 flex items-center justify-between">
+                                    <span>Evolução: Falhas de Iluminação vs Insegurança/Furtos</span>
+                                    <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700">Teoria Janelas Quebradas</Badge>
+                                </CardTitle>
+                                <CardDescription className="text-xs">
+                                    Demonstra como a falta de manutenção de postes se correlaciona com a sensação de insegurança.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={220}>
+                                    <LineChart data={analytics.bivariateSecurityTrends}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                        <XAxis dataKey="period" tick={{ fontSize: 10 }} tickLine={false} />
+                                        <YAxis tick={{ fontSize: 10 }} tickLine={false} axisLine={false} />
+                                        <Tooltip contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }} />
+                                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
+                                        <Line type="monotone" dataKey="infrastructureDefects" stroke="#f59e0b" strokeWidth={2} name="Postes/Iluminação" />
+                                        <Line type="monotone" dataKey="resultingIncidents" stroke="#8b5cf6" strokeWidth={2} name="Furtos/Insegurança" />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+                {/* ─── ABA 3: Cruzamento Territorial & Bairros ─── */}
                 <TabsContent value="territory" className="space-y-4 pt-2">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Tabela de Cruzamento Bairro x Demandas */}

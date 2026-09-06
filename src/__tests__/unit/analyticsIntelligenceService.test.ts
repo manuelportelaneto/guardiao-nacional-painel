@@ -87,4 +87,71 @@ describe('Serviço de Inteligência Analítica e Cruzamento de Dados (analyticsI
         // Predições
         expect(result.predictiveTrends).toHaveLength(7);
     });
+
+    it('deve correlacionar falhas de infraestrutura hidráulica com risco de alagamentos e enchentes', () => {
+        const floodMock: Contribution[] = [
+            {
+                id: 'fl-1',
+                title: 'Bueiro totalmente entupido e assoreado',
+                description: 'Boca de lobo cheia de terra e folhas impedindo a drenagem da água.',
+                category: 'bueiro_rua',
+                city: 'Mauá',
+                neighborhood: 'Vila Assis Brasil',
+                createdAt: new Date() as any
+            } as any,
+            {
+                id: 'fl-2',
+                title: 'Alagamento severo na avenida principal',
+                description: 'Enxurrada e enchente cobrindo a pista após chuva de 30 minutos.',
+                category: 'alagamento',
+                city: 'Mauá',
+                neighborhood: 'Vila Assis Brasil',
+                createdAt: new Date() as any
+            } as any
+        ];
+
+        const result = analyticsIntelligenceService.computeAnalytics(floodMock, []);
+
+        expect(result.causalInsights.length).toBeGreaterThanOrEqual(1);
+        const floodInsight = result.causalInsights.find(i => i.theme === 'DEFESA_CIVIL_INFRA');
+        expect(floodInsight).toBeDefined();
+        expect(floodInsight?.observedData.causeCount).toBe(1);
+        expect(floodInsight?.observedData.effectCount).toBe(1);
+        expect(floodInsight?.correlationScore).toBeGreaterThanOrEqual(65);
+        expect(floodInsight?.predictiveWarning).toContain('enchente');
+        expect(floodInsight?.recommendedActions.length).toBeGreaterThanOrEqual(2);
+        expect(result.bivariateFloodTrends).toHaveLength(4);
+    });
+
+    it('deve correlacionar falhas de iluminação pública com aumento de queixas de segurança e furtos (Janelas Quebradas)', () => {
+        const securityMock: Contribution[] = [
+            {
+                id: 'sec-1',
+                title: 'Postes apagados na praça central',
+                description: 'Três lâmpadas queimadas deixando o quarteirão em completa escuridão.',
+                category: 'iluminação pública',
+                city: 'Santo André',
+                neighborhood: 'Vila Pires',
+                createdAt: new Date() as any
+            } as any,
+            {
+                id: 'sec-2',
+                title: 'Tentativa de furto e assalto na esquina escura',
+                description: 'Indivíduos aproveitando a falta de luz e policiamento para cometer roubos.',
+                category: 'segurança',
+                city: 'Santo André',
+                neighborhood: 'Vila Pires',
+                createdAt: new Date() as any
+            } as any
+        ];
+
+        const result = analyticsIntelligenceService.computeAnalytics(securityMock, []);
+
+        const securityInsight = result.causalInsights.find(i => i.theme === 'SEGURANCA_ILUMINACAO');
+        expect(securityInsight).toBeDefined();
+        expect(securityInsight?.observedData.causeCount).toBe(1);
+        expect(securityInsight?.observedData.effectCount).toBe(1);
+        expect(securityInsight?.predictiveWarning).toContain('abordagens suspeitas e furtos');
+        expect(result.bivariateSecurityTrends).toHaveLength(4);
+    });
 });

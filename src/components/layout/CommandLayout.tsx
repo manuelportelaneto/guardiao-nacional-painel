@@ -359,21 +359,19 @@ export const CommandLayout: React.FC<CommandLayoutProps> = ({ children }) => {
                             <span className="hidden lg:inline">{syncing ? 'Lendo Banco...' : 'Forçar Leitura do Banco'}</span>
                         </Button>
 
-                        {/* Botão de Retorno ao Hub de Painéis */}
-                        <Button
-                            size="sm"
-                            variant={location.pathname === '/hub' || location.pathname === '/role-hub' ? 'default' : 'outline'}
-                            onClick={() => navigate('/hub')}
-                            className={`h-8 text-xs gap-1.5 font-medium shadow-sm transition-all ${
-                                location.pathname === '/hub' || location.pathname === '/role-hub'
-                                    ? 'bg-blue-600 text-white hover:bg-blue-700 border-blue-600'
-                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300'
-                            }`}
-                            title="Ir ao Hub Central de Seleção de Painéis e Perfis"
-                        >
-                            <LayoutGrid className={`w-3.5 h-3.5 ${location.pathname === '/hub' || location.pathname === '/role-hub' ? 'text-white' : 'text-blue-600'}`} />
-                            <span className="hidden sm:inline">Hub de Painéis</span>
-                        </Button>
+                        {/* Botão de Retorno ao Hub de Painéis (quando navegando em outros módulos) */}
+                        {!(location.pathname === '/hub' || location.pathname === '/role-hub') && (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => navigate('/hub')}
+                                className="h-8 text-xs gap-1.5 font-medium shadow-sm transition-all bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300"
+                                title="Voltar ao Hub Central de Seleção de Painéis e Perfis"
+                            >
+                                <LayoutGrid className="w-3.5 h-3.5 text-blue-600" />
+                                <span className="hidden sm:inline">Hub de Painéis</span>
+                            </Button>
+                        )}
 
                         {/* Atalho para Governança Federativa */}
                         <Button
