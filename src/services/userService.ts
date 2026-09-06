@@ -45,6 +45,8 @@ export interface UserManagement {
     lastLoginAt?: any; // Firestore Timestamp
     city?: string;
     uf?: string;
+    shadowRiskCount?: number;
+    isFlaggedForAudit?: boolean;
 }
 
 /**

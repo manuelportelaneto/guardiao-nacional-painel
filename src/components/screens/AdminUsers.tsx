@@ -391,6 +391,13 @@ const AdminUsers: React.FC = () => {
                                             </Badge>
                                         );
                                     })}
+                                    {/* Indicador Oculto de Risco para SysAdmin */}
+                                    {Boolean(user.shadowRiskCount && user.shadowRiskCount > 0) && (
+                                        <Badge variant="outline" className="text-red-700 border-red-300 bg-red-50 font-mono text-[10px] gap-1">
+                                            <span>🕵️‍♂️ Risco Oculto: {user.shadowRiskCount} {user.shadowRiskCount === 1 ? 'strike' : 'strikes'}</span>
+                                            {user.shadowRiskCount >= 3 && <span className="font-bold text-red-900">• Conta Suspeita</span>}
+                                        </Badge>
+                                    )}
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-gray-500 border-t pt-4">
                                     <span className="flex items-center gap-1">

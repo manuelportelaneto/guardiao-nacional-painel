@@ -27,8 +27,14 @@ import {
     Zap,
     Play,
     Building2,
-    MapPin
+    MapPin,
+    AlertTriangle,
+    FlaskConical,
+    CheckCircle2,
+    XCircle,
+    Eye
 } from 'lucide-react';
+import { sysadminAlertService, type SysAdminAlert } from '../../services/sysadminAlertService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -102,6 +108,8 @@ const AdminModeration: React.FC = () => {
     const [approvedList, setApprovedList] = useState<Contribution[]>([]);
     const [rejectedList, setRejectedList] = useState<Contribution[]>([]);
     const [trashList, setTrashList] = useState<Contribution[]>([]);
+    const [sysadminAlerts, setSysadminAlerts] = useState<SysAdminAlert[]>([]);
+    const [sysadminFilter, setSysadminFilter] = useState<'all' | 'TEST_CONTRIBUTION' | 'HIGH_RISK_PUBLICATION'>('all');
 
     // Filters
     const [searchTerm, setSearchTerm] = useState('');
@@ -322,7 +330,15 @@ const AdminModeration: React.FC = () => {
                     setTrashList(trash);
                 }, (error) => {
                     console.error("Recent subscribe error:", error);
-                    // It's possible even this needs an index if 'contributions' is complex, but usually orderBy(single field) is supported by default.
+                });
+
+                // 3. SysAdmin Alerts (Testes + Alto Risco)
+                const alertsQuery = query(collection(db, 'sysadmin_alerts'), orderBy('createdAt', 'desc'), limit(100));
+                const unsubscribeAlerts = onSnapshot(alertsQuery, (snapshot) => {
+                    const alertItems = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as SysAdminAlert));
+                    setSysadminAlerts(alertItems);
+                }, (error) => {
+                    console.warn("Alerts subscribe warning:", error);
                 });
 
                 return () => {
@@ -330,6 +346,7 @@ const AdminModeration: React.FC = () => {
                     unsubscribeReports();
                     unsubscribeQueue();
                     unsubscribeRecent();
+                    unsubscribeAlerts();
                 };
 
             } catch (err) {
@@ -730,6 +747,16 @@ const AdminModeration: React.FC = () => {
                         <TabsTrigger value="trash" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap">
                             Lixo ({trashList.length})
                         </TabsTrigger>
+                        <TabsTrigger value="sysadmin" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap gap-1.5 font-bold text-amber-900 data-[state=active]:bg-amber-100 data-[state=active]:text-amber-950">
+                            <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                            Alertas SysAdmin ({sysadminAlerts.filter(a => a.status === 'PENDING_REVIEW').length})
+                            {sysadminAlerts.some(a => a.status === 'PENDING_REVIEW') && (
+                                <span className="relative flex h-2 w-2">
+                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                                </span>
+                            )}
+                        </TabsTrigger>
                         <TabsTrigger value="config" className="text-xs md:text-sm px-3 py-2 whitespace-nowrap gap-2">
                             <Settings className="w-4 h-4" />
                             Configurações
@@ -864,6 +891,157 @@ const AdminModeration: React.FC = () => {
                                 </div>
                             </CardContent>
                         </Card>
+                    </div>
+                </TabsContent>
+
+                {/* ABA DEDICADA: Alertas do SysAdmin (Testes & Alto Risco) */}
+                <TabsContent value="sysadmin" className="mt-6 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-amber-50/80 border border-amber-200 p-4 rounded-xl">
+                        <div>
+                            <h3 className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                                Fila de Intervenção Rápida do SysAdmin
+                            </h3>
+                            <p className="text-xs text-amber-700 mt-0.5">
+                                Relatos marcados como contas de teste de homologação ou risco elevado para a comunicação pública.
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                size="sm"
+                                variant={sysadminFilter === 'all' ? 'default' : 'outline'}
+                                onClick={() => setSysadminFilter('all')}
+                                className="h-8 text-xs font-semibold"
+                            >
+                                Todos ({sysadminAlerts.length})
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={sysadminFilter === 'TEST_CONTRIBUTION' ? 'default' : 'outline'}
+                                onClick={() => setSysadminFilter('TEST_CONTRIBUTION')}
+                                className="h-8 text-xs font-semibold gap-1"
+                            >
+                                <FlaskConical className="w-3 h-3 text-purple-600" />
+                                Testes ({sysadminAlerts.filter(a => a.alertType === 'TEST_CONTRIBUTION').length})
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant={sysadminFilter === 'HIGH_RISK_PUBLICATION' ? 'default' : 'outline'}
+                                onClick={() => setSysadminFilter('HIGH_RISK_PUBLICATION')}
+                                className="h-8 text-xs font-semibold gap-1"
+                            >
+                                <AlertTriangle className="w-3 h-3 text-red-600" />
+                                Alto Risco ({sysadminAlerts.filter(a => a.alertType === 'HIGH_RISK_PUBLICATION').length})
+                            </Button>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {sysadminAlerts
+                            .filter(alert => sysadminFilter === 'all' || alert.alertType === sysadminFilter)
+                            .map((alert) => (
+                                <Card key={alert.id || alert.contributionId} className="overflow-hidden border-slate-200 bg-white shadow-sm flex flex-col justify-between">
+                                    <CardHeader className="pb-2 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <Badge className={alert.alertType === 'TEST_CONTRIBUTION'
+                                                ? 'bg-purple-100 text-purple-800 border-purple-200 gap-1'
+                                                : 'bg-red-100 text-red-800 border-red-200 gap-1'
+                                            }>
+                                                {alert.alertType === 'TEST_CONTRIBUTION' ? <FlaskConical className="w-3 h-3" /> : <AlertTriangle className="w-3 h-3" />}
+                                                {alert.alertType === 'TEST_CONTRIBUTION' ? 'Teste Homologação' : `Alto Risco (Nível ${alert.riskScore})`}
+                                            </Badge>
+                                            <Badge variant="outline" className={`text-[10px] font-mono ${
+                                                alert.status === 'PENDING_REVIEW' ? 'bg-amber-50 text-amber-700 border-amber-300' :
+                                                alert.status === 'KEPT_PUBLISHED' ? 'bg-emerald-50 text-emerald-700 border-emerald-300' :
+                                                'bg-red-50 text-red-700 border-red-300'
+                                            }`}>
+                                                {alert.status === 'PENDING_REVIEW' ? 'Pendente SysAdmin' :
+                                                 alert.status === 'KEPT_PUBLISHED' ? 'Mantido Publicado' : 'Despublicado'}
+                                            </Badge>
+                                        </div>
+                                        <CardTitle className="text-sm font-bold text-slate-900 line-clamp-1">
+                                            {alert.contributionTitle}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3 flex-1 text-xs">
+                                        <p className="text-slate-600 line-clamp-3 italic bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                                            "{alert.contributionDescription}"
+                                        </p>
+
+                                        <div className="space-y-1">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase">Motivos Detectados:</span>
+                                            <div className="text-[11px] text-slate-700">
+                                                {alert.detectedReasons?.join(' • ')}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-1 pt-1">
+                                            {alert.detectedTags?.map((tag: string) => (
+                                                <span key={tag} className="text-[10px] font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">
+                                                    {tag}
+                                                </span>
+                                            ))}
+                                        </div>
+
+                                        <div className="text-[11px] text-slate-400 border-t pt-2 flex justify-between">
+                                            <span>Autor: {alert.authorName}</span>
+                                            <span>ID: {alert.contributionId.substring(0, 8)}...</span>
+                                        </div>
+                                    </CardContent>
+                                    <CardFooter className="bg-slate-50/80 p-3 border-t flex gap-2">
+                                        {alert.status === 'PENDING_REVIEW' ? (
+                                            <>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="flex-1 text-xs text-emerald-700 hover:bg-emerald-50 border-emerald-300 gap-1"
+                                                    onClick={async () => {
+                                                        if (!alert.id) return;
+                                                        await sysadminAlertService.resolveAlert({
+                                                            alertId: alert.id,
+                                                            contributionId: alert.contributionId,
+                                                            decision: 'KEPT_PUBLISHED',
+                                                            reviewerUid: currentUser?.uid || 'sysadmin'
+                                                        });
+                                                        toast.success("Relato mantido publicado.");
+                                                    }}
+                                                >
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    Manter Publicado
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="destructive"
+                                                    className="flex-1 text-xs gap-1"
+                                                    onClick={async () => {
+                                                        if (!alert.id) return;
+                                                        await sysadminAlertService.resolveAlert({
+                                                            alertId: alert.id,
+                                                            contributionId: alert.contributionId,
+                                                            decision: 'REMOVED_FROM_FEED',
+                                                            reviewerUid: currentUser?.uid || 'sysadmin'
+                                                        });
+                                                        toast.success("Publicação removida do feed com sucesso.");
+                                                    }}
+                                                >
+                                                    <XCircle className="w-3.5 h-3.5" />
+                                                    Remover Publicação
+                                                </Button>
+                                            </>
+                                        ) : (
+                                            <div className="w-full text-center text-[11px] text-slate-500 font-semibold py-1">
+                                                Decisão registrada por SysAdmin
+                                            </div>
+                                        )}
+                                    </CardFooter>
+                                </Card>
+                            ))}
+
+                        {sysadminAlerts.filter(alert => sysadminFilter === 'all' || alert.alertType === sysadminFilter).length === 0 && (
+                            <div className="col-span-3 text-center py-12 text-slate-400 text-xs border border-dashed rounded-xl">
+                                Nenhum alerta pendente para a seleção atual.
+                            </div>
+                        )}
                     </div>
                 </TabsContent>
 

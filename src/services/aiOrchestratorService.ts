@@ -10,6 +10,8 @@
 
 import type { AiTriageResult, AiStructuredTags } from '../types/intelligence';
 import { aiLearningService } from './aiLearningService';
+import { sysadminAlertService } from './sysadminAlertService';
+import { userRiskTrackingService } from './userRiskTrackingService';
 
 // Padrões de detecção de PII e identificações pessoais no texto
 const PII_REGEX_PATTERNS = [
@@ -63,6 +65,11 @@ export const aiOrchestratorService = {
      * Realiza a triagem completa e geração de tags internas inteligentes da ocorrência.
      */
     async analyzeContribution(data: {
+        contributionId?: string;
+        userId?: string;
+        authorName?: string;
+        city?: string;
+        state?: string;
         title: string;
         description: string;
         category?: string;
@@ -88,6 +95,24 @@ export const aiOrchestratorService = {
 
             detectedTags.push('natureza:teste_homologacao', 'urgencia:baixa', 'risco:nenhum', 'teste_google_revisor');
             freeformTags.push('conta_teste', 'google_play_review');
+
+            // Dispara alerta e notificação por e-mail para o SysAdmin (não bloqueante)
+            if (data.contributionId) {
+                sysadminAlertService.createAlert({
+                    contributionId: data.contributionId,
+                    title: data.title,
+                    description: data.description,
+                    alertType: 'TEST_CONTRIBUTION',
+                    riskScore: 1,
+                    relevanceScore: 50,
+                    authorId: data.userId || 'anonimo',
+                    authorName: data.authorName || 'Conta de Homologação/QA',
+                    city: data.city,
+                    state: data.state,
+                    reasons: ['Relato identificado com padrões de teste de homologação/Google Review'],
+                    tags: detectedTags
+                }).catch(err => console.warn('Erro ao disparar alerta de teste:', err));
+            }
 
             return {
                 relevanceScore: 50,
@@ -290,6 +315,43 @@ export const aiOrchestratorService = {
             summary: `Ocorrência com Relevância Populacional ${relevanceScore}/100 e Risco de Publicação Nível ${riskScore} para ${suggestedDepartmentName}.`,
             usedFallbackModel: false
         };
+
+        // Se o risco de publicação for alto (>= 4), dispara alerta SysAdmin e strike oculto de risco
+        if (riskScore >= 4) {
+            if (data.userId && data.userId !== 'anonimo') {
+                userRiskTrackingService.recordRiskStrike({
+                    userId: data.userId,
+                    contributionId: data.contributionId || 'contrib_' + Date.now(),
+                    contributionTitle: data.title,
+                    riskScore,
+                    reasons: [
+                        publicationRisk === 'temperatura_alta' ? 'Temperatura de linguagem agressiva / insultos' :
+                        publicationRisk === 'propaganda_politica' ? 'Discurso partidário / campanha eleitoral' :
+                        publicationRisk === 'anuncio_spam' ? 'Anúncio comercial / spam' :
+                        'Violação de segurança na publicação'
+                    ]
+                }).catch(err => console.warn('Erro ao registrar strike oculto de risco:', err));
+            }
+
+            if (data.contributionId) {
+                sysadminAlertService.createAlert({
+                    contributionId: data.contributionId,
+                    title: data.title,
+                    description: data.description,
+                    alertType: 'HIGH_RISK_PUBLICATION',
+                    riskScore,
+                    relevanceScore,
+                    authorId: data.userId || 'anonimo',
+                    authorName: data.authorName || 'Munícipe',
+                    city: data.city,
+                    state: data.state,
+                    reasons: [
+                        `Classificado com Risco ${riskScore}/5 (${publicationRisk})`
+                    ],
+                    tags: detectedTags
+                }).catch(err => console.warn('Erro ao disparar alerta de alto risco:', err));
+            }
+        }
 
         // Grava padrão de aprendizado
         await aiLearningService.recordDecisionPattern(
