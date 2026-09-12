@@ -1,9 +1,8 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader } from '../../ui/card';
 import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
-import { Ban, User } from 'lucide-react';
+import { Ban, User, CheckCircle2, CheckCheck, Check, Bot } from 'lucide-react';
 import type { Contribution } from '../../../types/contribution';
 
 interface ModerationCardProps {
@@ -12,17 +11,36 @@ interface ModerationCardProps {
     onClick: (item: Contribution) => void;
     onAction: (action: string, item: Contribution) => void;
     onReply: (item: Contribution) => void;
+    isSelected?: boolean;
+    onToggleSelect?: (item: Contribution, e: React.MouseEvent) => void;
 }
 
-export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onClick, onAction, onReply }) => {
-
-
+export const ModerationCard: React.FC<ModerationCardProps> = ({
+    item,
+    tab,
+    onClick,
+    onAction,
+    onReply,
+    isSelected = false,
+    onToggleSelect
+}) => {
 
     const formatDate = (date: any) => {
         if (!date) return 'Data desconhecida';
         if (date.toDate) return date.toDate().toLocaleDateString('pt-BR');
         return 'Data inválida';
     };
+
+    const isRejectedByAi = item.status === 'Rejeitado' && (
+        (item as any).rejectedBy === 'AI' ||
+        (item as any).rejectedBy === 'SYSTEM' ||
+        item.rejectionReason?.toLowerCase().includes('ia') ||
+        item.rejectionReason?.toLowerCase().includes('inteligência') ||
+        item.rejectionReason?.toLowerCase().includes('automátic') ||
+        item.rejectionReason?.toLowerCase().includes('filtro') ||
+        item.aiAnalysis !== undefined ||
+        !(item as any).rejectedByAdmin
+    );
 
     const renderRiskBadges = () => {
         const analysis = item.aiAnalysis as any;
@@ -79,13 +97,51 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
             );
         }
 
+        // 5. BADGE DE STATUS RESOLVIDO OU RECUSADO POR IA
+        if (item.status === 'Resolvido') {
+            elements.push(
+                <Badge key="resolved" className="bg-green-100 text-green-800 border-green-300 text-[10px]">
+                    ✅ Resolvido
+                </Badge>
+            );
+        } else if (isRejectedByAi && (tab === 'rejected' || item.status === 'Rejeitado')) {
+            elements.push(
+                <Badge key="ai-rejected" variant="outline" className="bg-rose-50 text-rose-700 border-rose-300 text-[10px] flex items-center gap-1">
+                    <Bot className="w-3 h-3" /> Recusado pela IA
+                </Badge>
+            );
+        }
+
         return <div className="flex flex-wrap gap-1 mt-1">{elements}</div>;
     };
 
     return (
-        <Card onClick={() => onClick(item)} className="cursor-pointer hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2 flex flex-row justify-between space-y-0">
-                <Badge variant="outline">{item.category}</Badge>
+        <Card
+            onClick={() => onClick(item)}
+            className={`relative cursor-pointer hover:shadow-md transition-all ${
+                isSelected ? 'ring-2 ring-blue-600 border-blue-500 bg-blue-50/20 shadow-md' : ''
+            }`}
+        >
+            <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+                <div className="flex items-center gap-2">
+                    {/* Checkbox de Seleção Massiva com toque amplo */}
+                    {onToggleSelect && (
+                        <div
+                            role="checkbox"
+                            aria-checked={isSelected}
+                            className={`w-5 h-5 rounded border flex items-center justify-center transition-colors cursor-pointer ${
+                                isSelected ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-300 hover:border-gray-500'
+                            }`}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleSelect(item, e);
+                            }}
+                        >
+                            {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                        </div>
+                    )}
+                    <Badge variant="outline">{item.category}</Badge>
+                </div>
                 <span className="text-xs text-gray-400">{formatDate(item.createdAt)}</span>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -104,8 +160,15 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
                     <span className="text-[10px] break-all opacity-70 ml-4">ID: {item.userId || 'unknown'}</span>
                 </div>
 
+                {/* Motivo da Rejeição se houver */}
+                {item.rejectionReason && (tab === 'rejected' || item.status === 'Rejeitado') && (
+                    <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                        <span className="font-semibold">Motivo da recusa:</span> {item.rejectionReason}
+                    </div>
+                )}
+
                 {/* Actions Bar */}
-                <div className="pt-2">
+                <div className="pt-2 space-y-1.5">
                     {tab === 'queue' && (
                         <div className="flex gap-2">
                             <Button size="sm" variant="destructive" className="flex-1 h-10 touch-manipulation" onClick={e => { e.stopPropagation(); onAction('reject_contrib', item); }}>
@@ -117,13 +180,30 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
                         </div>
                     )}
                     {tab === 'approved' && (
-                        <Button size="sm" variant="outline" className="w-full text-red-500 hover:text-red-600 hover:bg-red-50 h-10 touch-manipulation" onClick={e => { e.stopPropagation(); onAction('reject_approved', item); }}>
-                            <Ban className="h-3 w-3 mr-1" /> Rejeitar
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" className="flex-1 text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 border-emerald-300 h-10 touch-manipulation" onClick={e => { e.stopPropagation(); onAction('resolve_contrib', item); }}>
+                                <CheckCheck className="h-3 w-3 mr-1" /> Resolvido
+                            </Button>
+                            <Button size="sm" variant="outline" className="flex-1 text-red-500 hover:text-red-600 hover:bg-red-50 h-10 touch-manipulation" onClick={e => { e.stopPropagation(); onAction('reject_approved', item); }}>
+                                <Ban className="h-3 w-3 mr-1" /> Rejeitar
+                            </Button>
+                        </div>
+                    )}
+                    {tab === 'rejected' && isRejectedByAi && (
+                        <Button
+                            size="sm"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold h-10 touch-manipulation flex items-center justify-center gap-1.5 shadow-sm"
+                            onClick={e => {
+                                e.stopPropagation();
+                                onAction('accept_override', item);
+                            }}
+                        >
+                            <CheckCircle2 className="h-4 w-4" /> Aceitar Publicação
                         </Button>
                     )}
                     {tab !== 'trash' && (
-                        <Button size="sm" variant="ghost" className="w-full mt-1 text-blue-600 hover:text-blue-700 h-10 touch-manipulation" onClick={e => { e.stopPropagation(); onReply(item); }}>
-                            Responder
+                        <Button size="sm" variant="ghost" className="w-full text-blue-600 hover:text-blue-700 h-9 touch-manipulation" onClick={e => { e.stopPropagation(); onReply(item); }}>
+                            Enviar Mensagem ao Autor
                         </Button>
                     )}
                 </div>
@@ -131,3 +211,4 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({ item, tab, onCli
         </Card>
     );
 };
+

@@ -26,8 +26,24 @@
  */
 
 import { db } from '../firebaseConfig';
-import { collection, query, where, getDocs, limit, Timestamp } from 'firebase/firestore';
+import {
+    collection,
+    query,
+    where,
+    getDocs,
+    limit,
+    Timestamp,
+    doc,
+    updateDoc,
+    setDoc,
+    addDoc,
+    increment,
+    serverTimestamp
+} from 'firebase/firestore';
 import type { Contribution } from '../types/contribution';
+import { notificationService } from './notificationService';
+import { loggingService } from './loggingService';
+import { sysadminAlertService } from './sysadminAlertService';
 
 export interface ModerationItem extends Contribution {
     priorityScore: number;    // Score matemático calculado de prioridade de moderação (0 a 100)
@@ -118,6 +134,242 @@ export const moderationService = {
             console.error("Erro ao gerar a fila inteligente de moderação:", error);
             throw error;
         }
+    },
+
+    /**
+     * Aceita manualmente uma publicação que foi previamente recusada pela IA ou moderadores.
+     * Reverte o status para 'Aprovado', anula strikes de risco e credita os pontos de gamificação (+10 XP).
+     */
+    acceptRejectedContribution: async (contribution: Contribution, adminUid?: string): Promise<boolean> => {
+        try {
+            const contribRef = doc(db, 'contributions', contribution.id);
+            await updateDoc(contribRef, {
+                status: 'Aprovado',
+                approvedAt: serverTimestamp(),
+                rejectionReason: null,
+                aiDecision: 'approved_override',
+                manuallyApprovedAfterRejection: true,
+                updatedAt: serverTimestamp()
+            });
+
+            // Reverte o strike e credita XP do cidadão
+            if (contribution.userId && contribution.userId !== 'anonimo') {
+                const userRef = doc(db, 'users', contribution.userId);
+                await setDoc(userRef, {
+                    xp: increment(10),
+                    interactions: {
+                        ratingsReceived: increment(1)
+                    },
+                    riskStrikes: increment(-1) // Anula strike indevido caso tenha
+                }, { merge: true });
+
+                // Notifica o cidadão no App Móvel
+                await addDoc(collection(db, 'users', contribution.userId, 'notifications'), {
+                    title: 'Publicação Aprovada pela Equipe! 🎉',
+                    message: `Sua contribuição "${contribution.title}" foi revisada pela equipe de moderação e aprovada no mapa!`,
+                    type: 'success',
+                    link: '/history',
+                    read: false,
+                    createdAt: serverTimestamp()
+                });
+            }
+
+            // Resolve alertas pendentes no SysAdmin para esta contribuição
+            try {
+                await sysadminAlertService.resolveAlert(contribution.id, 'APPROVED_OVERRIDE');
+            } catch {
+                // Alerta pode não existir se for contribuição antiga
+            }
+
+            if (adminUid) {
+                loggingService.logAudit('CONTRIBUTION_OVERRIDE_APPROVE', adminUid, contribution.id, {
+                    previousStatus: contribution.status
+                });
+            }
+
+            return true;
+        } catch (err) {
+            console.error('Erro ao aceitar publicação recusada:', err);
+            throw err;
+        }
+    },
+
+    /**
+     * Aprova múltiplas contribuições de uma só vez (Ação em Massa).
+     */
+    bulkApprove: async (contributions: Contribution[], rating: number = 5, adminUid?: string): Promise<{ success: number; failed: number }> => {
+        let success = 0;
+        let failed = 0;
+
+        for (const contrib of contributions) {
+            try {
+                await updateDoc(doc(db, 'contributions', contrib.id), {
+                    status: 'Aprovado',
+                    rating,
+                    approvedAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+
+                if (contrib.userId && contrib.userId !== 'anonimo') {
+                    const userRef = doc(db, 'users', contrib.userId);
+                    await setDoc(userRef, {
+                        interactions: { ratingsReceived: increment(1) },
+                        xp: increment(10)
+                    }, { merge: true });
+
+                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                        title: 'Contribuição Aprovada! 🎉',
+                        message: `Sua contribuição "${contrib.title}" foi aprovada e já está pública no mapa.`,
+                        type: 'success',
+                        link: '/history',
+                        read: false,
+                        createdAt: serverTimestamp()
+                    });
+                }
+
+                if (adminUid) {
+                    loggingService.logAudit('BULK_APPROVE', adminUid, contrib.id, { rating });
+                }
+
+                success++;
+            } catch (err) {
+                console.error(`Erro ao aprovar em massa item ${contrib.id}:`, err);
+                failed++;
+            }
+        }
+
+        return { success, failed };
+    },
+
+    /**
+     * Rejeita múltiplas contribuições em lote com justificativa padronizada.
+     */
+    bulkReject: async (contributions: Contribution[], reason: string, adminUid?: string): Promise<{ success: number; failed: number }> => {
+        let success = 0;
+        let failed = 0;
+
+        for (const contrib of contributions) {
+            try {
+                await updateDoc(doc(db, 'contributions', contrib.id), {
+                    status: 'Rejeitado',
+                    rejectionReason: reason,
+                    rejectedAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+
+                if (contrib.userId && contrib.userId !== 'anonimo') {
+                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                        title: 'Aviso de Moderação 🛡️',
+                        message: `Sua ocorrência "${contrib.title}" foi analisada e não pôde ser aprovada: ${reason}.`,
+                        type: 'warning',
+                        link: '/history',
+                        read: false,
+                        createdAt: serverTimestamp()
+                    });
+                }
+
+                if (adminUid) {
+                    loggingService.logAudit('BULK_REJECT', adminUid, contrib.id, { reason });
+                }
+
+                success++;
+            } catch (err) {
+                console.error(`Erro ao rejeitar em massa item ${contrib.id}:`, err);
+                failed++;
+            }
+        }
+
+        return { success, failed };
+    },
+
+    /**
+     * Marca múltiplas ocorrências como Resolvidas (Concluídas).
+     */
+    bulkResolve: async (contributions: Contribution[], adminUid?: string): Promise<{ success: number; failed: number }> => {
+        let success = 0;
+        let failed = 0;
+
+        for (const contrib of contributions) {
+            try {
+                await updateDoc(doc(db, 'contributions', contrib.id), {
+                    status: 'Resolvido',
+                    resolvedAt: serverTimestamp(),
+                    updatedAt: serverTimestamp()
+                });
+
+                if (contrib.userId && contrib.userId !== 'anonimo') {
+                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                        title: 'Demanda Solucionada! ✅',
+                        message: `A ocorrência "${contrib.title}" foi atendida e marcada como resolvida pela gestão pública!`,
+                        type: 'info',
+                        link: '/history',
+                        read: false,
+                        createdAt: serverTimestamp()
+                    });
+                }
+
+                if (adminUid) {
+                    loggingService.logAudit('BULK_RESOLVE', adminUid, contrib.id, {});
+                }
+
+                success++;
+            } catch (err) {
+                console.error(`Erro ao resolver em massa item ${contrib.id}:`, err);
+                failed++;
+            }
+        }
+
+        return { success, failed };
+    },
+
+    /**
+     * Despacha mensagens e notificações em massa para os autores das contribuições selecionadas.
+     */
+    bulkNotify: async (
+        recipients: { userId: string; userEmail?: string; contributionTitle?: string }[],
+        title: string,
+        message: string,
+        sendEmail: boolean = false
+    ): Promise<{ notifiedCount: number }> => {
+        const uniqueUserIds = Array.from(new Set(recipients.map(r => r.userId).filter(id => Boolean(id) && id !== 'anonimo')));
+        let count = 0;
+
+        for (const uid of uniqueUserIds) {
+            try {
+                await addDoc(collection(db, 'users', uid, 'notifications'), {
+                    title,
+                    message,
+                    type: 'info',
+                    read: false,
+                    createdAt: serverTimestamp()
+                });
+
+                if (sendEmail) {
+                    const recipient = recipients.find(r => r.userId === uid);
+                    if (recipient?.userEmail) {
+                        await notificationService.sendEmail({
+                            to: [recipient.userEmail],
+                            subject: `${title} - Guardião Nacional`,
+                            html: `
+                                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                                    <h2 style="color: #2563EB;">${title} 📢</h2>
+                                    <p style="white-space: pre-wrap; font-size: 14px; line-height: 1.6;">${message}</p>
+                                    <p style="margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px; font-size: 12px; color: #666;">
+                                        Equipe de Gestão e Moderação · Guardião Nacional
+                                    </p>
+                                </div>
+                            `
+                        });
+                    }
+                }
+
+                count++;
+            } catch (err) {
+                console.error(`Erro ao notificar usuário ${uid}:`, err);
+            }
+        }
+
+        return { notifiedCount: count };
     }
 };
 

@@ -25,7 +25,10 @@ export type ModerationAction =
     | 'approve_contrib'
     | 'reject_contrib'
     | 'reject_approved'
-    | 'approve_remove_content';
+    | 'approve_remove_content'
+    | 'accept_override'
+    | 'resolve_contrib';
+
 
 interface ConfirmActionDialogProps {
     open: boolean;
@@ -123,6 +126,28 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
             };
         }
 
+        if (action === 'accept_override') {
+            return {
+                title: 'Aceitar Publicação Recusada pela IA',
+                description: 'Esta publicação foi recusada pela moderação automática da IA. Ao aceitá-la, ela se tornará pública imediatamente no aplicativo, os pontos cívicos serão creditados ao cidadão e o autor receberá uma notificação de aprovação.',
+                showRating: false,
+                showReason: false,
+                confirmText: 'Aceitar e Publicar',
+                confirmVariant: 'default' as const
+            };
+        }
+
+        if (action === 'resolve_contrib') {
+            return {
+                title: 'Marcar como Resolvido',
+                description: 'Esta demanda será marcada com o status "Resolvido". O cidadão autor será notificado de que a ocorrência foi solucionada pelos órgãos responsáveis.',
+                showRating: false,
+                showReason: false,
+                confirmText: 'Confirmar Solução',
+                confirmVariant: 'default' as const
+            };
+        }
+
         return {
             title: 'Confirmar Ação',
             description: 'Confirmar esta ação?',
@@ -131,6 +156,7 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
             confirmText: 'Confirmar',
             confirmVariant: 'default' as const
         };
+
     };
 
     const content = getDialogContent();

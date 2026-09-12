@@ -49,7 +49,10 @@ type ModerationAction =
     | 'approve_contrib'
     | 'reject_contrib'
     | 'reject_approved'
-    | 'approve_remove_content';
+    | 'approve_remove_content'
+    | 'accept_override'
+    | 'resolve_contrib';
+
 
 interface ModerationDialogState {
     // Confirm Dialog

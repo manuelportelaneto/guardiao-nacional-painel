@@ -32,8 +32,18 @@ import {
     FlaskConical,
     CheckCircle2,
     XCircle,
-    Eye
+    Eye,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+    Sparkles,
+    CheckSquare
 } from 'lucide-react';
+import { BulkActionsBar } from './moderation/BulkActionsBar';
+import { BulkNotifyModal } from './moderation/BulkNotifyModal';
+import { WeeklyDigestModal } from './moderation/WeeklyDigestModal';
+
 import { sysadminAlertService, type SysAdminAlert } from '../../services/sysadminAlertService';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Label } from '../ui/label';
@@ -124,6 +134,15 @@ const AdminModeration: React.FC = () => {
     const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null);
 
     const [actionLoading, setActionLoading] = useState(false);
+
+    // Bulk Management & Pagination State
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [pageSize, setPageSize] = useState<number>(12);
+    const [isWeeklyDigestOpen, setIsWeeklyDigestOpen] = useState<boolean>(false);
+    const [isBulkNotifyOpen, setIsBulkNotifyOpen] = useState<boolean>(false);
+    const [bulkLoading, setBulkLoading] = useState<boolean>(false);
+
     // Store State
     const {
         confirmDialog,
@@ -153,6 +172,13 @@ const AdminModeration: React.FC = () => {
             setActiveTab(tab);
         }
     }, [searchParams]);
+
+    // Reseta página e desmarca seleção quando troca de aba ou filtro de busca
+    useEffect(() => {
+        setSelectedIds(new Set());
+        setCurrentPage(1);
+    }, [activeTab, searchTerm, categoryFilter, locationFilter]);
+
 
     const [collapsedFilters, setCollapsedFilters] = useState(true);
     const [settings, setSettings] = useState<SystemSettings>(DEFAULT_SETTINGS);
@@ -599,13 +625,182 @@ const AdminModeration: React.FC = () => {
     };
 
     // Unified Confirm Handler
-    const handleConfirmAction = () => {
+    const handleConfirmAction = async () => {
+        if (confirmDialog.action === 'accept_override') {
+            if (!confirmDialog.contribution) return;
+            setActionLoading(true);
+            try {
+                await moderationService.acceptRejectedContribution(confirmDialog.contribution, currentUser?.uid || 'admin');
+                toast.success("Publicação aceita e tornada pública! O autor recebeu pontuação e notificação.");
+                closeConfirmDialog();
+            } catch (err) {
+                console.error(err);
+                toast.error("Erro ao aceitar publicação recusada.");
+            } finally {
+                setActionLoading(false);
+            }
+            return;
+        }
+
+        if (confirmDialog.action === 'resolve_contrib') {
+            if (!confirmDialog.contribution) return;
+            setActionLoading(true);
+            try {
+                await updateDoc(doc(db, 'contributions', confirmDialog.contribution.id), {
+                    status: 'Resolvido',
+                    resolvedAt: Timestamp.now(),
+                    resolvedByAdminId: currentUser?.uid || 'admin'
+                });
+                if (confirmDialog.contribution.userId) {
+                    await addDoc(collection(db, 'users', confirmDialog.contribution.userId, 'notifications'), {
+                        title: 'Demanda Resolvida! 🎉',
+                        message: `Sua ocorrência "${confirmDialog.contribution.title}" foi marcada como resolvida pelas autoridades competentes.`,
+                        type: 'success',
+                        link: '/history',
+                        read: false,
+                        createdAt: Timestamp.now()
+                    });
+                }
+                toast.success("Publicação marcada como resolvida!");
+                closeConfirmDialog();
+            } catch (err) {
+                console.error(err);
+                toast.error("Erro ao marcar como resolvida.");
+            } finally {
+                setActionLoading(false);
+            }
+            return;
+        }
+
         if (confirmDialog.action?.includes('contrib') || confirmDialog.action?.includes('approved')) {
             handleQueueAction();
         } else if (confirmDialog.report) {
             handleReportAction(confirmDialog.action as any);
         }
     };
+
+    // ─── GERENCIAMENTO EM LOTE (BULK ACTIONS) ──────────────────────────
+    const handleToggleSelect = (item: Contribution, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(item.id)) {
+                next.delete(item.id);
+            } else {
+                next.add(item.id);
+            }
+            return next;
+        });
+    };
+
+    const handleSelectAll = (itemsToSelect: Contribution[]) => {
+        if (itemsToSelect.length > 0 && itemsToSelect.every(i => selectedIds.has(i.id))) {
+            setSelectedIds(prev => {
+                const next = new Set(prev);
+                itemsToSelect.forEach(i => next.delete(i.id));
+                return next;
+            });
+        } else {
+            setSelectedIds(prev => {
+                const next = new Set(prev);
+                itemsToSelect.forEach(i => next.add(i.id));
+                return next;
+            });
+        }
+    };
+
+    const handleClearSelection = () => {
+        setSelectedIds(new Set());
+    };
+
+    const getSelectedContributions = () => {
+        const allItems = [...moderationQueue, ...approvedList, ...rejectedList, ...trashList];
+        const uniqueMap = new Map<string, Contribution>();
+        allItems.forEach(item => uniqueMap.set(item.id, item));
+        return Array.from(selectedIds)
+            .map(id => uniqueMap.get(id))
+            .filter((item): item is Contribution => item !== undefined);
+    };
+
+    const handleBulkApprove = async () => {
+        const items = getSelectedContributions();
+        if (items.length === 0) return;
+        setBulkLoading(true);
+        try {
+            const res = await moderationService.bulkApprove(items, 5, currentUser?.uid || 'admin');
+            toast.success(`${res.success} publicação(ões) aprovada(s) com sucesso!`);
+            setSelectedIds(new Set());
+        } catch (err) {
+            console.error(err);
+            toast.error('Erro ao aprovar em lote.');
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
+    const handleBulkResolve = async () => {
+        const items = getSelectedContributions();
+        if (items.length === 0) return;
+        setBulkLoading(true);
+        try {
+            const res = await moderationService.bulkResolve(items, currentUser?.uid || 'admin');
+            toast.success(`${res.success} publicação(ões) marcada(s) como resolvida(s)!`);
+            setSelectedIds(new Set());
+        } catch (err) {
+            console.error(err);
+            toast.error('Erro ao resolver em lote.');
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
+    const handleBulkReject = async () => {
+        const items = getSelectedContributions();
+        if (items.length === 0) return;
+        const reason = window.prompt('Informe o motivo da rejeição em massa:', 'Conteúdo não compatível com as diretrizes da comunidade.');
+        if (!reason) return;
+        setBulkLoading(true);
+        try {
+            const res = await moderationService.bulkReject(items, reason, currentUser?.uid || 'admin');
+            toast.success(`${res.success} publicação(ões) rejeitada(s) com sucesso!`);
+            setSelectedIds(new Set());
+        } catch (err) {
+            console.error(err);
+            toast.error('Erro ao rejeitar em lote.');
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
+    const handleBulkNotifySubmit = async (title: string, message: string, sendEmail: boolean) => {
+        const items = getSelectedContributions();
+        if (items.length === 0) return;
+        const recipientMap = new Map<string, { userId: string; authorName?: string; email?: string }>();
+        items.forEach(c => {
+            if (c.userId && !recipientMap.has(c.userId)) {
+                recipientMap.set(c.userId, {
+                    userId: c.userId,
+                    authorName: c.authorName,
+                    email: (c as any).email || (c as any).userEmail
+                });
+            }
+        });
+        const recipients = Array.from(recipientMap.values());
+        setBulkLoading(true);
+        try {
+            const res = await moderationService.bulkNotify(recipients, title, message, sendEmail);
+            toast.success(`Mensagem/notificação enviada com sucesso para ${res.notifiedCount} cidadão(s)!`);
+            setIsBulkNotifyOpen(false);
+            setSelectedIds(new Set());
+        } catch (err) {
+            console.error(err);
+            toast.error('Erro ao enviar mensagens em lote.');
+        } finally {
+            setBulkLoading(false);
+        }
+    };
+
+
 
     const handleReplyAction = async () => {
         if (!replyDialog.contribution) return;
@@ -680,9 +875,22 @@ const AdminModeration: React.FC = () => {
                     <Button variant="ghost" size="icon" onClick={() => navigate('/admin')}><ArrowLeft className="h-5 w-5" /></Button>
                     <div><h1 className="text-2xl font-bold">Moderação</h1><p className="text-sm text-gray-500">Gestão de Conteúdo e Triagem</p></div>
                 </div>
-                <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => window.location.reload()}><RefreshCw className="h-4 w-4" /></Button>
+                <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsWeeklyDigestOpen(true)}
+                        className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 text-purple-900 hover:bg-purple-100 font-semibold flex items-center gap-1.5 shadow-2xs h-9 px-3 touch-manipulation"
+                    >
+                        <Sparkles className="h-4 w-4 text-purple-600" />
+                        <span className="hidden sm:inline">Noticiário Semanal IA</span>
+                        <span className="sm:hidden">Noticiário IA</span>
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => window.location.reload()} title="Recarregar dados">
+                        <RefreshCw className="h-4 w-4" />
+                    </Button>
                 </div>
+
             </div>
 
             {/* ─── Banner de Escopo Federativo Ativo ────────────────────────── */}
@@ -774,26 +982,134 @@ const AdminModeration: React.FC = () => {
                     </TabsList>
                 </div>
 
-                {/* TABS CONTENT MAPPING */}
-                {['queue', 'approved', 'rejected', 'trash'].map(tab => (
-                    <TabsContent key={tab} value={tab} className="mt-6">
-                        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                            {filterList(tab === 'queue' ? moderationQueue : tab === 'approved' ? approvedList : tab === 'rejected' ? rejectedList : trashList).map((item) => (
-                                <ModerationCard
-                                    key={item.id}
-                                    item={item}
-                                    tab={tab}
-                                    onClick={(i) => setSelectedContribution(i)}
-                                    onAction={(action, i) => openConfirmDialog(action as any, i, undefined)}
-                                    onReply={(i) => openReplyDialog(i)}
-                                />
-                            ))}
-                            {filterList(tab === 'queue' ? moderationQueue : tab === 'approved' ? approvedList : tab === 'rejected' ? rejectedList : trashList).length === 0 && (
-                                <div className="col-span-3 text-center py-12 text-gray-500 border border-dashed rounded">Lista vazia.</div>
+                {/* TABS CONTENT MAPPING COM PAGINAÇÃO E SELEÇÃO */}
+                {['queue', 'approved', 'rejected', 'trash'].map(tab => {
+                    const fullList = filterList(tab === 'queue' ? moderationQueue : tab === 'approved' ? approvedList : tab === 'rejected' ? rejectedList : trashList);
+                    const totalItems = fullList.length;
+                    const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+                    const safePage = Math.min(currentPage, totalPages);
+                    const displayedItems = fullList.slice((safePage - 1) * pageSize, safePage * pageSize);
+                    const allPageSelected = displayedItems.length > 0 && displayedItems.every(i => selectedIds.has(i.id));
+
+                    return (
+                        <TabsContent key={tab} value={tab} className="mt-6 space-y-4">
+                            {/* Toolbar de Seleção e Controles de Exibição */}
+                            {totalItems > 0 && (
+                                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-white rounded-xl border border-gray-200 shadow-2xs">
+                                    <div className="flex items-center gap-3">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => handleSelectAll(displayedItems)}
+                                            className="h-8 text-xs font-medium gap-1.5 touch-manipulation"
+                                        >
+                                            <CheckSquare className="w-3.5 h-3.5" />
+                                            {allPageSelected ? 'Desmarcar Página' : 'Selecionar Todos da Página'}
+                                        </Button>
+                                        {selectedIds.size > 0 && (
+                                            <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">
+                                                {selectedIds.size} selecionado(s)
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">Exibir:</span>
+                                        <select
+                                            value={pageSize}
+                                            onChange={(e) => {
+                                                setPageSize(Number(e.target.value));
+                                                setCurrentPage(1);
+                                            }}
+                                            className="text-xs bg-gray-50 border border-gray-300 rounded-md px-2 py-1 focus:ring-1 focus:ring-blue-500 font-medium"
+                                        >
+                                            <option value={12}>12 por página</option>
+                                            <option value={24}>24 por página</option>
+                                            <option value={48}>48 por página</option>
+                                        </select>
+                                    </div>
+                                </div>
                             )}
-                        </div>
-                    </TabsContent>
-                ))}
+
+                            {/* Grid de Cards */}
+                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                {displayedItems.map((item) => (
+                                    <ModerationCard
+                                        key={item.id}
+                                        item={item}
+                                        tab={tab}
+                                        isSelected={selectedIds.has(item.id)}
+                                        onToggleSelect={handleToggleSelect}
+                                        onClick={(i) => setSelectedContribution(i)}
+                                        onAction={(action, i) => openConfirmDialog(action as any, i, undefined)}
+                                        onReply={(i) => openReplyDialog(i)}
+                                    />
+                                ))}
+                                {totalItems === 0 && (
+                                    <div className="col-span-3 text-center py-12 text-gray-500 border border-dashed rounded">
+                                        Lista vazia.
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Paginação Responsiva Web & Mobile */}
+                            {totalPages > 1 && (
+                                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-gray-200">
+                                    <div className="text-xs text-gray-500 order-2 sm:order-1 text-center sm:text-left">
+                                        Mostrando <span className="font-semibold text-gray-700">{Math.min((safePage - 1) * pageSize + 1, totalItems)}</span> a{' '}
+                                        <span className="font-semibold text-gray-700">{Math.min(safePage * pageSize, totalItems)}</span> de{' '}
+                                        <span className="font-semibold text-gray-700">{totalItems}</span> publicações
+                                    </div>
+                                    <div className="flex items-center gap-1 order-1 sm:order-2">
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 px-2.5 text-xs touch-manipulation"
+                                            disabled={safePage === 1}
+                                            onClick={() => setCurrentPage(1)}
+                                            title="Primeira página"
+                                        >
+                                            <ChevronsLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 px-3 text-xs gap-1 touch-manipulation"
+                                            disabled={safePage === 1}
+                                            onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                            <span className="hidden sm:inline">Anterior</span>
+                                        </Button>
+                                        <div className="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 rounded-md shadow-2xs">
+                                            {safePage} / {totalPages}
+                                        </div>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 px-3 text-xs gap-1 touch-manipulation"
+                                            disabled={safePage >= totalPages}
+                                            onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                                        >
+                                            <span className="hidden sm:inline">Próxima</span>
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            className="h-9 px-2.5 text-xs touch-manipulation"
+                                            disabled={safePage >= totalPages}
+                                            onClick={() => setCurrentPage(totalPages)}
+                                            title="Última página"
+                                        >
+                                            <ChevronsRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </TabsContent>
+                    );
+                })}
+
 
                 <TabsContent value="reports" className="mt-6">
                     <div className="grid gap-4 md:grid-cols-3">
@@ -1129,7 +1445,33 @@ const AdminModeration: React.FC = () => {
                 setRejectionReason={setRejectionReason}
             />
 
-        </div >
+            {/* Barra Flutuante Inferior para Ações em Lote */}
+            <BulkActionsBar
+                selectedCount={selectedIds.size}
+                onApprove={handleBulkApprove}
+                onResolve={handleBulkResolve}
+                onReject={handleBulkReject}
+                onNotify={() => setIsBulkNotifyOpen(true)}
+                onClear={handleClearSelection}
+                isLoading={bulkLoading}
+            />
+
+            {/* Modal de Notificações / Mensagens em Massa */}
+            <BulkNotifyModal
+                isOpen={isBulkNotifyOpen}
+                onClose={() => setIsBulkNotifyOpen(false)}
+                onSend={handleBulkNotifySubmit}
+                selectedContributions={getSelectedContributions()}
+                isLoading={bulkLoading}
+            />
+
+            {/* Modal do Noticiário Semanal Gerado por IA */}
+            <WeeklyDigestModal
+                isOpen={isWeeklyDigestOpen}
+                onClose={() => setIsWeeklyDigestOpen(false)}
+            />
+        </div>
+
     );
 };
 
