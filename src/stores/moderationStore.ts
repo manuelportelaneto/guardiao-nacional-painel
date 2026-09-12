@@ -74,6 +74,7 @@ interface ModerationDialogState {
     approvalRating: number;
     replyText: string;
     useDefaultReply: boolean;
+    penalizeUser: boolean;
 
     // Actions
     setConfirmDialog: (dialog: Partial<ModerationDialogState['confirmDialog']>) => void;
@@ -88,6 +89,7 @@ interface ModerationDialogState {
     setApprovalRating: (rating: number) => void;
     setReplyText: (text: string) => void;
     setUseDefaultReply: (use: boolean) => void;
+    setPenalizeUser: (penalize: boolean) => void;
 
     resetDialogState: () => void;
 }
@@ -107,6 +109,7 @@ const initialState = {
     approvalRating: 5,
     replyText: '',
     useDefaultReply: false,
+    penalizeUser: false,
 };
 
 export const useModerationStore = create<ModerationDialogState>((set) => ({
@@ -124,7 +127,8 @@ export const useModerationStore = create<ModerationDialogState>((set) => ({
                 action,
                 contribution: contribution || null,
                 report: report || null
-            }
+            },
+            penalizeUser: false
         }),
 
     closeConfirmDialog: () =>
@@ -137,6 +141,7 @@ export const useModerationStore = create<ModerationDialogState>((set) => ({
             },
             rejectionReason: '',
             approvalRating: 5,
+            penalizeUser: false
         }),
 
     setReplyDialog: (dialog) =>
@@ -160,6 +165,7 @@ export const useModerationStore = create<ModerationDialogState>((set) => ({
     setApprovalRating: (approvalRating) => set({ approvalRating }),
     setReplyText: (replyText) => set({ replyText }),
     setUseDefaultReply: (useDefaultReply) => set({ useDefaultReply }),
+    setPenalizeUser: (penalizeUser) => set({ penalizeUser }),
 
     resetDialogState: () => set(initialState),
 }));

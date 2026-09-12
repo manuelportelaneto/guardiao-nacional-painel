@@ -52,11 +52,11 @@ describe('moderationUtils', () => {
 
     describe('getReasonLabel', () => {
         it('should return label for known reasons', () => {
-            expect(getReasonLabel('spam')).toBe('Spam');
-            expect(getReasonLabel('inappropriate')).toBe('Conteúdo Impróprio');
-            expect(getReasonLabel('false_info')).toBe('Informação Falsa');
+            expect(getReasonLabel('spam')).toBe('Spam / Divulgação Repetitiva');
+            expect(getReasonLabel('inappropriate')).toBe('Conteúdo Impróprio ou Não Condizente com a Finalidade Cívica');
+            expect(getReasonLabel('false_info')).toBe('Informação Incorreta, Trote ou Dados Divergentes');
             expect(getReasonLabel('harassment')).toBe('Assédio');
-            expect(getReasonLabel('other')).toBe('Outro');
+            expect(getReasonLabel('other')).toBe('Revisão Administrativa / Ajuste Necessário');
         });
 
         it('should return original value for unknown reasons', () => {

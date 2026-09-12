@@ -67,11 +67,13 @@ import { ModerationCard } from './moderation/ModerationCard';
 import { ModerationFilters } from './moderation/ModerationFilters';
 import { ModerationDetails } from './moderation/ModerationDetails';
 import { ReplyDialog, ConfirmActionDialog } from './moderation';
+import { getReasonLabel } from './moderation/moderationUtils';
 import type { Contribution } from '../../types/contribution';
 import { notificationService } from '../../services/notificationService';
 import { loggingService } from '../../services/loggingService';
 import { automationService } from '../../services/automationService';
 import { aiLearningService } from '../../services/aiLearningService';
+import { userRiskTrackingService } from '../../services/userRiskTrackingService';
 import { Switch } from '../ui/switch';
 
 interface SystemSettings {
@@ -158,7 +160,9 @@ const AdminModeration: React.FC = () => {
         replyText,
         setReplyText,
         useDefaultReply,
-        setUseDefaultReply
+        setUseDefaultReply,
+        penalizeUser,
+        setPenalizeUser
     } = useModerationStore();
 
     const { scope, isNational, resetToNational, dataMasking } = useScope();
@@ -251,21 +255,6 @@ const AdminModeration: React.FC = () => {
         return 'Data inválida';
     };
 
-    const getReasonLabel = (reason: string) => {
-        const reasons: Record<string, string> = {
-            'lgpd_pii': 'Violação de Privacidade / LGPD (Rosto, Placa de Veículo ou Dado Pessoal Identificável)',
-            'commercial': 'Finalidade Comercial / Propaganda Não Permitida',
-            'defamation': 'Difamação / Ataque Pessoal Sem Fundamentação',
-            'unclear_location': 'Localização Geográfica Incorreta ou Divergente',
-            'quality': 'Foto Ilegível ou Descrição Vaga / Insuficiente',
-            'duplicate': 'Ocorrência Duplicada',
-            'false_info': 'Informação Incorreta ou Trote',
-            'spam': 'Spam / Divulgação Repetitiva',
-            'inappropriate': 'Conteúdo Impróprio ou Ofensivo',
-            'other': 'Revisão Administrativa'
-        };
-        return reasons[reason] || reason;
-    };
 
     // 1. Fetch Settings & Reports
     useEffect(() => {
@@ -554,39 +543,88 @@ const AdminModeration: React.FC = () => {
                 );
 
             } else if (action === 'reject_contrib' || action === 'reject_approved') {
-                const reason = rejectionReason || 'Sem motivo especificado';
+                const reason = rejectionReason || 'false_info';
+                const formattedReason = getReasonLabel(reason);
+
+                // Preserva localização original e remove o pino definitivamente do mapa (app móvel)
+                const originalLocation = (contrib as any).originalLocation || contrib.location || ((contrib as any).latitude && (contrib as any).longitude ? {
+                    latitude: (contrib as any).latitude,
+                    longitude: (contrib as any).longitude,
+                    lat: (contrib as any).latitude,
+                    lng: (contrib as any).longitude
+                } : null);
+
                 await updateDoc(doc(db, 'contributions', contrib.id), {
                     status: 'Rejeitado',
-                    rejectionReason: reason,
-                    rejectedAt: Timestamp.now()
+                    rejectionReason: formattedReason,
+                    rejectionCode: reason,
+                    rejectedAt: Timestamp.now(),
+                    rejectedBy: currentUser?.uid || 'admin',
+                    // REMOVE DEFINITIVAMENTE O PINO DO MAPA:
+                    location: null,
+                    latitude: null,
+                    longitude: null,
+                    isMapVisible: false,
+                    removedFromMap: true,
+                    originalLocation: originalLocation
                 });
 
-                // Trigger Automation
-                await automationService.runAutomation('status_updated', { ...contrib, status: 'Rejeitado', rejectionReason: reason });
+                // Se solicitada penalização de infração grave / strike
+                if (penalizeUser && contrib.userId && contrib.userId !== 'anonimo') {
+                    try {
+                        await userRiskTrackingService.recordRiskStrike({
+                            userId: contrib.userId,
+                            contributionId: contrib.id,
+                            contributionTitle: contrib.title || 'Sem título',
+                            riskScore: 5,
+                            reasons: [formattedReason, 'Penalização por infração grave aplicada pelo moderador']
+                        });
+                        toast.info("Infração de risco registrada no histórico do usuário.");
+                    } catch (strikeErr) {
+                        console.warn("Falha ao registrar strike de risco:", strikeErr);
+                    }
+                }
 
-                // Alimenta o motor de Machine Learning com a decisão humana rejeitada
-                aiLearningService.recordDecisionPattern(
-                    contrib.category || 'geral',
-                    `${contrib.title} ${contrib.description || ''}`,
-                    contrib.riskLevel || 4,
-                    'REJECTED',
-                    'HUMAN_MODERATOR'
-                );
-
-
-                // Notify User (Alert) - Rejected
-                if (contrib.userId) {
-                    const formattedReason = getReasonLabel(reason);
-                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
-                        title: 'Contribuição Recusada / Devolvida',
-                        message: `Sua contribuição "${contrib.title}" não pôde ser publicada. Motivo: ${formattedReason}`,
-                        type: 'error',
-                        link: '/history', // Link to history (Filtered by Rejected ideally, but history root is fine)
-                        read: false,
-                        createdAt: Timestamp.now()
+                // Automação protegida
+                try {
+                    await automationService.runAutomation('status_updated', {
+                        ...contrib,
+                        status: 'Rejeitado',
+                        rejectionReason: formattedReason
                     });
+                } catch (autoErr) {
+                    console.warn("Aviso na automação de rejeição:", autoErr);
+                }
 
-                    // Send Email Notification (if campaign enabled)
+                // Alimenta o motor de Machine Learning
+                try {
+                    aiLearningService.recordDecisionPattern(
+                        contrib.category || 'geral',
+                        `${contrib.title} ${contrib.description || ''}`,
+                        contrib.riskLevel || 4,
+                        'REJECTED',
+                        'HUMAN_MODERATOR'
+                    );
+                } catch (aiErr) {
+                    console.warn("Aviso no aprendizado IA:", aiErr);
+                }
+
+                // Notificação ao Usuário (protegida para evitar que regras de subcoleção gerem toast de erro)
+                if (contrib.userId && contrib.userId !== 'anonimo') {
+                    try {
+                        await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                            title: 'Contribuição Devolvida / Revisão',
+                            message: `Sua contribuição "${contrib.title}" precisa de ajustes: ${formattedReason}. Você pode reenviá-la corrigindo as informações.`,
+                            type: 'warning',
+                            link: '/history',
+                            read: false,
+                            createdAt: Timestamp.now()
+                        });
+                    } catch (notifErr) {
+                        console.warn('Aviso: Não foi possível gravar notificação na subcoleção do usuário:', notifErr);
+                    }
+
+                    // Envio de E-mail Notificação
                     try {
                         const settingsDoc = await getDoc(doc(db, 'settings', 'global'));
                         const settings = settingsDoc.data() || {};
@@ -604,13 +642,15 @@ const AdminModeration: React.FC = () => {
                             }
                         }
                     } catch (emailErr) {
-                        console.error('Failed to send rejection email:', emailErr);
-                        // Don't fail the rejection if email fails
+                        console.warn('Falha no envio de e-mail de rejeição:', emailErr);
                     }
                 }
 
-                toast.success("Rejeitado com motivo.");
-                if (currentUser) loggingService.logAudit('CONTRIBUTION_REJECT', currentUser.uid, contrib.id, { reason });
+                toast.success("Contribuição rejeitada e pino removido do mapa.");
+                if (currentUser) loggingService.logAudit('CONTRIBUTION_REJECT', currentUser.uid, contrib.id, {
+                    reason: formattedReason,
+                    penalized: penalizeUser
+                });
             }
 
             closeConfirmDialog();
@@ -1443,6 +1483,8 @@ const AdminModeration: React.FC = () => {
                 setApprovalRating={setApprovalRating}
                 rejectionReason={rejectionReason}
                 setRejectionReason={setRejectionReason}
+                penalizeUser={penalizeUser}
+                setPenalizeUser={setPenalizeUser}
             />
 
             {/* Barra Flutuante Inferior para Ações em Lote */}

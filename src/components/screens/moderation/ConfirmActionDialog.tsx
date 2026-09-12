@@ -42,11 +42,14 @@ interface ConfirmActionDialogProps {
     // For rejection
     rejectionReason?: string;
     setRejectionReason?: (reason: string) => void;
+    // For user penalty / strike
+    penalizeUser?: boolean;
+    setPenalizeUser?: (penalize: boolean) => void;
 }
 
 /**
  * ConfirmActionDialog - Confirmation dialog for moderation actions
- * Supports approval with rating and rejection with reason
+ * Supports approval with rating and rejection with reason and risk penalty
  */
 export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
     open,
@@ -57,7 +60,9 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
     approvalRating = 5,
     setApprovalRating,
     rejectionReason = '',
-    setRejectionReason
+    setRejectionReason,
+    penalizeUser = false,
+    setPenalizeUser
 }) => {
     const getDialogContent = () => {
         if (action === 'approve_contrib') {
@@ -207,18 +212,28 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
                                     <SelectValue placeholder="Selecione o motivo oficial" />
                                 </SelectTrigger>
                                 <SelectContent className="z-[9999]">
+                                    <SelectItem value="false_info">❌ Informação Incorreta, Trote ou Dados Divergentes</SelectItem>
                                     <SelectItem value="lgpd_pii">🛡️ Violação LGPD (Rosto, Placa, Telefone ou CPF na foto/texto)</SelectItem>
-                                    <SelectItem value="commercial">🏪 Comércio / Venda / Divulgação Comercial Não Permitida</SelectItem>
-                                    <SelectItem value="defamation">⚖️ Ataque Pessoal / Difamação ou Acusação Sem Provas</SelectItem>
+                                    <SelectItem value="defamation">⚖️ Ataque Pessoal, Difamação ou Ofensa</SelectItem>
+                                    <SelectItem value="commercial">🏪 Divulgação Comercial / Propaganda Não Permitida</SelectItem>
                                     <SelectItem value="unclear_location">📍 Localização ou Endereço Incorreto / Divergente</SelectItem>
                                     <SelectItem value="quality">📷 Foto Ilegível / Texto Vago ou Insuficiente</SelectItem>
                                     <SelectItem value="duplicate">📑 Ocorrência Duplicada / Já Cadastrada</SelectItem>
-                                    <SelectItem value="false_info">❌ Informação Incorreta ou Trote</SelectItem>
-                                    <SelectItem value="other">📝 Outro Motivo Específico</SelectItem>
+                                    <SelectItem value="inappropriate">🚫 Conteúdo Impróprio ou Não Condizente</SelectItem>
+                                    <SelectItem value="other">📝 Revisão Administrativa / Outro Motivo</SelectItem>
                                 </SelectContent>
                             </Select>
 
-                            {/* Orientação Didática Explicativa */}
+                            {/* Orientações Didáticas Explicativas */}
+                            {rejectionReason === 'false_info' && (
+                                <div className="p-3 bg-red-50 rounded-lg border border-red-200 text-xs text-red-900 space-y-1">
+                                    <span className="font-bold flex items-center gap-1">❌ Mensagem de Esclarecimento ao Cidadão:</span>
+                                    <p className="text-[11px] leading-relaxed text-red-800">
+                                        "As informações enviadas não puderam ser confirmadas ou divergem do local indicado. Por favor, verifique os dados e a veracidade da ocorrência antes de reenviar."
+                                    </p>
+                                </div>
+                            )}
+
                             {rejectionReason === 'lgpd_pii' && (
                                 <div className="p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-900 space-y-1">
                                     <span className="font-bold flex items-center gap-1">🛡️ Mensagem Didática LGPD ao Cidadão:</span>
@@ -245,6 +260,26 @@ export const ConfirmActionDialog: React.FC<ConfirmActionDialogProps> = ({
                                     </p>
                                 </div>
                             )}
+
+                            {/* Opção de Penalização de Risco por Infração Grave */}
+                            <div className="pt-2 border-t border-slate-200">
+                                <label className="flex items-start gap-2.5 p-2.5 bg-slate-50 hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer transition-colors">
+                                    <input
+                                        type="checkbox"
+                                        checked={penalizeUser}
+                                        onChange={(e) => setPenalizeUser?.(e.target.checked)}
+                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-red-600 focus:ring-red-500 cursor-pointer"
+                                    />
+                                    <div className="flex-1 text-xs">
+                                        <div className="font-semibold text-slate-800 flex items-center gap-1">
+                                            ⚠️ Penalizar Usuário com Infração de Risco (Strike Oculto)
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                            Incrementa o índice de risco do usuário silenciosamente no sistema para auditoria e controle de abusos (trotes, ódio, ataques).
+                                        </p>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     )}
                 </div>

@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Button } from '../../ui/button';
 import { Label } from '../../ui/label';
 import type { Contribution } from '../../../types/contribution';
+import { getReasonLabel } from './moderationUtils';
 
 interface ModerationDetailsProps {
     contribution: Contribution | null;
@@ -247,8 +248,8 @@ export const ModerationDetails: React.FC<ModerationDetailsProps> = ({ contributi
                                         </div>
                                     )}
 
-                                    {contribution.rejectionReason && <p className="text-red-400 pt-2 border-t border-slate-700">Motivo Rejeição: {contribution.rejectionReason}</p>}
-                                    {contribution.deletionReason && <p className="text-red-400">Motivo Exclusão: {contribution.deletionReason}</p>}
+                                     {contribution.rejectionReason && <p className="text-red-400 pt-2 border-t border-slate-700 font-medium">Motivo da Rejeição: <span className="text-white font-normal">{getReasonLabel(contribution.rejectionReason)}</span></p>}
+                                     {contribution.deletionReason && <p className="text-red-400 font-medium">Motivo da Exclusão: <span className="text-white font-normal">{getReasonLabel(contribution.deletionReason)}</span></p>}
                                     <p className="text-[10px] text-gray-500 mt-4">Pego via IP: {contribution.ipAddress || 'Unknown'}</p>
                                 </div>
                             </div>

@@ -143,35 +143,53 @@ export const moderationService = {
     acceptRejectedContribution: async (contribution: Contribution, adminUid?: string): Promise<boolean> => {
         try {
             const contribRef = doc(db, 'contributions', contribution.id);
-            await updateDoc(contribRef, {
+            const originalLoc = (contribution as any).originalLocation;
+
+            const updatePayload: Record<string, any> = {
                 status: 'Aprovado',
                 approvedAt: serverTimestamp(),
                 rejectionReason: null,
+                rejectionCode: null,
                 aiDecision: 'approved_override',
                 manuallyApprovedAfterRejection: true,
+                isMapVisible: true,
+                removedFromMap: false,
                 updatedAt: serverTimestamp()
-            });
+            };
+
+            // Restaura o pino do mapa caso tenha sido removido ao rejeitar
+            if (originalLoc) {
+                updatePayload.location = originalLoc;
+                updatePayload.latitude = originalLoc.latitude || originalLoc.lat || null;
+                updatePayload.longitude = originalLoc.longitude || originalLoc.lng || null;
+            }
+
+            await updateDoc(contribRef, updatePayload);
 
             // Reverte o strike e credita XP do cidadão
             if (contribution.userId && contribution.userId !== 'anonimo') {
-                const userRef = doc(db, 'users', contribution.userId);
-                await setDoc(userRef, {
-                    xp: increment(10),
-                    interactions: {
-                        ratingsReceived: increment(1)
-                    },
-                    riskStrikes: increment(-1) // Anula strike indevido caso tenha
-                }, { merge: true });
+                try {
+                    const userRef = doc(db, 'users', contribution.userId);
+                    await setDoc(userRef, {
+                        xp: increment(10),
+                        interactions: {
+                            ratingsReceived: increment(1)
+                        },
+                        riskStrikes: increment(-1) // Anula strike indevido caso tenha
+                    }, { merge: true });
 
-                // Notifica o cidadão no App Móvel
-                await addDoc(collection(db, 'users', contribution.userId, 'notifications'), {
-                    title: 'Publicação Aprovada pela Equipe! 🎉',
-                    message: `Sua contribuição "${contribution.title}" foi revisada pela equipe de moderação e aprovada no mapa!`,
-                    type: 'success',
-                    link: '/history',
-                    read: false,
-                    createdAt: serverTimestamp()
-                });
+                    // Notifica o cidadão no App Móvel
+                    await addDoc(collection(db, 'users', contribution.userId, 'notifications'), {
+                        title: 'Publicação Aprovada pela Equipe! 🎉',
+                        message: `Sua contribuição "${contribution.title}" foi revisada pela equipe de moderação e aprovada no mapa!`,
+                        type: 'success',
+                        link: '/history',
+                        read: false,
+                        createdAt: serverTimestamp()
+                    });
+                } catch (userErr) {
+                    console.warn('Aviso: Não foi possível atualizar perfil ou criar notificação:', userErr);
+                }
             }
 
             // Resolve alertas pendentes no SysAdmin para esta contribuição
@@ -203,28 +221,45 @@ export const moderationService = {
 
         for (const contrib of contributions) {
             try {
-                await updateDoc(doc(db, 'contributions', contrib.id), {
+                const originalLoc = (contrib as any).originalLocation;
+                const updatePayload: Record<string, any> = {
                     status: 'Aprovado',
                     rating,
                     approvedAt: serverTimestamp(),
+                    isMapVisible: true,
+                    removedFromMap: false,
+                    rejectionReason: null,
+                    rejectionCode: null,
                     updatedAt: serverTimestamp()
-                });
+                };
+
+                if (originalLoc) {
+                    updatePayload.location = originalLoc;
+                    updatePayload.latitude = originalLoc.latitude || originalLoc.lat || null;
+                    updatePayload.longitude = originalLoc.longitude || originalLoc.lng || null;
+                }
+
+                await updateDoc(doc(db, 'contributions', contrib.id), updatePayload);
 
                 if (contrib.userId && contrib.userId !== 'anonimo') {
-                    const userRef = doc(db, 'users', contrib.userId);
-                    await setDoc(userRef, {
-                        interactions: { ratingsReceived: increment(1) },
-                        xp: increment(10)
-                    }, { merge: true });
+                    try {
+                        const userRef = doc(db, 'users', contrib.userId);
+                        await setDoc(userRef, {
+                            interactions: { ratingsReceived: increment(1) },
+                            xp: increment(10)
+                        }, { merge: true });
 
-                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
-                        title: 'Contribuição Aprovada! 🎉',
-                        message: `Sua contribuição "${contrib.title}" foi aprovada e já está pública no mapa.`,
-                        type: 'success',
-                        link: '/history',
-                        read: false,
-                        createdAt: serverTimestamp()
-                    });
+                        await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                            title: 'Contribuição Aprovada! 🎉',
+                            message: `Sua contribuição "${contrib.title}" foi aprovada e já está pública no mapa.`,
+                            type: 'success',
+                            link: '/history',
+                            read: false,
+                            createdAt: serverTimestamp()
+                        });
+                    } catch (userErr) {
+                        console.warn('Aviso: Falha ao notificar autor em bulkApprove:', userErr);
+                    }
                 }
 
                 if (adminUid) {
@@ -242,7 +277,7 @@ export const moderationService = {
     },
 
     /**
-     * Rejeita múltiplas contribuições em lote com justificativa padronizada.
+     * Rejeita múltiplas contribuições em lote com justificativa padronizada e remove pino do mapa.
      */
     bulkReject: async (contributions: Contribution[], reason: string, adminUid?: string): Promise<{ success: number; failed: number }> => {
         let success = 0;
@@ -250,22 +285,39 @@ export const moderationService = {
 
         for (const contrib of contributions) {
             try {
+                const originalLocation = (contrib as any).originalLocation || contrib.location || (contrib.latitude && contrib.longitude ? {
+                    latitude: contrib.latitude,
+                    longitude: contrib.longitude,
+                    lat: contrib.latitude,
+                    lng: contrib.longitude
+                } : null);
+
                 await updateDoc(doc(db, 'contributions', contrib.id), {
                     status: 'Rejeitado',
                     rejectionReason: reason,
                     rejectedAt: serverTimestamp(),
+                    location: null,
+                    latitude: null,
+                    longitude: null,
+                    isMapVisible: false,
+                    removedFromMap: true,
+                    originalLocation: originalLocation,
                     updatedAt: serverTimestamp()
                 });
 
                 if (contrib.userId && contrib.userId !== 'anonimo') {
-                    await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
-                        title: 'Aviso de Moderação 🛡️',
-                        message: `Sua ocorrência "${contrib.title}" foi analisada e não pôde ser aprovada: ${reason}.`,
-                        type: 'warning',
-                        link: '/history',
-                        read: false,
-                        createdAt: serverTimestamp()
-                    });
+                    try {
+                        await addDoc(collection(db, 'users', contrib.userId, 'notifications'), {
+                            title: 'Aviso de Moderação 🛡️',
+                            message: `Sua ocorrência "${contrib.title}" foi analisada e não pôde ser aprovada: ${reason}.`,
+                            type: 'warning',
+                            link: '/history',
+                            read: false,
+                            createdAt: serverTimestamp()
+                        });
+                    } catch (userErr) {
+                        console.warn('Aviso: Falha ao notificar autor em bulkReject:', userErr);
+                    }
                 }
 
                 if (adminUid) {

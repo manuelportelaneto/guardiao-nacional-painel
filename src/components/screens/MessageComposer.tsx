@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { collection, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
@@ -10,9 +10,18 @@ import { Checkbox } from '../ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter
+} from '../ui/dialog';
+import {
     Send, Smartphone, Bell, Mail, MessageSquare, Users, Target, ClipboardList,
     ScrollText, Plus, Trash2, ShieldAlert, Sparkles, Building2, MapPin, CheckCircle2,
-    X, AlertTriangle, Eye, Layers, Wifi, BatteryCharging, Radio, Siren
+    X, AlertTriangle, Eye, Layers, Wifi, BatteryCharging, Radio, Siren,
+    CloudRain, Wind, TestTube2, RefreshCw, ExternalLink, Check
 } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { StandardLocationFilter } from '../common/StandardLocationFilter';
@@ -23,6 +32,9 @@ import 'react-quill-new/dist/quill.snow.css';
 import { useScope } from '../../context/ScopeContext';
 import { OFFICIAL_COMMUNICATION_TEMPLATES, type OfficialTemplate } from '../../data/officialCommunicationTemplates';
 import { getCityNeighborhoods, MUNICIPAL_NEIGHBORHOODS_DB } from '../../data/municipalNeighborhoods';
+import { civilDefenseService } from '../../services/civilDefenseService';
+import type { OfficialCivilDefenseAlert } from '../../types/civilDefense';
+import { notificationService } from '../../services/notificationService';
 
 const QUILL_MODULES = {
     toolbar: [
@@ -89,6 +101,19 @@ const MessageComposer: React.FC = () => {
     const [manualSmsList, setManualSmsList] = useState('');
     const [manualListExclusive, setManualListExclusive] = useState(false);
 
+    // Métricas Reais de Munícipes (Firestore)
+    const [realTotalUsers, setRealTotalUsers] = useState<number>(0);
+    const [realCityUsers, setRealCityUsers] = useState<number>(0);
+
+    // Alertas Oficiais da Defesa Civil / INMET
+    const [officialAlerts, setOfficialAlerts] = useState<OfficialCivilDefenseAlert[]>([]);
+    const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
+    const [showAlertsModal, setShowAlertsModal] = useState(false);
+
+    // Modo de Homologação / Teste de Campanhas
+    const [isTestMode, setIsTestMode] = useState(false);
+    const [testEmail, setTestEmail] = useState('manuelportela@guardiaonacional.com');
+
     // Preview Mockup State (push vs inapp)
     const [previewTab, setPreviewTab] = useState<'push' | 'feed'>('push');
 
@@ -97,6 +122,31 @@ const MessageComposer: React.FC = () => {
     const activeCityName = scope.cityName || 'Santo André';
     const cityNeighborhoodData = useMemo(() => {
         return getCityNeighborhoods(activeCityId) || getCityNeighborhoods(activeCityName);
+    }, [activeCityId, activeCityName]);
+
+    // Carrega contagem real de munícipes cadastrados
+    useEffect(() => {
+        const loadRealAudienceMetrics = async () => {
+            try {
+                const usersSnap = await getDocs(collection(db, 'users'));
+                const docs = usersSnap.docs.map(d => d.data());
+                const total = docs.length;
+                setRealTotalUsers(total);
+
+                if (activeCityName || activeCityId) {
+                    const normCity = activeCityName.toLowerCase().trim();
+                    const cityMatches = docs.filter(u => {
+                        const uCity = (u.cityName || u.city || '').toLowerCase().trim();
+                        const uCityId = (u.cityId || '').toLowerCase().trim();
+                        return uCityId === activeCityId.toLowerCase() || uCity.includes(normCity) || normCity.includes(uCity);
+                    });
+                    setRealCityUsers(cityMatches.length > 0 ? cityMatches.length : total);
+                }
+            } catch (err) {
+                console.warn('Erro ao carregar contagem real de munícipes:', err);
+            }
+        };
+        loadRealAudienceMetrics();
     }, [activeCityId, activeCityName]);
 
     // Aplicação de Template em 1 Clique
@@ -110,6 +160,52 @@ const MessageComposer: React.FC = () => {
         setChannels(template.defaultChannels);
         toast.success(`Modelo "${template.title}" aplicado!`, {
             description: 'Você pode personalizar os dados antes de disparar.'
+        });
+    };
+
+    // Consulta Alertas Oficiais da Defesa Civil / INMET via API Governamental
+    const handleOpenCivilDefenseAlerts = async () => {
+        setIsLoadingAlerts(true);
+        setShowAlertsModal(true);
+        try {
+            const alerts = await civilDefenseService.getAlertsForScope(scope.state || 'SP', activeCityName);
+            setOfficialAlerts(alerts);
+        } catch (err) {
+            console.warn('Falha ao buscar alertas oficiais:', err);
+            toast.error('Não foi possível sincronizar alertas do INMET/Defesa Civil no momento.');
+        } finally {
+            setIsLoadingAlerts(false);
+        }
+    };
+
+    // Aplica Alerta Governamental Selecionado
+    const handleApplyOfficialAlert = (alert: OfficialCivilDefenseAlert) => {
+        setTitle(`🚨 ALERTA DEFESA CIVIL: ${alert.title}`);
+        const instructionsHtml = alert.instructions && alert.instructions.length > 0
+            ? `<ul>${alert.instructions.map(i => `<li>${i}</li>`).join('')}</ul>`
+            : '<p>Mantenha-se em local seguro e siga as diretrizes dos agentes de proteção e defesa civil.</p>';
+
+        setBody(`
+            <p><strong>Aviso Oficial (${alert.source}):</strong></p>
+            <p>${alert.description}</p>
+            <p><strong>Instruções de Segurança e Prevenção:</strong></p>
+            ${instructionsHtml}
+            <p style="margin-top: 12px; color: #b91c1c; font-weight: bold;">
+                Em situações de emergência, desabamento ou alagamento, contate a Defesa Civil (199) ou o Corpo de Bombeiros (193).
+            </p>
+        `);
+        setIsEmergency(alert.severity === 'GRANDE_PERIGO' || alert.severity === 'PERIGO');
+        setCategoryTag('Defesa Civil');
+        setMessageType('info');
+        setChannels({
+            push: true,
+            internal: true,
+            email: true,
+            sms: alert.severity === 'GRANDE_PERIGO'
+        });
+        setShowAlertsModal(false);
+        toast.success(`Alerta Governamental "${alert.title}" importado!`, {
+            description: 'Dados técnicos, gravidade e orientações de prevenção preenchidos.'
         });
     };
 
@@ -164,14 +260,28 @@ const MessageComposer: React.FC = () => {
         return tmp.textContent || tmp.innerText || "";
     }, [body]);
 
-    // Estimativa de Munícipes Atingidos
+    // Estimativa Real de Munícipes Atingidos baseada na contagem do Firestore
     const estimatedAudienceCount = useMemo(() => {
-        if (isTargetAll) return 18450; // População estimada com app instalado na base municipal
-        if (selectedNeighborhoods.length > 0) {
-            return selectedNeighborhoods.length * 1420;
+        if (manualListExclusive) {
+            const emailCount = manualEmailList ? manualEmailList.split(/[\s,;]+/).filter(Boolean).length : 0;
+            const smsCount = manualSmsList ? manualSmsList.split(/[\s,;]+/).filter(Boolean).length : 0;
+            return Math.max(emailCount + smsCount, 1);
         }
-        return 1200;
-    }, [isTargetAll, selectedNeighborhoods.length]);
+
+        const baseMunicipal = realCityUsers > 0 ? realCityUsers : (realTotalUsers > 0 ? realTotalUsers : 25);
+        const totalNeighborhoods = cityNeighborhoodData?.neighborhoods?.length || 20;
+
+        if (isTargetAll) {
+            return baseMunicipal;
+        }
+
+        if (selectedNeighborhoods.length > 0) {
+            const fraction = Math.min(selectedNeighborhoods.length / totalNeighborhoods, 1);
+            return Math.max(Math.round(fraction * baseMunicipal), selectedNeighborhoods.length);
+        }
+
+        return Math.min(baseMunicipal, 15);
+    }, [isTargetAll, selectedNeighborhoods.length, realCityUsers, realTotalUsers, manualListExclusive, manualEmailList, manualSmsList, cityNeighborhoodData]);
 
     const addPollOption = () => {
         if (pollOptions.length < 6) {
@@ -290,6 +400,58 @@ const MessageComposer: React.FC = () => {
                 };
             }
 
+            // ─── Disparo em Modo de Teste / Homologação ───
+            if (isTestMode) {
+                // Envia e-mail de homologação diretamente para o administrador responsável
+                await notificationService.sendEmail({
+                    to: [testEmail || 'manuelportela@guardiaonacional.com'],
+                    subject: `[HOMOLOGAÇÃO / TESTE] ${title}`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 2px dashed #f59e0b; border-radius: 12px; background: #fffbeb;">
+                            <div style="text-align: center; margin-bottom: 20px;">
+                                <img src="https://guardiao-painel-admin.web.app/logo.png" alt="Guardião Nacional" style="height: 48px; object-fit: contain;" />
+                                <h3 style="color: #b45309; margin: 10px 0 2px 0;">AMBIENTE DE HOMOLOGAÇÃO & SIMULAÇÃO</h3>
+                                <p style="color: #78350f; font-size: 12px; margin: 0;">Disparo de Teste de Campanha e Mensageria Oficial</p>
+                            </div>
+                            <div style="background: #ffffff; padding: 18px; border-radius: 8px; border: 1px solid #fde68a; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                                <h2 style="color: #0f172a; margin-top: 0; font-size: 18px;">${title}</h2>
+                                <div style="font-size: 14px; line-height: 1.6; color: #334155;">
+                                    ${body}
+                                </div>
+                                ${imageUrl ? `<div style="margin-top: 15px;"><img src="${imageUrl}" alt="Anexo" style="max-width: 100%; border-radius: 6px;" /></div>` : ''}
+                            </div>
+                            <div style="margin-top: 18px; font-size: 11px; color: #92400e; border-top: 1px solid #fde68a; padding-top: 12px;">
+                                <p style="margin: 0 0 6px 0;"><strong>📋 Parâmetros da Simulação de Entrega:</strong></p>
+                                <ul style="margin: 0; padding-left: 18px; line-height: 1.5;">
+                                    <li>Município Alvo: ${activeCityName} (${scope.state || 'SP'})</li>
+                                    <li>Canais Selecionados: ${selectedChannels.join(', ').toUpperCase()}</li>
+                                    <li>Estimativa de Munícipes: ~${estimatedAudienceCount.toLocaleString('pt-BR')} cidadãos</li>
+                                    <li>Gravidade: ${isEmergency ? '🚨 EMERGÊNCIA MUNICIPAL' : 'Comunicado Informativo Padrão'}</li>
+                                </ul>
+                                <p style="margin: 10px 0 0 0; font-style: italic; color: #78350f;">
+                                    * Este disparo foi emitido exclusivamente em ambiente de teste para conferência do gestor. Nenhum cidadão da base pública recebeu esta mensagem.
+                                </p>
+                            </div>
+                        </div>
+                    `
+                });
+
+                // Registra simulação no histórico com status controlado
+                await addDoc(collection(db, 'messages'), {
+                    ...messageData,
+                    status: 'simulated_test',
+                    isSimulation: true,
+                    testRecipient: testEmail || 'manuelportela@guardiaonacional.com',
+                    createdAt: serverTimestamp()
+                });
+
+                toast.success('Disparo de Homologação Realizado!', {
+                    description: `Validação de teste despachada para ${testEmail}. Nenhum munícipe real foi impactado.`
+                });
+                return;
+            }
+
+            // ─── Disparo Real em Produção ───
             await addDoc(collection(db, 'messages'), messageData);
 
             const typeLabel = isEmergency 
@@ -348,6 +510,36 @@ const MessageComposer: React.FC = () => {
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
+
+                        {/* ─── Integração Oficial: Alertas Governamentais em Tempo Real (INMET & Defesa Civil) ─── */}
+                        <div className="p-3.5 bg-gradient-to-r from-blue-50 via-slate-50 to-amber-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                                    <CloudRain className="w-5 h-5 animate-pulse" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs font-bold text-slate-900">Alertas Oficiais em Tempo Real</span>
+                                        <Badge className="bg-blue-700 hover:bg-blue-700 text-white text-[9px] px-1.5 py-0 uppercase tracking-wide">
+                                            API Oficial Governo (INMET)
+                                        </Badge>
+                                    </div>
+                                    <p className="text-[11px] text-slate-600">
+                                        Importe dados meteorológicos e avisos da Defesa Civil para proteção de áreas de risco e prevenção de desastres.
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleOpenCivilDefenseAlerts}
+                                disabled={isLoadingAlerts}
+                                className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold whitespace-nowrap gap-1.5 shadow-sm"
+                            >
+                                <Radio className="w-3.5 h-3.5 text-red-400 animate-pulse" />
+                                {isLoadingAlerts ? 'Consultando...' : 'Sincronizar Alertas Oficiais'}
+                            </Button>
+                        </div>
 
                         {/* ─── 0. Barra de Modelos Prontos em 1 Clique (Presets) ─── */}
                         <div className="space-y-2.5">
@@ -671,23 +863,80 @@ const MessageComposer: React.FC = () => {
                             )}
                         </div>
 
+                        {/* ─── Controle de Ambiente: Homologação / Modo de Teste ─── */}
+                        <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2.5 shadow-sm">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-lg bg-amber-600 text-white flex items-center justify-center flex-shrink-0">
+                                        <TestTube2 className="w-4 h-4" />
+                                    </div>
+                                    <div>
+                                        <span className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                                            Ambiente de Teste & Validação
+                                            {isTestMode && <Badge className="bg-amber-600 text-white text-[9px] px-1.5 py-0">HOMOLOGAÇÃO ATIVA</Badge>}
+                                        </span>
+                                        <p className="text-[11px] text-amber-800">
+                                            Valide layout, links e entrega técnica sem disparar mensagens aos munícipes reais.
+                                        </p>
+                                    </div>
+                                </div>
+                                <Switch
+                                    id="testModeSwitch"
+                                    checked={isTestMode}
+                                    onCheckedChange={setIsTestMode}
+                                />
+                            </div>
+
+                            {isTestMode && (
+                                <div className="pt-2 border-t border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center gap-2 text-xs">
+                                    <Label htmlFor="testEmailInput" className="text-[11px] text-amber-900 font-bold whitespace-nowrap">
+                                        E-mail para Validação de Teste:
+                                    </Label>
+                                    <Input
+                                        id="testEmailInput"
+                                        type="email"
+                                        value={testEmail}
+                                        onChange={(e) => setTestEmail(e.target.value)}
+                                        className="h-8 text-xs bg-white border-amber-300 text-amber-950 focus:border-amber-500 font-medium"
+                                        placeholder="manuelportela@guardiaonacional.com"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
                         {/* Botão de Disparo */}
                         <Button
-                            className={`w-full text-base font-bold shadow-md py-6 ${
-                                isEmergency 
-                                    ? 'bg-red-600 hover:bg-red-700 text-white animate-none ring-2 ring-red-300' 
-                                    : 'bg-slate-900 hover:bg-slate-800 text-white'
+                            className={`w-full text-base font-bold shadow-md py-6 transition-all ${
+                                isTestMode
+                                    ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-300'
+                                    : isEmergency 
+                                        ? 'bg-red-600 hover:bg-red-700 text-white animate-none ring-2 ring-red-300' 
+                                        : 'bg-slate-900 hover:bg-slate-800 text-white'
                             }`}
                             size="lg"
                             onClick={handleSend}
                             disabled={loading}
                         >
                             {loading ? (
-                                'Processando disparo...'
+                                'Processando envio...'
                             ) : (
                                 <span className="flex items-center justify-center gap-2">
-                                    <Send className="w-5 h-5" />
-                                    {isEmergency ? '🚨 DISPARAR ALERTA DE EMERGÊNCIA' : 'Publicar e Disparar Comunicado'}
+                                    {isTestMode ? (
+                                        <>
+                                            <TestTube2 className="w-5 h-5" />
+                                            🔬 DISPARAR TESTE DE HOMOLOGAÇÃO (Validação Segura)
+                                        </>
+                                    ) : isEmergency ? (
+                                        <>
+                                            <Send className="w-5 h-5" />
+                                            🚨 DISPARAR ALERTA DE EMERGÊNCIA
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="w-5 h-5" />
+                                            Publicar e Disparar Comunicado
+                                        </>
+                                    )}
                                 </span>
                             )}
                         </Button>
@@ -760,8 +1009,8 @@ const MessageComposer: React.FC = () => {
                                     }`}>
                                         <div className="flex items-center justify-between mb-1.5">
                                             <div className="flex items-center gap-1.5">
-                                                <div className={`w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold ${isEmergency ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}>
-                                                    🛡️
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center overflow-hidden ${isEmergency ? 'bg-red-600' : 'bg-slate-800'}`}>
+                                                    <img src="/logo.png" alt="Guardião" className="w-full h-full object-contain" />
                                                 </div>
                                                 <span className="text-[10px] font-bold tracking-wide uppercase text-slate-300">
                                                     GUARDIÃO • {activeCityName.toUpperCase()}
@@ -809,8 +1058,8 @@ const MessageComposer: React.FC = () => {
                                     {/* Card do Feed */}
                                     <div className="bg-slate-950 border border-slate-800 rounded-xl p-3 space-y-2.5">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-7 h-7 rounded-full bg-blue-950 border border-blue-800 flex items-center justify-center text-xs">
-                                                🏛️
+                                            <div className="w-7 h-7 rounded-full bg-blue-950 border border-blue-800 flex items-center justify-center overflow-hidden p-0.5">
+                                                <img src="/logo.png" alt="Prefeitura" className="w-full h-full object-contain" />
                                             </div>
                                             <div className="flex-1 leading-tight">
                                                 <div className="text-[11px] font-bold text-white flex items-center gap-1">
@@ -873,6 +1122,111 @@ const MessageComposer: React.FC = () => {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Modal de Alertas Oficiais da Defesa Civil / INMET */}
+            <Dialog open={showAlertsModal} onOpenChange={setShowAlertsModal}>
+                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <div className="flex items-center gap-2">
+                            <div className="w-9 h-9 rounded-xl bg-orange-100 border border-orange-200 flex items-center justify-center text-orange-600">
+                                <ShieldAlert className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <DialogTitle className="text-base font-bold text-slate-900">
+                                    Alertas Oficiais Governamentais (INMET & Defesa Civil)
+                                </DialogTitle>
+                                <DialogDescription className="text-xs text-slate-500">
+                                    Dados em tempo real para prevenção de desastres e incidentes em {activeCityName} ({scope.state || 'SP'}).
+                                </DialogDescription>
+                            </div>
+                        </div>
+                    </DialogHeader>
+
+                    {isLoadingAlerts ? (
+                        <div className="py-12 flex flex-col items-center justify-center gap-3 text-slate-500">
+                            <RefreshCw className="w-8 h-8 animate-spin text-orange-500" />
+                            <p className="text-xs font-medium">Sincronizando com as APIs oficiais do INMET e Defesa Civil...</p>
+                        </div>
+                    ) : officialAlerts.length === 0 ? (
+                        <div className="py-10 text-center space-y-2 border border-dashed rounded-xl p-6 bg-slate-50">
+                            <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto" />
+                            <p className="text-sm font-semibold text-slate-800">Nenhum Alerta Crítico Vigente</p>
+                            <p className="text-xs text-slate-500 max-w-md mx-auto">
+                                Não há avisos meteorológicos de perigo emitidos pelo INMET ou Defesa Civil para {activeCityName} no momento.
+                            </p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3 py-2">
+                            {officialAlerts.map(alert => {
+                                const isExtreme = alert.severity === 'GRANDE_PERIGO' || alert.severity === 'PERIGO';
+                                return (
+                                    <div
+                                        key={alert.id}
+                                        className={`p-4 rounded-xl border transition-all ${
+                                            isExtreme 
+                                                ? 'bg-red-50/70 border-red-200' 
+                                                : 'bg-amber-50/70 border-amber-200'
+                                        }`}
+                                    >
+                                        <div className="flex items-start justify-between gap-3 mb-2">
+                                            <div className="flex items-center gap-2">
+                                                <Badge className={`text-[10px] font-bold ${
+                                                    isExtreme ? 'bg-red-600 text-white' : 'bg-amber-600 text-white'
+                                                }`}>
+                                                    {alert.source} • {alert.severity.replace('_', ' ')}
+                                                </Badge>
+                                                <span className="text-[11px] text-slate-500 font-medium">
+                                                    Nível de Risco: {alert.riskLevel}/5
+                                                </span>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                className="h-8 text-xs font-bold gap-1 bg-slate-900 hover:bg-slate-800 text-white"
+                                                onClick={() => handleApplyOfficialAlert(alert)}
+                                            >
+                                                <Check className="w-3.5 h-3.5" />
+                                                Aplicar no Comunicado
+                                            </Button>
+                                        </div>
+
+                                        <h4 className="text-sm font-bold text-slate-900 mb-1">
+                                            {alert.title}
+                                        </h4>
+                                        <p className="text-xs text-slate-700 leading-relaxed mb-2">
+                                            {alert.description}
+                                        </p>
+
+                                        {alert.instructions && alert.instructions.length > 0 && (
+                                            <div className="p-2.5 bg-white/80 rounded-lg border border-slate-200/80 text-[11px] text-slate-700">
+                                                <p className="font-semibold text-slate-900 mb-1">Diretrizes de Segurança:</p>
+                                                <ul className="list-disc pl-4 space-y-0.5">
+                                                    {alert.instructions.map((inst, i) => (
+                                                        <li key={i}>{inst}</li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    <DialogFooter className="border-t pt-3 flex items-center justify-between sm:justify-between">
+                        <span className="text-[11px] text-slate-400 flex items-center gap-1">
+                            Fonte: APIs Públicas INMET / Defesa Civil Brasil
+                        </span>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAlertsModal(false)}
+                            className="text-xs"
+                        >
+                            Fechar
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

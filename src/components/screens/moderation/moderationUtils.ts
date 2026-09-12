@@ -28,29 +28,48 @@ export const formatDate = (date: any): string => {
 export const REPORT_REASON_LABELS: Record<string, string> = {
     'spam': 'Spam',
     'inappropriate': 'Conteúdo Impróprio',
-    'false_info': 'Informação Falsa',
+    'false_info': 'Informação Incorreta ou Trote',
     'harassment': 'Assédio',
     'other': 'Outro'
 };
 
 /**
- * Get human-readable label for report reason
+ * Rejection reason labels for citizen notifications & moderation cards
+ */
+export const REJECTION_REASON_LABELS: Record<string, string> = {
+    'false_info': 'Informação Incorreta, Trote ou Dados Divergentes',
+    'lgpd_pii': 'Violação de Privacidade / LGPD (Rosto, Placa ou Dados Pessoais Identificáveis)',
+    'commercial': 'Divulgação Comercial ou Publicidade Não Permitida',
+    'defamation': 'Difamação, Acusação Sem Provas ou Ataque Pessoal',
+    'unclear_location': 'Localização Geográfica Incorreta ou Divergente',
+    'quality': 'Foto Ilegível ou Descrição Insuficiente para Atendimento',
+    'duplicate': 'Ocorrência Duplicada / Já Cadastrada Anteriormente',
+    'spam': 'Spam / Divulgação Repetitiva',
+    'inappropriate': 'Conteúdo Impróprio ou Não Condizente com a Finalidade Cívica',
+    'other': 'Revisão Administrativa / Ajuste Necessário'
+};
+
+/**
+ * Get human-readable label for report or rejection reason
  */
 export const getReasonLabel = (reason: string): string => {
-    return REPORT_REASON_LABELS[reason] || reason;
+    if (!reason) return 'Sem motivo especificado';
+    return REJECTION_REASON_LABELS[reason] || REPORT_REASON_LABELS[reason] || reason;
 };
 
 /**
  * Default rejection reasons
  */
 export const DEFAULT_REJECTION_REASONS = [
-    { value: 'duplicate', label: 'Conteúdo duplicado' },
-    { value: 'inappropriate', label: 'Conteúdo impróprio' },
-    { value: 'false_info', label: 'Informação falsa' },
-    { value: 'spam', label: 'Spam ou propaganda' },
-    { value: 'quality', label: 'Baixa qualidade' },
-    { value: 'off_topic', label: 'Fora do escopo' },
-    { value: 'other', label: 'Outro motivo' }
+    { value: 'false_info', label: 'Informação Incorreta, Trote ou Dados Divergentes' },
+    { value: 'lgpd_pii', label: 'Violação LGPD (Rosto, Placa ou Dados Pessoais)' },
+    { value: 'defamation', label: 'Difamação ou Acusação Sem Provas' },
+    { value: 'unclear_location', label: 'Localização Incorreta ou Divergente' },
+    { value: 'quality', label: 'Foto Ilegível ou Descrição Insuficiente' },
+    { value: 'duplicate', label: 'Ocorrência Duplicada' },
+    { value: 'commercial', label: 'Comércio ou Divulgação Não Permitida' },
+    { value: 'inappropriate', label: 'Conteúdo Impróprio' },
+    { value: 'other', label: 'Outro Motivo Específico' }
 ] as const;
 
 /**

@@ -4,6 +4,7 @@ import { Badge } from '../../ui/badge';
 import { Button } from '../../ui/button';
 import { Ban, User, CheckCircle2, CheckCheck, Check, Bot } from 'lucide-react';
 import type { Contribution } from '../../../types/contribution';
+import { getReasonLabel } from './moderationUtils';
 
 interface ModerationCardProps {
     item: Contribution;
@@ -163,7 +164,7 @@ export const ModerationCard: React.FC<ModerationCardProps> = ({
                 {/* Motivo da Rejeição se houver */}
                 {item.rejectionReason && (tab === 'rejected' || item.status === 'Rejeitado') && (
                     <div className="p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                        <span className="font-semibold">Motivo da recusa:</span> {item.rejectionReason}
+                        <span className="font-semibold">Motivo da recusa:</span> {getReasonLabel(item.rejectionReason)}
                     </div>
                 )}
 
