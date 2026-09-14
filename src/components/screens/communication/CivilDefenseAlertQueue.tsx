@@ -30,14 +30,15 @@ interface ActiveEmergencyMessage {
 }
 
 export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ onSelectAlertForDispatch }) => {
-    const { scope } = useScope();
-    const activeCityName = scope.cityName || 'Santo André';
-    const activeState = scope.state || 'SP';
+    const { scope, isNational, availableStates } = useScope();
+    const activeCityName = scope.cityName;
+    const activeState = scope.state;
 
     const [alerts, setAlerts] = useState<OfficialCivilDefenseAlert[]>([]);
     const [loading, setLoading] = useState(false);
     const [filterSource, setFilterSource] = useState<string>('ALL');
     const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
+    const [filterState, setFilterState] = useState<string>('ALL');
     const [searchTerm, setSearchTerm] = useState('');
 
     // Alertas ativos de emergência no Firestore (para encerramento manual sob demanda)
@@ -45,11 +46,14 @@ export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ 
     const [loadingEmergencies, setLoadingEmergencies] = useState(false);
     const [concludingId, setConcludingId] = useState<string | null>(null);
 
-    // Carrega alertas oficiais dos órgãos governamentais
+    // Carrega alertas oficiais dos órgãos governamentais respeitando o escopo federativo
     const loadOfficialAlerts = async () => {
         setLoading(true);
         try {
-            const list = await civilDefenseService.getAlertsForScope(activeState, activeCityName);
+            // Se for escopo Nacional ou não houver cidade/estado fixado, carrega os alertas de todo o país
+            const list = (isNational || (!activeCityName && !activeState))
+                ? await civilDefenseService.getAlertsForScope()
+                : await civilDefenseService.getAlertsForScope(activeState, activeCityName);
             setAlerts(list);
         } catch (err) {
             console.error('Falha ao sincronizar alertas governamentais:', err);
@@ -122,16 +126,18 @@ export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ 
         return alerts.filter(a => {
             if (filterSource !== 'ALL' && a.source !== filterSource) return false;
             if (filterSeverity !== 'ALL' && a.severity !== filterSeverity) return false;
+            if (filterState !== 'ALL' && !a.affectedStates.includes(filterState.toUpperCase())) return false;
             if (searchTerm.trim()) {
                 const term = searchTerm.toLowerCase().trim();
                 const matchTitle = a.title.toLowerCase().includes(term);
                 const matchDesc = a.description.toLowerCase().includes(term);
                 const matchCities = a.affectedCities.some(c => c.toLowerCase().includes(term));
-                if (!matchTitle && !matchDesc && !matchCities) return false;
+                const matchStates = a.affectedStates.some(s => s.toLowerCase().includes(term));
+                if (!matchTitle && !matchDesc && !matchCities && !matchStates) return false;
             }
             return true;
         });
-    }, [alerts, filterSource, filterSeverity, searchTerm]);
+    }, [alerts, filterSource, filterSeverity, filterState, searchTerm]);
 
     const formatDateTime = (dateStr?: string) => {
         if (!dateStr) return 'Não informada';
@@ -188,10 +194,10 @@ export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ 
                                 <Siren className="w-5 h-5 text-red-600 animate-pulse" />
                                 <div>
                                     <CardTitle className="text-sm font-bold">
-                                        Alertas de Emergência em Andamento ({activeEmergencies.length})
+                                        Alertas Críticos com Bloqueio de Tela Ativos no Celular dos Munícipes ({activeEmergencies.length})
                                     </CardTitle>
                                     <CardDescription className="text-xs text-red-700">
-                                        Estes comunicados estão ativos no momento. Quando o perigo cessar, encerre o alerta para liberar a tela dos munícipes.
+                                        Estes alertas estão ativamente sobrepostos na tela dos cidadãos. Você pode encerrar o estado de emergência manualmente antes do término previsto.
                                     </CardDescription>
                                 </div>
                             </div>
@@ -245,14 +251,19 @@ export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ 
                                 <ShieldAlert className="w-5 h-5" />
                             </div>
                             <div>
-                                <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <CardTitle className="text-base font-bold text-slate-900 flex items-center gap-2 flex-wrap">
                                     Fila de Alertas Governamentais & Defesa Civil
                                     <Badge variant="outline" className="text-xs border-orange-200 text-orange-700 font-semibold py-0">
                                         APIs Oficiais
                                     </Badge>
+                                    <Badge className="bg-blue-50 text-blue-700 border-blue-200 text-xs font-medium py-0">
+                                        {isNational ? '🇧🇷 Visão Nacional (Brasil)' : activeCityName ? `📍 ${activeCityName} - ${activeState || 'SP'}` : `📍 ${activeState || 'Brasil'}`}
+                                    </Badge>
                                 </CardTitle>
                                 <CardDescription className="text-xs text-slate-500">
-                                    Avisos e comunicados emitidos pelo INMET, Defesa Civil Nacional/SP e CEMADEN para rápida triagem e disparo cívico.
+                                    {isNational
+                                        ? 'Exibindo alertas de todo o território brasileiro emitidos pelo INMET, Defesa Civil Nacional (CENAD) e órgãos estaduais.'
+                                        : `Alertas e avisos meteorológicos filtrados para ${activeCityName || activeState || 'a sua jurisdição'}.`}
                                 </CardDescription>
                             </div>
                         </div>
@@ -272,16 +283,28 @@ export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ 
                     </div>
 
                     {/* Barra de Filtros e Busca da Fila */}
-                    <div className="pt-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="pt-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
                         <div className="relative">
                             <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-slate-400" />
                             <Input
-                                placeholder="Filtrar por município, evento..."
+                                placeholder="Filtrar município, evento..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="pl-8 h-8 text-xs bg-slate-50 border-slate-200"
                             />
                         </div>
+
+                        <Select value={filterState} onValueChange={setFilterState}>
+                            <SelectTrigger className="h-8 text-xs bg-slate-50 border-slate-200">
+                                <SelectValue placeholder="Estado (UF)" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">Todos os Estados (BR)</SelectItem>
+                                {availableStates.map(st => (
+                                    <SelectItem key={st.uf} value={st.uf}>{st.uf} - {st.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
 
                         <Select value={filterSource} onValueChange={setFilterSource}>
                             <SelectTrigger className="h-8 text-xs bg-slate-50 border-slate-200">
@@ -329,9 +352,9 @@ export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ 
                         <div className="space-y-3">
                             {filteredAlerts.map(alert => {
                                 const isExtreme = alert.severity === 'GRANDE_PERIGO' || alert.severity === 'PERIGO';
-                                const isAffectingActiveCity = alert.affectedCities.some(c =>
-                                    c.toLowerCase().includes(activeCityName.toLowerCase()) ||
-                                    activeCityName.toLowerCase().includes(c.toLowerCase())
+                                const isAffectingActiveCity = Boolean(activeCityName) && alert.affectedCities.some(c =>
+                                    c.toLowerCase().includes(activeCityName!.toLowerCase()) ||
+                                    activeCityName!.toLowerCase().includes(c.toLowerCase())
                                 );
 
                                 return (
@@ -356,8 +379,8 @@ export const CivilDefenseAlertQueue: React.FC<CivilDefenseAlertQueueProps> = ({ 
                                                             <MapPin className="w-3 h-3" /> Impacta {activeCityName}
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="text-[10px] text-slate-600 border-slate-300">
-                                                            Região Ampliada
+                                                        <Badge variant="outline" className="text-[10px] text-slate-700 bg-slate-100 border-slate-300 font-medium">
+                                                            📍 {alert.affectedStates.join(', ')} {alert.affectedCities.length > 0 ? `• ${alert.affectedCities.slice(0, 3).join(', ')}${alert.affectedCities.length > 3 ? ` (+${alert.affectedCities.length - 3})` : ''}` : ''}
                                                         </Badge>
                                                     )}
 

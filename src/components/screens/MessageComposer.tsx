@@ -134,14 +134,43 @@ const MessageComposer: React.FC = () => {
     // Preview Mockup State (push vs inapp)
     const [previewTab, setPreviewTab] = useState<'push' | 'feed'>('push');
 
-    // Identificação de Bairros da Cidade Atual do Escopo
-    const activeCityId = scope.cityId || 'santo-andre';
-    const activeCityName = scope.cityName || 'Santo André';
-    const cityNeighborhoodData = useMemo(() => {
-        return getCityNeighborhoods(activeCityId) || getCityNeighborhoods(activeCityName);
-    }, [activeCityId, activeCityName]);
+    // Cidades Vizinhas do Grande ABC
+    const ABC_NEIGHBOR_CITIES = useMemo(() => [
+        'Santo André',
+        'São Bernardo do Campo',
+        'São Caetano do Sul',
+        'Diadema',
+        'Mauá',
+        'Ribeirão Pires',
+        'Rio Grande da Serra'
+    ], []);
 
-    // Carrega contagem real de munícipes cadastrados
+    // Cidades Selecionadas para o Disparo (Suporta Santo André + Cidades Vizinhas ou Nacional)
+    const [selectedCities, setSelectedCities] = useState<string[]>(() => {
+        if (scope.cityName) return [scope.cityName];
+        return ['Santo André'];
+    });
+    const [customCityInput, setCustomCityInput] = useState('');
+
+    // Sincroniza com mudanças no Hub de Jurisdição do Cabeçalho
+    useEffect(() => {
+        if (scope.cityName) {
+            setSelectedCities([scope.cityName]);
+        }
+    }, [scope.cityName]);
+
+    // Identificação Territorial Dinâmica
+    const activeCityId = scope.cityId || (selectedCities.length === 1 ? selectedCities[0].toLowerCase().replace(/\s+/g, '-') : 'santo-andre');
+    const primaryCityName = selectedCities[0] || scope.cityName || 'Santo André';
+    const activeCityName = isNational && selectedCities.length === 0
+        ? 'Brasil (Nacional)'
+        : (selectedCities.length === 1 ? selectedCities[0] : (selectedCities.length > 1 ? `${selectedCities.length} Cidades (${selectedCities[0]}...)` : (scope.cityName || 'Santo André')));
+
+    const cityNeighborhoodData = useMemo(() => {
+        return getCityNeighborhoods(activeCityId) || getCityNeighborhoods(primaryCityName);
+    }, [activeCityId, primaryCityName]);
+
+    // Carrega contagem real de munícipes cadastrados (Agregando as cidades selecionadas)
     useEffect(() => {
         const loadRealAudienceMetrics = async () => {
             try {
@@ -150,21 +179,56 @@ const MessageComposer: React.FC = () => {
                 const total = docs.length;
                 setRealTotalUsers(total);
 
-                if (activeCityName || activeCityId) {
-                    const normCity = activeCityName.toLowerCase().trim();
+                if (selectedCities.length > 0) {
+                    const normCities = selectedCities.map(c => c.toLowerCase().trim());
                     const cityMatches = docs.filter(u => {
                         const uCity = (u.cityName || u.city || '').toLowerCase().trim();
                         const uCityId = (u.cityId || '').toLowerCase().trim();
-                        return uCityId === activeCityId.toLowerCase() || uCity.includes(normCity) || normCity.includes(uCity);
+                        return normCities.some(nc => uCity.includes(nc) || nc.includes(uCity) || uCityId.includes(nc));
                     });
                     setRealCityUsers(cityMatches.length > 0 ? cityMatches.length : total);
+                } else {
+                    setRealCityUsers(total);
                 }
             } catch (err) {
                 console.warn('Erro ao carregar contagem real de munícipes:', err);
             }
         };
         loadRealAudienceMetrics();
-    }, [activeCityId, activeCityName]);
+    }, [selectedCities, activeCityId, primaryCityName]);
+
+    // Alternância de Cidades Selecionadas
+    const toggleCity = (cityName: string) => {
+        setSelectedCities(prev => {
+            if (prev.includes(cityName)) {
+                return prev.filter(c => c !== cityName);
+            } else {
+                return [...prev, cityName];
+            }
+        });
+    };
+
+    const handleSelectAllAbc = () => {
+        setSelectedCities(ABC_NEIGHBOR_CITIES);
+        toast.info(`Selecionadas as 7 cidades do Grande ABC: ${ABC_NEIGHBOR_CITIES.join(', ')}`);
+    };
+
+    const handleClearCities = () => {
+        setSelectedCities([]);
+        toast.info('Filtro de cidades limpo. Transmissão em escopo nacional.');
+    };
+
+    const handleAddCustomCity = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && customCityInput.trim()) {
+            e.preventDefault();
+            const newCity = customCityInput.trim();
+            if (!selectedCities.includes(newCity)) {
+                setSelectedCities(prev => [...prev, newCity]);
+                toast.success(`Cidade "${newCity}" adicionada ao público-alvo.`);
+            }
+            setCustomCityInput('');
+        }
+    };
 
     // Aplicação de Template em 1 Clique
     const handleApplyTemplate = (template: OfficialTemplate) => {
@@ -213,6 +277,11 @@ const MessageComposer: React.FC = () => {
                 Em situações de emergência, desabamento ou alagamento, contate a Defesa Civil (199) ou o Corpo de Bombeiros (193).
             </p>
         `);
+
+        // Pré-seleciona automaticamente as cidades afetadas pelo alerta da Defesa Civil
+        if (alert.affectedCities && alert.affectedCities.length > 0) {
+            setSelectedCities(alert.affectedCities);
+        }
 
         const isGrandePerigo = alert.severity === 'GRANDE_PERIGO';
         setPriorityMode(isGrandePerigo ? 'siren_and_overlay' : 'overlay_only');
@@ -393,15 +462,25 @@ const MessageComposer: React.FC = () => {
                 isSilentEmergency: priorityMode === 'overlay_only',
                 priorityMode,
                 jurisdiction: {
+                    level: isNational ? (selectedCities.length > 0 ? 'REGIONAL' : 'NATIONAL') : scope.level,
                     cityId: activeCityId,
                     cityName: activeCityName,
+                    cities: selectedCities,
                     state: scope.state || 'SP'
                 },
+                targetedCities: selectedCities,
                 targetedNeighborhoods: selectedNeighborhoods,
                 filters: {
-                    isTargetAll: manualListExclusive ? false : isTargetAll,
+                    isTargetAll: manualListExclusive ? false : (isTargetAll && selectedCities.length === 0),
                     manualListExclusive,
-                    location: manualListExclusive ? {} : { ...locationFilter, neighborhoods: selectedNeighborhoods },
+                    location: manualListExclusive ? {} : {
+                        ...locationFilter,
+                        city: selectedCities.length === 1 ? selectedCities[0] : (scope.cityName || 'Santo André'),
+                        cities: selectedCities,
+                        isNational: isTargetAll && selectedCities.length === 0,
+                        state: scope.state || 'SP',
+                        neighborhoods: selectedNeighborhoods
+                    },
                     demographics: manualListExclusive ? {} : targetAudience,
                     targetUserIds: manualListExclusive ? [] : (targetUserIds ? targetUserIds.split(',').map(id => id.trim()).filter(Boolean) : []),
                     manualEmailList: manualEmailList ? manualEmailList.split(/[\s,;]+/).map(e => e.trim()).filter(Boolean) : [],
@@ -576,7 +655,7 @@ const MessageComposer: React.FC = () => {
 
                 <div className="flex items-center gap-2 text-xs">
                     <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 font-semibold px-2.5 py-1">
-                        📍 {activeCityName} - {scope.state || 'SP'}
+                        {isNational ? '🇧🇷 Brasil (Escopo Nacional)' : scope.cityName ? `📍 ${scope.cityName} - ${scope.state || 'SP'}` : `📍 ${scope.state || 'Brasil'}`}
                     </Badge>
                 </div>
             </div>
@@ -597,11 +676,11 @@ const MessageComposer: React.FC = () => {
                                             Novo Comunicado Oficial & Alerta Municipal
                                         </CardTitle>
                                         <CardDescription>
-                                            Emissão de avisos de utilidade pública, campanhas e alertas da Defesa Civil com segmentação por bairro.
+                                            Emissão de avisos de utilidade pública, campanhas e alertas da Defesa Civil com segmentação por município e bairro.
                                         </CardDescription>
                                     </div>
                                     <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-semibold px-2.5 py-1">
-                                        {activeCityName} - {scope.state || 'SP'}
+                                        {isNational ? '🇧🇷 Escopo Nacional' : scope.cityName ? `${scope.cityName} - ${scope.state || 'SP'}` : `${scope.state || 'Brasil'}`}
                                     </Badge>
                                 </div>
                             </CardHeader>
@@ -928,140 +1007,225 @@ const MessageComposer: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* ─── 4. Segmentação Territorial & Bairros ─── */}
+                        {/* ─── 4. Segmentação Territorial Federativa & Cidades Vizinhas ─── */}
                         <div className="space-y-4 border-t pt-4">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <Label className="text-sm font-bold flex items-center gap-1.5 text-slate-900">
-                                        <MapPin className="w-4 h-4 text-blue-600" /> Segmentação Territorial de Bairros
+                                        <MapPin className="w-4 h-4 text-blue-600" /> Segmentação Territorial: Cidades & Bairros
                                     </Label>
-                                    <p className="text-xs text-slate-500">Escolha os bairros específicos ou envie para todo o município.</p>
+                                    <p className="text-xs text-slate-500">
+                                        Defina os municípios alvo do envio (Santo André, cidades vizinhas ou transmissão nacional).
+                                    </p>
                                 </div>
                                 <div className="flex items-center gap-2">
                                     <Label htmlFor="target-all-switch" className="text-xs font-medium text-slate-700 cursor-pointer">
-                                        Toda a Cidade
+                                        {isNational ? 'Brasil Inteiro (Nacional)' : 'Toda a Cidade'}
                                     </Label>
                                     <Switch
                                         id="target-all-switch"
-                                        checked={isTargetAll}
-                                        onCheckedChange={setIsTargetAll}
+                                        checked={isTargetAll && selectedCities.length === 0}
+                                        onCheckedChange={(checked) => {
+                                            if (checked) {
+                                                setIsTargetAll(true);
+                                                setSelectedCities([]);
+                                            } else {
+                                                setIsTargetAll(false);
+                                                if (selectedCities.length === 0) {
+                                                    setSelectedCities([scope.cityName || 'Santo André']);
+                                                }
+                                            }
+                                        }}
                                     />
                                 </div>
                             </div>
 
-                            {/* Seletor de Bairros quando NÃO for toda a cidade */}
-                            {!isTargetAll && (
-                                <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200 space-y-3.5">
-                                    {/* Ações Rápidas */}
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase mr-1">Atalhos:</span>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={handleSelectAllNeighborhoods}
-                                            className="h-6 text-[10px] px-2 bg-white"
-                                        >
-                                            Todos ({cityNeighborhoodData?.neighborhoods.length || 0})
-                                        </Button>
-                                        {cityNeighborhoodData?.criticalBasinNeighborhoods && cityNeighborhoodData.criticalBasinNeighborhoods.length > 0 && (
+                            {/* Seletor de Cidades e Região Metropolitana */}
+                            {(!isTargetAll || selectedCities.length > 0) && (
+                                <div className="bg-slate-50/90 p-4 rounded-xl border border-slate-200 space-y-3.5">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                        <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                            <Building2 className="w-3.5 h-3.5 text-blue-600" />
+                                            Municípios Alvo do Disparo:
+                                        </span>
+                                        <div className="flex items-center gap-2">
                                             <Button
                                                 type="button"
+                                                size="sm"
                                                 variant="outline"
-                                                size="sm"
-                                                onClick={handleSelectBasinNeighborhoods}
-                                                className="h-6 text-[10px] px-2 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                                onClick={handleSelectAllAbc}
+                                                className="h-7 text-xs bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100 font-semibold gap-1"
                                             >
-                                                🌊 Bacias de Alagamento ({cityNeighborhoodData.criticalBasinNeighborhoods.length})
+                                                🎯 Selecionar Grande ABC (Santo André + 6 Vizinhas)
                                             </Button>
-                                        )}
-                                        {cityNeighborhoodData?.criticalSlopeNeighborhoods && cityNeighborhoodData.criticalSlopeNeighborhoods.length > 0 && (
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleSelectSlopeNeighborhoods}
-                                                className="h-6 text-[10px] px-2 bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
-                                            >
-                                                ⛰️ Encostas ({cityNeighborhoodData.criticalSlopeNeighborhoods.length})
-                                            </Button>
-                                        )}
-                                        {selectedNeighborhoods.length > 0 && (
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={handleClearNeighborhoods}
-                                                className="h-6 text-[10px] px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                            >
-                                                Limpar
-                                            </Button>
-                                        )}
-                                    </div>
-
-                                    {/* Lista de Chips de Bairros Cadastrados */}
-                                    <div className="space-y-1.5">
-                                        <Label className="text-[11px] font-semibold text-slate-700">
-                                            Bairros Disponíveis em {activeCityName}:
-                                        </Label>
-                                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-white rounded-lg border border-slate-200">
-                                            {cityNeighborhoodData?.neighborhoods.map(neighborhood => {
-                                                const isChecked = selectedNeighborhoods.includes(neighborhood);
-                                                return (
-                                                    <button
-                                                        key={neighborhood}
-                                                        type="button"
-                                                        onClick={() => toggleNeighborhood(neighborhood)}
-                                                        className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
-                                                            isChecked
-                                                                ? 'bg-blue-600 text-white shadow-sm'
-                                                                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                                                        }`}
-                                                    >
-                                                        {isChecked && <CheckCircle2 className="w-3 h-3" />}
-                                                        {neighborhood}
-                                                    </button>
-                                                );
-                                            })}
+                                            {selectedCities.length > 0 && (
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={handleClearCities}
+                                                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                >
+                                                    Limpar
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
 
-                                    {/* Input de Bairro Customizado (para cidades sem lista completa) */}
+                                    {/* Chips Rápidos de Cidades do ABC e Região Metropolitana */}
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {[
+                                            'Santo André',
+                                            'São Bernardo do Campo',
+                                            'São Caetano do Sul',
+                                            'Mauá',
+                                            'Ribeirão Pires',
+                                            'Rio Grande da Serra',
+                                            'Diadema',
+                                            'São Paulo'
+                                        ].map(city => {
+                                            const isSelected = selectedCities.includes(city);
+                                            return (
+                                                <button
+                                                    key={city}
+                                                    type="button"
+                                                    onClick={() => toggleCity(city)}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                                                        isSelected
+                                                            ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-700'
+                                                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                                                    }`}
+                                                >
+                                                    {isSelected && <Check className="w-3 h-3" />}
+                                                    {city}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Input para adicionar qualquer outro município brasileiro */}
                                     <div className="flex gap-2 items-center pt-1">
                                         <Input
-                                            placeholder="Digitar outro bairro e pressionar Enter..."
-                                            value={customNeighborhoodInput}
-                                            onChange={e => setCustomNeighborhoodInput(e.target.value)}
-                                            onKeyDown={handleAddCustomNeighborhood}
+                                            placeholder="Digitar outro município (ex: Campinas, Santos, Osasco) e pressionar Enter..."
+                                            value={customCityInput}
+                                            onChange={e => setCustomCityInput(e.target.value)}
+                                            onKeyDown={handleAddCustomCity}
                                             className="text-xs h-8 bg-white"
                                         />
                                         <Button
                                             type="button"
                                             variant="secondary"
                                             size="sm"
-                                            onClick={handleAddCustomNeighborhood}
-                                            className="h-8 text-xs"
+                                            onClick={() => {
+                                                if (customCityInput.trim()) {
+                                                    const nCity = customCityInput.trim();
+                                                    if (!selectedCities.includes(nCity)) {
+                                                        setSelectedCities(prev => [...prev, nCity]);
+                                                    }
+                                                    setCustomCityInput('');
+                                                }
+                                            }}
+                                            className="h-8 text-xs shrink-0"
                                         >
-                                            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar
+                                            <Plus className="w-3.5 h-3.5 mr-1" /> Adicionar Cidade
                                         </Button>
                                     </div>
 
-                                    {/* Bairros Selecionados */}
-                                    {selectedNeighborhoods.length > 0 && (
+                                    {/* Cidades Atualmente Selecionadas */}
+                                    {selectedCities.length > 0 && (
                                         <div className="pt-2 border-t border-slate-200">
-                                            <div className="text-[11px] text-slate-600 font-semibold mb-1">
-                                                🎯 {selectedNeighborhoods.length} bairro(s) selecionado(s):
+                                            <div className="text-[11px] text-slate-600 font-semibold mb-1 flex items-center justify-between">
+                                                <span>🎯 {selectedCities.length} município(s) selecionado(s):</span>
+                                                <span className="text-emerald-700 font-bold text-[10px]">
+                                                    Alcance estimado: ~{realCityUsers} munícipes cadastrados
+                                                </span>
                                             </div>
                                             <div className="flex flex-wrap gap-1">
-                                                {selectedNeighborhoods.map(n => (
-                                                    <Badge key={n} variant="secondary" className="bg-blue-100 text-blue-900 gap-1 text-[10px] pr-1">
-                                                        {n}
+                                                {selectedCities.map(c => (
+                                                    <Badge key={c} variant="secondary" className="bg-blue-100 text-blue-900 gap-1 text-[11px] font-medium pr-1">
+                                                        {c}
                                                         <X 
                                                             className="w-3 h-3 cursor-pointer hover:text-red-600" 
-                                                            onClick={() => toggleNeighborhood(n)} 
+                                                            onClick={() => toggleCity(c)} 
                                                         />
                                                     </Badge>
                                                 ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Se apenas 1 cidade estiver selecionada, permite refinar por Bairros */}
+                                    {selectedCities.length === 1 && (
+                                        <div className="mt-3 pt-3 border-t border-slate-200 space-y-2.5">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-slate-800">
+                                                    Refinamento por Bairros de {selectedCities[0]}:
+                                                </span>
+                                                <div className="flex items-center gap-1.5">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleSelectAllNeighborhoods}
+                                                        className="h-6 text-[10px] px-2 bg-white"
+                                                    >
+                                                        Todos ({cityNeighborhoodData?.neighborhoods.length || 0})
+                                                    </Button>
+                                                    {cityNeighborhoodData?.criticalBasinNeighborhoods && cityNeighborhoodData.criticalBasinNeighborhoods.length > 0 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={handleSelectBasinNeighborhoods}
+                                                            className="h-6 text-[10px] px-2 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                                                        >
+                                                            🌊 Bacias ({cityNeighborhoodData.criticalBasinNeighborhoods.length})
+                                                        </Button>
+                                                    )}
+                                                    {cityNeighborhoodData?.criticalSlopeNeighborhoods && cityNeighborhoodData.criticalSlopeNeighborhoods.length > 0 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={handleSelectSlopeNeighborhoods}
+                                                            className="h-6 text-[10px] px-2 bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                                                        >
+                                                            ⛰️ Encostas ({cityNeighborhoodData.criticalSlopeNeighborhoods.length})
+                                                        </Button>
+                                                    )}
+                                                    {selectedNeighborhoods.length > 0 && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={handleClearNeighborhoods}
+                                                            className="h-6 text-[10px] px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                        >
+                                                            Limpar
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-white rounded-lg border border-slate-200">
+                                                {cityNeighborhoodData?.neighborhoods.map(neighborhood => {
+                                                    const isChecked = selectedNeighborhoods.includes(neighborhood);
+                                                    return (
+                                                        <button
+                                                            key={neighborhood}
+                                                            type="button"
+                                                            onClick={() => toggleNeighborhood(neighborhood)}
+                                                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                                                                isChecked
+                                                                    ? 'bg-blue-600 text-white shadow-sm'
+                                                                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                                                            }`}
+                                                        >
+                                                            {isChecked && <CheckCircle2 className="w-3 h-3" />}
+                                                            {neighborhood}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
