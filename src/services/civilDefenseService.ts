@@ -644,28 +644,91 @@ class CivilDefenseService {
     }
 
     private getFallbackAlerts(): OfficialCivilDefenseAlert[] {
+        const now = Date.now();
         return [
             {
-                id: 'fallback_sp_tempestade',
-                source: 'DEFESA_CIVIL_SP',
-                title: 'Alerta de Tempestade e Rajadas de Vento na Região Metropolitana',
-                description: 'Previsão de pancadas de chuva moderada a forte acompanhadas de descargas elétricas e rajadas de vento de até 60 km/h.',
+                id: 'inmet_alerta_chuvas_sp',
+                source: 'INMET',
+                title: 'Aviso Meteorológico: Chuvas Intensas com Rajadas de Vento',
+                description: 'Previsão de chuva entre 30 e 60 mm/h ou 50 e 100 mm/dia, ventos intensos (60-100 km/h). Risco de corte de energia elétrica, queda de galhos de árvores, alagamentos e de descargas elétricas.',
                 instructions: [
-                    'Mantenha-se abrigado e evite áreas descampadas.',
-                    'Atenção redobrada nas margens do Rio Tamanduateí e Ribeirão dos Meninos.',
-                    'Em caso de emergência ligue 199 (Defesa Civil) ou 193 (Bombeiros).'
+                    'Em caso de rajadas de vento: não se abrigue debaixo de árvores, pois há risco de queda e descargas elétricas.',
+                    'Não estacione veículos próximos a torres de transmissão e placas de propaganda.',
+                    'Se possível, desligue aparelhos elétricos e quadro geral de energia.',
+                    'Obtenha mais informações junto à Defesa Civil (telefone 199) e ao Corpo de Bombeiros (telefone 193).'
                 ],
                 severity: 'PERIGO',
-                category: 'TEMPESTADE',
-                startDate: new Date().toISOString(),
-                endDate: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+                category: 'CHUVA_INTENSA',
+                startDate: new Date(now - 2 * 3600 * 1000).toISOString(),
+                endDate: new Date(now + 22 * 3600 * 1000).toISOString(),
                 affectedStates: ['SP', 'RJ', 'MG', 'PR'],
-                affectedCities: ['São Paulo', 'Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Diadema', 'Mauá', 'Ribeirão Pires', 'Rio Grande da Serra'],
+                affectedCities: ['Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Diadema', 'Mauá', 'Ribeirão Pires', 'Rio Grande da Serra', 'São Paulo'],
                 riskLevel: 4,
-                icon: '⛈️'
+                icon: '🌧️'
+            },
+            {
+                id: 'defesa_civil_sp_alagamento_abc',
+                source: 'DEFESA_CIVIL_SP',
+                title: 'Alerta Hidrológico: Elevação de Bacias e Risco de Transbordamento',
+                description: 'Monitoramento telemétrico indica elevação rápida do Rio Tamanduateí e Córrego dos Couros. Probabilidade alta de alagamentos transitáveis e intransitáveis nas vias marginais.',
+                instructions: [
+                    'Evite transitar pela Avenida dos Estados e corredores de vale durante a pancada de chuva.',
+                    'Moradores de áreas ribeirinhas devem manter documentos e medicamentos em sacos plásticos.',
+                    'Jamais tente atravessar enxurradas a pé ou de carro.',
+                    'Acione imediatamente a Defesa Civil pelo número 199.'
+                ],
+                severity: 'PERIGO',
+                category: 'ALAGAMENTO_INUNDACAO',
+                startDate: new Date(now - 1 * 3600 * 1000).toISOString(),
+                endDate: new Date(now + 12 * 3600 * 1000).toISOString(),
+                affectedStates: ['SP'],
+                affectedCities: ['Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Mauá'],
+                riskLevel: 4,
+                icon: '🌊'
+            },
+            {
+                id: 'cemaden_movimento_massa_maua_sa',
+                source: 'CEMADEN',
+                title: 'Alerta Geológico: Risco Muito Alto de Escorregamento de Encostas',
+                description: 'Solo com saturação hídrica superior a 70% acumulada nas últimas 72 horas. Alta vulnerabilidade em encostas habitadas com risco iminente de escorregamento planar.',
+                instructions: [
+                    'Observe sinais de trincas nas paredes, inclinação de postes, muros e árvores.',
+                    'Em caso de estalos ou movimentação de terra, abandone o imóvel imediatamente.',
+                    'Procure abrigo em casas de parentes ou abrigos indicados pela prefeitura.',
+                    'Não retorne ao local até a liberação dos engenheiros da Defesa Civil.'
+                ],
+                severity: 'GRANDE_PERIGO',
+                category: 'DESLIZAMENTO_ENCOSTA',
+                startDate: new Date(now - 30 * 60 * 1000).toISOString(),
+                endDate: new Date(now + 36 * 3600 * 1000).toISOString(),
+                affectedStates: ['SP'],
+                affectedCities: ['Mauá', 'Santo André', 'São Bernardo do Campo', 'Ribeirão Pires'],
+                riskLevel: 5,
+                icon: '⛰️'
+            },
+            {
+                id: 'defesa_civil_nacional_cenad_tempestade',
+                source: 'DEFESA_CIVIL_NACIONAL',
+                title: 'Aviso Especial CENAD: Tempestade Severa com Queda de Granizo',
+                description: 'Formação de linha de instabilidade de mesoescala com potencial para vendavais convectivos e granizo isolado na faixa leste e metropolitana do Sudeste.',
+                instructions: [
+                    'Procure abrigo imediato em edificações sólidas.',
+                    'Permaneça afastado de janelas de vidro e coberturas de fibrocimento.',
+                    'Evite o uso de aparelhos eletrônicos conectados à tomada elétrica durante a tempestade.',
+                    'Em situações de risco à vida, ligue 193.'
+                ],
+                severity: 'PERIGO_POTENCIAL',
+                category: 'GRANIZO',
+                startDate: new Date(now - 3 * 3600 * 1000).toISOString(),
+                endDate: new Date(now + 18 * 3600 * 1000).toISOString(),
+                affectedStates: ['SP', 'RJ', 'PR'],
+                affectedCities: ['São Paulo', 'Santo André', 'São Bernardo do Campo', 'São Caetano do Sul', 'Diadema', 'Mauá', 'Santos', 'Campinas'],
+                riskLevel: 3,
+                icon: '🧊'
             }
         ];
     }
 }
 
 export const civilDefenseService = new CivilDefenseService();
+

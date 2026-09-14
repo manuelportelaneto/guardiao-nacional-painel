@@ -21,7 +21,7 @@ import {
     Send, Smartphone, Bell, Mail, MessageSquare, Users, Target, ClipboardList,
     ScrollText, Plus, Trash2, ShieldAlert, Sparkles, Building2, MapPin, CheckCircle2,
     X, AlertTriangle, Eye, Layers, Wifi, BatteryCharging, Radio, Siren,
-    CloudRain, Wind, TestTube2, RefreshCw, ExternalLink, Check
+    CloudRain, Wind, TestTube2, RefreshCw, ExternalLink, Check, Clock
 } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { StandardLocationFilter } from '../common/StandardLocationFilter';
@@ -35,6 +35,7 @@ import { getCityNeighborhoods, MUNICIPAL_NEIGHBORHOODS_DB } from '../../data/mun
 import { civilDefenseService } from '../../services/civilDefenseService';
 import type { OfficialCivilDefenseAlert } from '../../types/civilDefense';
 import { notificationService } from '../../services/notificationService';
+import { CivilDefenseAlertQueue } from './communication/CivilDefenseAlertQueue';
 
 const QUILL_MODULES = {
     toolbar: [
@@ -52,6 +53,9 @@ const MessageComposer: React.FC = () => {
     const { scope } = useScope();
     const [loading, setLoading] = useState(false);
 
+    // Controle de Abas Principais (Composição vs Fila de Alertas Oficiais)
+    const [activeMainTab, setActiveMainTab] = useState<'compose' | 'queue'>('compose');
+
     // Template Selecionado
     const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
 
@@ -62,6 +66,10 @@ const MessageComposer: React.FC = () => {
     const [imageLink, setImageLink] = useState('');
     const [isEmergency, setIsEmergency] = useState(false);
     const [categoryTag, setCategoryTag] = useState<string>('Geral');
+
+    // Vigência do Alerta de Emergência na Tela (Expiração Automática no Backend)
+    const [emergencyDurationHours, setEmergencyDurationHours] = useState<number>(2);
+    const [officialAlertReference, setOfficialAlertReference] = useState<OfficialCivilDefenseAlert | null>(null);
 
     // Message Type: info | poll | petition
     const [messageType, setMessageType] = useState<'info' | 'poll' | 'petition'>('info');
@@ -178,8 +186,10 @@ const MessageComposer: React.FC = () => {
         }
     };
 
-    // Aplica Alerta Governamental Selecionado
-    const handleApplyOfficialAlert = (alert: OfficialCivilDefenseAlert) => {
+    // Aplica Alerta Governamental Selecionado (Importação Rápida ou Fila)
+    const handleSelectAlertForDispatch = (alert: OfficialCivilDefenseAlert) => {
+        setActiveMainTab('compose');
+        setOfficialAlertReference(alert);
         setTitle(`🚨 ALERTA DEFESA CIVIL: ${alert.title}`);
         const instructionsHtml = alert.instructions && alert.instructions.length > 0
             ? `<ul>${alert.instructions.map(i => `<li>${i}</li>`).join('')}</ul>`
@@ -194,19 +204,35 @@ const MessageComposer: React.FC = () => {
                 Em situações de emergência, desabamento ou alagamento, contate a Defesa Civil (199) ou o Corpo de Bombeiros (193).
             </p>
         `);
-        setIsEmergency(alert.severity === 'GRANDE_PERIGO' || alert.severity === 'PERIGO');
+
+        const isSevero = alert.severity === 'GRANDE_PERIGO' || alert.severity === 'PERIGO';
+        setIsEmergency(isSevero);
         setCategoryTag('Defesa Civil');
         setMessageType('info');
+
+        // Calcula vigência estimada com base na data de término do alerta meteorológico
+        if (alert.endDate) {
+            const diffHours = Math.max(Math.round((new Date(alert.endDate).getTime() - Date.now()) / (3600 * 1000)), 1);
+            setEmergencyDurationHours(Math.min(Math.max(diffHours, 1), 24));
+        } else {
+            setEmergencyDurationHours(2);
+        }
+
         setChannels({
             push: true,
             internal: true,
             email: true,
             sms: alert.severity === 'GRANDE_PERIGO'
         });
+
         setShowAlertsModal(false);
-        toast.success(`Alerta Governamental "${alert.title}" importado!`, {
-            description: 'Dados técnicos, gravidade e orientações de prevenção preenchidos.'
+        toast.success(`Alerta de ${alert.source} Carregado na Composição!`, {
+            description: `Vigência configurada para ${emergencyDurationHours}h. A sirene de bloqueio expirará automaticamente após esse período.`
         });
+    };
+
+    const handleApplyOfficialAlert = (alert: OfficialCivilDefenseAlert) => {
+        handleSelectAlertForDispatch(alert);
     };
 
     // Alternar Bairro Selecionado
@@ -374,6 +400,19 @@ const MessageComposer: React.FC = () => {
                 createdBy: 'admin_official'
             };
 
+            // Vigência e Expiração Automática da Emergência no Backend
+            if (isEmergency) {
+                const expireDate = new Date(Date.now() + emergencyDurationHours * 60 * 60 * 1000);
+                messageData.expiresAt = Timestamp.fromDate(expireDate);
+                messageData.emergencyExpiresAt = Timestamp.fromDate(expireDate);
+                messageData.emergencyDurationHours = emergencyDurationHours;
+                if (officialAlertReference) {
+                    messageData.officialSource = officialAlertReference.source;
+                    messageData.officialAlertId = officialAlertReference.id;
+                    messageData.officialSeverity = officialAlertReference.severity;
+                }
+            }
+
             if (messageType === 'poll') {
                 const validOptions = pollOptions.filter(o => o.trim());
                 const votes: Record<string, number> = {};
@@ -489,57 +528,111 @@ const MessageComposer: React.FC = () => {
     };
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-            {/* Formulário Principal de Composição */}
-            <div className="xl:col-span-7 space-y-6">
-                <Card className="border-slate-200 shadow-sm">
-                    <CardHeader className="pb-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <CardTitle className="text-xl flex items-center gap-2 text-slate-900">
-                                    <Building2 className="w-5 h-5 text-blue-600" />
-                                    Novo Comunicado Oficial & Alerta Municipal
-                                </CardTitle>
-                                <CardDescription>
-                                    Emissão de avisos de utilidade pública, campanhas e alertas da Defesa Civil com segmentação por bairro.
-                                </CardDescription>
-                            </div>
-                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-semibold px-2.5 py-1">
-                                {activeCityName} - {scope.state || 'SP'}
-                            </Badge>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
+        <div className="space-y-6">
+            {/* ─── Barra Superior de Abas da Central de Mensageria ─── */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setActiveMainTab('compose')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            activeMainTab === 'compose'
+                                ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-300'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                    >
+                        <MessageSquare className="w-4 h-4" />
+                        Compositor de Mensagens & Alertas
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveMainTab('queue')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            activeMainTab === 'queue'
+                                ? 'bg-orange-600 text-white shadow-sm ring-2 ring-orange-300'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                        }`}
+                    >
+                        <ShieldAlert className="w-4 h-4" />
+                        Fila de Alertas Governamentais & Defesa Civil
+                        <Badge className="bg-white/20 text-white text-[10px] ml-1 py-0">APIs Oficiais</Badge>
+                    </button>
+                </div>
 
-                        {/* ─── Integração Oficial: Alertas Governamentais em Tempo Real (INMET & Defesa Civil) ─── */}
-                        <div className="p-3.5 bg-gradient-to-r from-blue-50 via-slate-50 to-amber-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-                                    <CloudRain className="w-5 h-5 animate-pulse" />
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-slate-900">Alertas Oficiais em Tempo Real</span>
-                                        <Badge className="bg-blue-700 hover:bg-blue-700 text-white text-[9px] px-1.5 py-0 uppercase tracking-wide">
-                                            API Oficial Governo (INMET)
-                                        </Badge>
+                <div className="flex items-center gap-2 text-xs">
+                    <Badge variant="outline" className="bg-slate-50 text-slate-700 border-slate-200 font-semibold px-2.5 py-1">
+                        📍 {activeCityName} - {scope.state || 'SP'}
+                    </Badge>
+                </div>
+            </div>
+
+            {/* ─── Renderização da Fila de Alertas Governamentais ─── */}
+            {activeMainTab === 'queue' ? (
+                <CivilDefenseAlertQueue onSelectAlertForDispatch={handleSelectAlertForDispatch} />
+            ) : (
+                <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+                    {/* Formulário Principal de Composição */}
+                    <div className="xl:col-span-7 space-y-6">
+                        <Card className="border-slate-200 shadow-sm">
+                            <CardHeader className="pb-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="text-xl flex items-center gap-2 text-slate-900">
+                                            <Building2 className="w-5 h-5 text-blue-600" />
+                                            Novo Comunicado Oficial & Alerta Municipal
+                                        </CardTitle>
+                                        <CardDescription>
+                                            Emissão de avisos de utilidade pública, campanhas e alertas da Defesa Civil com segmentação por bairro.
+                                        </CardDescription>
                                     </div>
-                                    <p className="text-[11px] text-slate-600">
-                                        Importe dados meteorológicos e avisos da Defesa Civil para proteção de áreas de risco e prevenção de desastres.
-                                    </p>
+                                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-semibold px-2.5 py-1">
+                                        {activeCityName} - {scope.state || 'SP'}
+                                    </Badge>
                                 </div>
-                            </div>
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={handleOpenCivilDefenseAlerts}
-                                disabled={isLoadingAlerts}
-                                className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold whitespace-nowrap gap-1.5 shadow-sm"
-                            >
-                                <Radio className="w-3.5 h-3.5 text-red-400 animate-pulse" />
-                                {isLoadingAlerts ? 'Consultando...' : 'Sincronizar Alertas Oficiais'}
-                            </Button>
-                        </div>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+
+                                {/* ─── Integração Oficial: Alertas Governamentais em Tempo Real (INMET & Defesa Civil) ─── */}
+                                <div className="p-3.5 bg-gradient-to-r from-blue-50 via-slate-50 to-amber-50 border border-blue-200/80 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
+                                            <CloudRain className="w-5 h-5 animate-pulse" />
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-slate-900">Alertas Oficiais em Tempo Real</span>
+                                                <Badge className="bg-blue-700 hover:bg-blue-700 text-white text-[9px] px-1.5 py-0 uppercase tracking-wide">
+                                                    API Oficial Governo (INMET)
+                                                </Badge>
+                                            </div>
+                                            <p className="text-[11px] text-slate-600">
+                                                Importe dados meteorológicos e avisos da Defesa Civil para proteção de áreas de risco e prevenção de desastres.
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={() => setActiveMainTab('queue')}
+                                            className="w-full sm:w-auto bg-orange-600 hover:bg-orange-700 text-white text-xs font-semibold whitespace-nowrap gap-1.5 shadow-sm"
+                                        >
+                                            <ShieldAlert className="w-3.5 h-3.5" />
+                                            Ver Fila Oficial
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={handleOpenCivilDefenseAlerts}
+                                            disabled={isLoadingAlerts}
+                                            className="w-full sm:w-auto text-xs font-semibold whitespace-nowrap gap-1.5"
+                                        >
+                                            <RefreshCw className={`w-3.5 h-3.5 ${isLoadingAlerts ? 'animate-spin' : ''}`} />
+                                            Sincronizar
+                                        </Button>
+                                    </div>
+                                </div>
 
                         {/* ─── 0. Barra de Modelos Prontos em 1 Clique (Presets) ─── */}
                         <div className="space-y-2.5">
@@ -623,7 +716,7 @@ const MessageComposer: React.FC = () => {
                                                 Alerta de Emergência
                                                 {isEmergency && <Badge className="bg-red-600 text-white text-[9px] px-1 py-0">SIRENE</Badge>}
                                             </div>
-                                            <p className="text-[10px] text-slate-500">Sobrescreve prioridade no celular</p>
+                                            <p className="text-[10px] text-slate-500">Toca sirene e destaca na tela</p>
                                         </div>
                                     </div>
                                     <Switch
@@ -632,6 +725,44 @@ const MessageComposer: React.FC = () => {
                                         onCheckedChange={setIsEmergency}
                                     />
                                 </div>
+
+                                {isEmergency && (
+                                    <div className="p-3 bg-red-50/90 border border-red-200 rounded-xl space-y-2 text-xs animate-none">
+                                        <div className="flex items-center justify-between">
+                                            <span className="font-bold text-red-950 flex items-center gap-1.5">
+                                                <Clock className="w-3.5 h-3.5 text-red-600" />
+                                                Vigência da Sirene no Celular dos Munícipes
+                                            </span>
+                                            <Badge className="bg-red-200 text-red-900 border-red-300 text-[9px]">
+                                                Auto-Expiração no Backend
+                                            </Badge>
+                                        </div>
+                                        <p className="text-[11px] text-red-800 leading-tight">
+                                            Após este período, a sirene e o bloqueio de tela são desativados automaticamente, mantendo a mensagem salva na caixa de notificações dos cidadãos.
+                                        </p>
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
+                                            {[
+                                                { label: '1 hora (Rápido)', val: 1 },
+                                                { label: '2 horas (Padrão)', val: 2 },
+                                                { label: '4 horas (Intenso)', val: 4 },
+                                                { label: '12 horas (Severo)', val: 12 }
+                                            ].map(opt => (
+                                                <button
+                                                    key={opt.val}
+                                                    type="button"
+                                                    onClick={() => setEmergencyDurationHours(opt.val)}
+                                                    className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
+                                                        emergencyDurationHours === opt.val
+                                                            ? 'bg-red-600 text-white border-red-700 shadow-sm'
+                                                            : 'bg-white text-slate-700 border-red-200 hover:bg-red-100/60'
+                                                    }`}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -1122,6 +1253,8 @@ const MessageComposer: React.FC = () => {
                     </CardContent>
                 </Card>
             </div>
+            </div>
+            )}
 
             {/* Modal de Alertas Oficiais da Defesa Civil / INMET */}
             <Dialog open={showAlertsModal} onOpenChange={setShowAlertsModal}>
