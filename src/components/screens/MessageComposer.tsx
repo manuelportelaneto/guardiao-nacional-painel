@@ -51,7 +51,7 @@ const QUILL_MODULES = {
 const QUILL_FORMATS = ['bold', 'italic', 'underline', 'color', 'list', 'link'];
 
 const MessageComposer: React.FC = () => {
-    const { scope } = useScope();
+    const { scope, isNational, availableCities } = useScope();
     const [loading, setLoading] = useState(false);
 
     // Controle de Abas Principais (Composição vs Fila de Alertas Oficiais)
