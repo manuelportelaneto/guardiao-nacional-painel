@@ -21,7 +21,8 @@ import {
     Send, Smartphone, Bell, Mail, MessageSquare, Users, Target, ClipboardList,
     ScrollText, Plus, Trash2, ShieldAlert, Sparkles, Building2, MapPin, CheckCircle2,
     X, AlertTriangle, Eye, Layers, Wifi, BatteryCharging, Radio, Siren,
-    CloudRain, Wind, TestTube2, RefreshCw, ExternalLink, Check, Clock
+    CloudRain, Wind, TestTube2, RefreshCw, ExternalLink, Check, Clock,
+    Volume2, VolumeX
 } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import { StandardLocationFilter } from '../common/StandardLocationFilter';
@@ -64,7 +65,15 @@ const MessageComposer: React.FC = () => {
     const [body, setBody] = useState('');
     const [imageUrl, setImageUrl] = useState('');
     const [imageLink, setImageLink] = useState('');
-    const [isEmergency, setIsEmergency] = useState(false);
+    // Modalidade de Prioridade de Entrega:
+    // - 'siren_and_overlay': Toca sirene estridente e destaca na tela
+    // - 'overlay_only': Somente destaque na tela (sem sirene sonora)
+    // - 'standard': Envio padrão (sem sirene e sem destaque de tela)
+    const [priorityMode, setPriorityMode] = useState<'siren_and_overlay' | 'overlay_only' | 'standard'>('standard');
+    const isEmergency = priorityMode !== 'standard';
+    const setIsEmergency = (val: boolean) => {
+        setPriorityMode(val ? 'siren_and_overlay' : 'standard');
+    };
     const [categoryTag, setCategoryTag] = useState<string>('Geral');
 
     // Vigência do Alerta de Emergência na Tela (Expiração Automática no Backend)
@@ -205,8 +214,8 @@ const MessageComposer: React.FC = () => {
             </p>
         `);
 
-        const isSevero = alert.severity === 'GRANDE_PERIGO' || alert.severity === 'PERIGO';
-        setIsEmergency(isSevero);
+        const isGrandePerigo = alert.severity === 'GRANDE_PERIGO';
+        setPriorityMode(isGrandePerigo ? 'siren_and_overlay' : 'overlay_only');
         setCategoryTag('Defesa Civil');
         setMessageType('info');
 
@@ -227,7 +236,7 @@ const MessageComposer: React.FC = () => {
 
         setShowAlertsModal(false);
         toast.success(`Alerta de ${alert.source} Carregado na Composição!`, {
-            description: `Vigência configurada para ${emergencyDurationHours}h. A sirene de bloqueio expirará automaticamente após esse período.`
+            description: `Prioridade definida como "${isGrandePerigo ? 'Sirene e Destaque' : 'Somente Destaque (Sem Sirene)'}". Vigência: ${emergencyDurationHours}h.`
         });
     };
 
@@ -374,11 +383,15 @@ const MessageComposer: React.FC = () => {
                 segment: isTargetAll ? 'all' : 'targeted',
                 content: { title, body, imageUrl, imageLink },
                 imageLink,
-                tag: isEmergency ? 'Emergência' : categoryTag,
+                tag: isEmergency ? (priorityMode === 'siren_and_overlay' ? 'Emergência' : 'Alerta Prioritário') : categoryTag,
                 categoryTag,
                 type: messageType === 'poll' ? 'poll' : messageType === 'petition' ? 'petition' : (isEmergency ? 'emergency' : 'info'),
                 channels: selectedChannels,
                 isEmergency,
+                hasSiren: priorityMode === 'siren_and_overlay',
+                soundEnabled: priorityMode === 'siren_and_overlay',
+                isSilentEmergency: priorityMode === 'overlay_only',
+                priorityMode,
                 jurisdiction: {
                     cityId: activeCityId,
                     cityName: activeCityName,
@@ -507,6 +520,8 @@ const MessageComposer: React.FC = () => {
             setImageUrl('');
             setImageLink('');
             setIsEmergency(false);
+            setPriorityMode('standard');
+            setOfficialAlertReference(null);
             setSelectedTemplateId('');
             setMessageType('info');
             setSelectedNeighborhoods([]);
@@ -703,42 +718,100 @@ const MessageComposer: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Alerta Sirene / Defesa Civil */}
+                            {/* Prioridade de Entrega / Modo de Alerta */}
                             <div className="space-y-2">
                                 <Label className="text-xs font-semibold text-slate-700">Prioridade de Entrega</Label>
-                                <div className={`p-2.5 rounded-lg border transition-all flex items-center justify-between ${
-                                    isEmergency ? 'bg-red-50 border-red-300 text-red-900 shadow-sm' : 'bg-slate-50 border-slate-200'
-                                }`}>
-                                    <div className="flex items-center gap-2">
-                                        <Siren className={`w-4 h-4 ${isEmergency ? 'text-red-600 animate-pulse' : 'text-slate-400'}`} />
-                                        <div>
-                                            <div className="text-xs font-bold flex items-center gap-1">
-                                                Alerta de Emergência
-                                                {isEmergency && <Badge className="bg-red-600 text-white text-[9px] px-1 py-0">SIRENE</Badge>}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                    {/* Opção 1: Sirene + Destaque */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setPriorityMode('siren_and_overlay')}
+                                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                                            priorityMode === 'siren_and_overlay'
+                                                ? 'bg-red-50 border-red-400 ring-2 ring-red-400/50 shadow-sm'
+                                                : 'bg-white border-slate-200 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <Siren className={`w-4 h-4 ${priorityMode === 'siren_and_overlay' ? 'text-red-600 animate-pulse' : 'text-slate-500'}`} />
+                                                <span className="text-xs font-bold text-slate-900">Sirene e Destaque</span>
                                             </div>
-                                            <p className="text-[10px] text-slate-500">Toca sirene e destaca na tela</p>
+                                            <Badge className="bg-red-600 text-white text-[9px] px-1 py-0 font-bold">SIRENE</Badge>
                                         </div>
-                                    </div>
-                                    <Switch
-                                        id="emergency-switch"
-                                        checked={isEmergency}
-                                        onCheckedChange={setIsEmergency}
-                                    />
+                                        <p className="text-[10px] text-slate-500 leading-tight">
+                                            Alarme sonoro contínuo + tela de emergência. Para catástrofes e risco iminente.
+                                        </p>
+                                    </button>
+
+                                    {/* Opção 2: Somente Destaque na Tela */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setPriorityMode('overlay_only')}
+                                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                                            priorityMode === 'overlay_only'
+                                                ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-400/50 shadow-sm'
+                                                : 'bg-white border-slate-200 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <VolumeX className={`w-4 h-4 ${priorityMode === 'overlay_only' ? 'text-amber-600' : 'text-slate-500'}`} />
+                                                <span className="text-xs font-bold text-slate-900">Somente Destaque</span>
+                                            </div>
+                                            <Badge className="bg-amber-500 text-white text-[9px] px-1 py-0 font-bold">SEM SOM</Badge>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 leading-tight">
+                                            Destaca na tela do munícipe sem emitir a sirene. Não assusta as pessoas.
+                                        </p>
+                                    </button>
+
+                                    {/* Opção 3: Envio Padrão */}
+                                    <button
+                                        type="button"
+                                        onClick={() => setPriorityMode('standard')}
+                                        className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between ${
+                                            priorityMode === 'standard'
+                                                ? 'bg-blue-50 border-blue-400 ring-2 ring-blue-400/50 shadow-sm'
+                                                : 'bg-white border-slate-200 hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between mb-1.5">
+                                            <div className="flex items-center gap-1.5">
+                                                <Bell className={`w-4 h-4 ${priorityMode === 'standard' ? 'text-blue-600' : 'text-slate-500'}`} />
+                                                <span className="text-xs font-bold text-slate-900">Envio Padrão</span>
+                                            </div>
+                                            <Badge className="bg-slate-200 text-slate-700 text-[9px] px-1 py-0 font-bold">REGULAR</Badge>
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 leading-tight">
+                                            Notificação push convencional e publicação no feed e caixa de entrada.
+                                        </p>
+                                    </button>
                                 </div>
 
                                 {isEmergency && (
-                                    <div className="p-3 bg-red-50/90 border border-red-200 rounded-xl space-y-2 text-xs animate-none">
+                                    <div className={`p-3 rounded-xl space-y-2 text-xs border ${
+                                        priorityMode === 'siren_and_overlay'
+                                            ? 'bg-red-50/90 border-red-200 text-red-950'
+                                            : 'bg-amber-50/90 border-amber-200 text-amber-950'
+                                    }`}>
                                         <div className="flex items-center justify-between">
-                                            <span className="font-bold text-red-950 flex items-center gap-1.5">
-                                                <Clock className="w-3.5 h-3.5 text-red-600" />
-                                                Vigência da Sirene no Celular dos Munícipes
+                                            <span className="font-bold flex items-center gap-1.5">
+                                                <Clock className={`w-3.5 h-3.5 ${priorityMode === 'siren_and_overlay' ? 'text-red-600' : 'text-amber-600'}`} />
+                                                {priorityMode === 'siren_and_overlay'
+                                                    ? 'Vigência da Sirene no Celular dos Munícipes'
+                                                    : 'Vigência do Destaque de Tela no Celular dos Munícipes'}
                                             </span>
-                                            <Badge className="bg-red-200 text-red-900 border-red-300 text-[9px]">
+                                            <Badge className={`text-[9px] ${
+                                                priorityMode === 'siren_and_overlay'
+                                                    ? 'bg-red-200 text-red-900 border-red-300'
+                                                    : 'bg-amber-200 text-amber-900 border-amber-300'
+                                            }`}>
                                                 Auto-Expiração no Backend
                                             </Badge>
                                         </div>
-                                        <p className="text-[11px] text-red-800 leading-tight">
-                                            Após este período, a sirene e o bloqueio de tela são desativados automaticamente, mantendo a mensagem salva na caixa de notificações dos cidadãos.
+                                        <p className={`text-[11px] leading-tight ${priorityMode === 'siren_and_overlay' ? 'text-red-800' : 'text-amber-800'}`}>
+                                            Após este período, {priorityMode === 'siren_and_overlay' ? 'a sirene e o bloqueio de tela' : 'o destaque de tela'} são desativados automaticamente, mantendo a mensagem salva na caixa de notificações dos cidadãos.
                                         </p>
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 pt-1">
                                             {[
@@ -753,8 +826,10 @@ const MessageComposer: React.FC = () => {
                                                     onClick={() => setEmergencyDurationHours(opt.val)}
                                                     className={`py-1.5 px-2 rounded-lg text-xs font-bold border transition-all text-center ${
                                                         emergencyDurationHours === opt.val
-                                                            ? 'bg-red-600 text-white border-red-700 shadow-sm'
-                                                            : 'bg-white text-slate-700 border-red-200 hover:bg-red-100/60'
+                                                            ? (priorityMode === 'siren_and_overlay'
+                                                                ? 'bg-red-600 text-white border-red-700 shadow-sm'
+                                                                : 'bg-amber-600 text-white border-amber-700 shadow-sm')
+                                                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
                                                     }`}
                                                 >
                                                     {opt.label}
@@ -1040,9 +1115,11 @@ const MessageComposer: React.FC = () => {
                             className={`w-full text-base font-bold shadow-md py-6 transition-all ${
                                 isTestMode
                                     ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-300'
-                                    : isEmergency 
-                                        ? 'bg-red-600 hover:bg-red-700 text-white animate-none ring-2 ring-red-300' 
-                                        : 'bg-slate-900 hover:bg-slate-800 text-white'
+                                    : priorityMode === 'siren_and_overlay'
+                                        ? 'bg-red-600 hover:bg-red-700 text-white animate-none ring-2 ring-red-300'
+                                        : priorityMode === 'overlay_only'
+                                            ? 'bg-amber-600 hover:bg-amber-700 text-white ring-2 ring-amber-300'
+                                            : 'bg-slate-900 hover:bg-slate-800 text-white'
                             }`}
                             size="lg"
                             onClick={handleSend}
@@ -1057,10 +1134,15 @@ const MessageComposer: React.FC = () => {
                                             <TestTube2 className="w-5 h-5" />
                                             🔬 DISPARAR TESTE DE HOMOLOGAÇÃO (Validação Segura)
                                         </>
-                                    ) : isEmergency ? (
+                                    ) : priorityMode === 'siren_and_overlay' ? (
                                         <>
-                                            <Send className="w-5 h-5" />
-                                            🚨 DISPARAR ALERTA DE EMERGÊNCIA
+                                            <Siren className="w-5 h-5 animate-pulse" />
+                                            🚨 DISPARAR ALERTA COM SIRENE E DESTAQUE
+                                        </>
+                                    ) : priorityMode === 'overlay_only' ? (
+                                        <>
+                                            <VolumeX className="w-5 h-5" />
+                                            📱 DISPARAR SOMENTE DESTAQUE NA TELA (SEM SIRENE)
                                         </>
                                     ) : (
                                         <>
@@ -1134,13 +1216,21 @@ const MessageComposer: React.FC = () => {
 
                                     {/* Card de Push Notificação */}
                                     <div className={`p-3.5 rounded-2xl backdrop-blur-md border shadow-lg transition-all ${
-                                        isEmergency
+                                        priorityMode === 'siren_and_overlay'
                                             ? 'bg-red-950/80 border-red-500 text-white ring-2 ring-red-500/50 animate-pulse'
-                                            : 'bg-slate-900/90 border-slate-700 text-white'
+                                            : priorityMode === 'overlay_only'
+                                                ? 'bg-amber-950/80 border-amber-500 text-white ring-2 ring-amber-500/40'
+                                                : 'bg-slate-900/90 border-slate-700 text-white'
                                     }`}>
                                         <div className="flex items-center justify-between mb-1.5">
                                             <div className="flex items-center gap-1.5">
-                                                <div className={`w-4 h-4 rounded flex items-center justify-center overflow-hidden ${isEmergency ? 'bg-red-600' : 'bg-slate-800'}`}>
+                                                <div className={`w-4 h-4 rounded flex items-center justify-center overflow-hidden ${
+                                                    priorityMode === 'siren_and_overlay'
+                                                        ? 'bg-red-600'
+                                                        : priorityMode === 'overlay_only'
+                                                            ? 'bg-amber-600'
+                                                            : 'bg-slate-800'
+                                                }`}>
                                                     <img src="/logo.png" alt="Guardião" className="w-full h-full object-contain" />
                                                 </div>
                                                 <span className="text-[10px] font-bold tracking-wide uppercase text-slate-300">
@@ -1150,7 +1240,13 @@ const MessageComposer: React.FC = () => {
                                             <span className="text-[9px] text-slate-400">agora</span>
                                         </div>
 
-                                        <h5 className={`font-bold text-xs leading-snug mb-1 ${isEmergency ? 'text-red-300' : 'text-white'}`}>
+                                        <h5 className={`font-bold text-xs leading-snug mb-1 ${
+                                            priorityMode === 'siren_and_overlay'
+                                                ? 'text-red-300'
+                                                : priorityMode === 'overlay_only'
+                                                    ? 'text-amber-200'
+                                                    : 'text-white'
+                                        }`}>
                                             {title || 'Título do Comunicado Oficial'}
                                         </h5>
 
@@ -1168,11 +1264,15 @@ const MessageComposer: React.FC = () => {
                                             <span className="text-blue-400 font-semibold flex items-center gap-1">
                                                 Toque para ver no mapa →
                                             </span>
-                                            {isEmergency && (
+                                            {priorityMode === 'siren_and_overlay' ? (
                                                 <span className="text-red-400 font-bold flex items-center gap-0.5">
-                                                    <Siren className="w-3 h-3" /> URGENTE
+                                                    <Siren className="w-3 h-3 animate-pulse" /> SIRENE ATIVA
                                                 </span>
-                                            )}
+                                            ) : priorityMode === 'overlay_only' ? (
+                                                <span className="text-amber-400 font-bold flex items-center gap-0.5">
+                                                    <VolumeX className="w-3 h-3" /> DESTAQUE VISUAL
+                                                </span>
+                                            ) : null}
                                         </div>
                                     </div>
                                 </div>
@@ -1199,8 +1299,14 @@ const MessageComposer: React.FC = () => {
                                                 </div>
                                                 <div className="text-[9px] text-slate-400">Canal Oficial de Transparência</div>
                                             </div>
-                                            <Badge className={`text-[9px] px-1.5 py-0 ${isEmergency ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'}`}>
-                                                {categoryTag}
+                                            <Badge className={`text-[9px] px-1.5 py-0 ${
+                                                priorityMode === 'siren_and_overlay'
+                                                    ? 'bg-red-600 text-white'
+                                                    : priorityMode === 'overlay_only'
+                                                        ? 'bg-amber-600 text-white'
+                                                        : 'bg-blue-600 text-white'
+                                            }`}>
+                                                {priorityMode === 'siren_and_overlay' ? 'Emergência' : priorityMode === 'overlay_only' ? 'Alerta' : categoryTag}
                                             </Badge>
                                         </div>
 
