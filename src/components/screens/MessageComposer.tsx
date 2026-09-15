@@ -357,11 +357,40 @@ const MessageComposer: React.FC = () => {
         setCustomNeighborhoodInput('');
     };
 
+    const formatRichTextToCleanText = (html: string): string => {
+        if (!html) return '';
+        let text = html;
+
+        // Converte quebras de parágrafo e linhas
+        text = text.replace(/<\/p>/gi, '\n\n');
+        text = text.replace(/<p[^>]*>/gi, '');
+        text = text.replace(/<br\s*\/?>/gi, '\n');
+
+        // Converte itens de lista em tópicos com marcador elegante
+        text = text.replace(/<li[^>]*>/gi, '• ');
+        text = text.replace(/<\/li>/gi, '\n');
+        text = text.replace(/<\/?ul[^>]*>/gi, '\n');
+        text = text.replace(/<\/?ol[^>]*>/gi, '\n');
+
+        // Remove quaisquer outras tags HTML restantes preservando o texto
+        text = text.replace(/<[^>]+>/g, '');
+
+        // Decodifica entidades HTML comuns
+        text = text.replace(/&nbsp;/gi, ' ');
+        text = text.replace(/&amp;/gi, '&');
+        text = text.replace(/&lt;/gi, '<');
+        text = text.replace(/&gt;/gi, '>');
+        text = text.replace(/&quot;/gi, '"');
+        text = text.replace(/&#39;/gi, "'");
+
+        // Normaliza quebras de linha múltiplas para no máximo 2
+        text = text.replace(/\n{3,}/g, '\n\n');
+        return text.trim();
+    };
+
     const charCount = useMemo(() => body.replace(/<[^>]*>/g, '').length, [body]);
     const plainTextBody = useMemo(() => {
-        const tmp = document.createElement("DIV");
-        tmp.innerHTML = body;
-        return tmp.textContent || tmp.innerText || "";
+        return formatRichTextToCleanText(body);
     }, [body]);
 
     // Estimativa Real de Munícipes Atingidos baseada na contagem do Firestore
@@ -445,12 +474,15 @@ const MessageComposer: React.FC = () => {
 
         setLoading(true);
         try {
+            const cleanBody = formatRichTextToCleanText(body);
             const messageData: Record<string, any> = {
                 title,
-                body,
-                plainText: plainTextBody,
+                body: cleanBody,
+                message: cleanBody,
+                plainText: cleanBody,
+                htmlBody: body,
                 segment: (manualListExclusive || (!isEmergency && !isNational && !isTargetAll && selectedCities.length === 1)) ? 'targeted' : 'all',
-                content: { title, body, imageUrl, imageLink },
+                content: { title, body: cleanBody, html: body, imageUrl, imageLink },
                 imageLink,
                 tag: isEmergency ? (priorityMode === 'siren_and_overlay' ? 'Emergência' : 'Alerta Prioritário') : categoryTag,
                 categoryTag,
