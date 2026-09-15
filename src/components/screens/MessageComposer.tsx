@@ -449,7 +449,7 @@ const MessageComposer: React.FC = () => {
                 title,
                 body,
                 plainText: plainTextBody,
-                segment: isTargetAll ? 'all' : 'targeted',
+                segment: (manualListExclusive || (!isEmergency && !isNational && !isTargetAll && selectedCities.length === 1)) ? 'targeted' : 'all',
                 content: { title, body, imageUrl, imageLink },
                 imageLink,
                 tag: isEmergency ? (priorityMode === 'siren_and_overlay' ? 'Emergência' : 'Alerta Prioritário') : categoryTag,
@@ -471,13 +471,13 @@ const MessageComposer: React.FC = () => {
                 targetedCities: selectedCities,
                 targetedNeighborhoods: selectedNeighborhoods,
                 filters: {
-                    isTargetAll: manualListExclusive ? false : (isTargetAll && selectedCities.length === 0),
+                    isTargetAll: manualListExclusive ? false : (isEmergency || isNational || isTargetAll || selectedCities.length === 0 || selectedCities.length > 1),
                     manualListExclusive,
                     location: manualListExclusive ? {} : {
                         ...locationFilter,
                         city: selectedCities.length === 1 ? selectedCities[0] : (scope.cityName || 'Santo André'),
                         cities: selectedCities,
-                        isNational: isTargetAll && selectedCities.length === 0,
+                        isNational: isNational || (isTargetAll && selectedCities.length === 0),
                         state: scope.state || 'SP',
                         neighborhoods: selectedNeighborhoods
                     },
