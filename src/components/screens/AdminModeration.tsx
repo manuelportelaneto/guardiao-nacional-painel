@@ -344,8 +344,8 @@ const AdminModeration: React.FC = () => {
                 const unsubscribeRecent = onSnapshot(recentQuery, (snapshot) => {
                     const allRecent = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as Contribution));
 
-                    // Filter into buckets
-                    const approved = allRecent.filter(c => c.status === 'Aprovado');
+                    // Filter into buckets - Inclui Aprovado, Resolvido e Concluído como conteúdos triados com sucesso
+                    const approved = allRecent.filter(c => c.status === 'Aprovado' || c.status === 'Resolvido' || c.status === 'Concluído');
                     const rejected = allRecent.filter(c => c.status === 'Rejeitado');
                     const trash = allRecent.filter(c => c.status === 'Lixo');
                     // Note: 'Em Análise' might also be here, but we have a dedicated list for that.
@@ -870,15 +870,22 @@ const AdminModeration: React.FC = () => {
         return list.filter(item => {
             // 1. Filtragem por Escopo Federativo (ScopeContext)
             if (scope.level === 'STATE' && scope.state) {
-                if (item.state?.toUpperCase() !== scope.state.toUpperCase()) return false;
+                const itemState = (item.state || '').toUpperCase();
+                const addressUpper = (item.address || '').toUpperCase();
+                const stateUpper = scope.state.toUpperCase();
+                const stateMatch = itemState === stateUpper || addressUpper.includes(`- ${stateUpper}`) || addressUpper.includes(`, ${stateUpper}`) || (!item.state && !item.address);
+                if (!stateMatch) return false;
             } else if (scope.level === 'MUNICIPAL' || scope.level === 'DEPARTMENT') {
                 const cCity = (item.city || '').toLowerCase();
                 const cCityId = ((item as any).cityId || '').toLowerCase();
                 const targetId = (scope.cityId || '').toLowerCase();
                 const targetName = (scope.cityName || '').toLowerCase();
+                const addrLower = (item.address || '').toLowerCase();
                 const cityMatch = (targetId && cCityId === targetId) ||
                                   (targetId && cCity === targetId) ||
-                                  (targetName && cCity === targetName);
+                                  (targetName && cCity === targetName) ||
+                                  (targetName && addrLower.includes(targetName)) ||
+                                  (!item.city && !item.address);
                 if (!cityMatch) return false;
             }
 
