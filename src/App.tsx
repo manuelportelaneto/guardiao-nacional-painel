@@ -78,6 +78,7 @@ const AdminExecutiveReports = lazy(() => import('./components/screens/AdminExecu
 const AdminJurisdictions = lazy(() => import('./components/screens/AdminJurisdictions'));
 const AdminGovernmentStaff = lazy(() => import('./components/screens/AdminGovernmentStaff'));
 const ActivateOfficialScreen = lazy(() => import('./components/screens/ActivateOfficialScreen'));
+const AdminScheduledCampaigns = lazy(() => import('./components/screens/AdminScheduledCampaigns'));
 
 // Full-page loading fallback for lazy-loaded routes
 const PageLoader = () => (
@@ -185,6 +186,9 @@ function App() {
                                     <Suspense fallback={<PageLoader />}><AdminModeration /></Suspense>
                                 } />
                                 <Route path="communication" element={<AdminCommunication />} />
+                                <Route path="scheduled-campaigns" element={
+                                    <Suspense fallback={<PageLoader />}><AdminScheduledCampaigns /></Suspense>
+                                } />
                                 <Route path="settings" element={<SystemControls />} />
                                 <Route path="logs" element={
                                     <Suspense fallback={<PageLoader />}><AdminLogs /></Suspense>

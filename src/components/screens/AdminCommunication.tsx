@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
-import { Megaphone, History, Send, Settings as SettingsIcon, TriangleAlert, MessageSquare } from 'lucide-react';
+import { Megaphone, History, Send, Settings as SettingsIcon, TriangleAlert, MessageSquare, CalendarClock } from 'lucide-react';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../firebaseConfig';
 import { useAuth } from '../../context/AuthContext';
@@ -13,6 +13,7 @@ import { loggingService } from '../../services/loggingService';
 import MarketingScreen from './MarketingScreen';
 import MessageComposer from './MessageComposer';
 import MessageHistory from './MessageHistory';
+import AdminScheduledCampaigns from './AdminScheduledCampaigns';
 
 interface SystemSettings {
     notifyOnApproval: boolean;
@@ -87,6 +88,10 @@ const AdminCommunication: React.FC = () => {
                         <Megaphone className="w-4 h-4" />
                         Campanhas
                     </TabsTrigger>
+                    <TabsTrigger value="scheduled" className="gap-2 font-semibold text-primary">
+                        <CalendarClock className="w-4 h-4" />
+                        Envios Programados (Q4 2026)
+                    </TabsTrigger>
                     <TabsTrigger value="config" className="gap-2">
                         <SettingsIcon className="w-4 h-4" />
                         Configurações
@@ -103,6 +108,10 @@ const AdminCommunication: React.FC = () => {
 
                 <TabsContent value="marketing" className="pt-4">
                     <MarketingScreen />
+                </TabsContent>
+
+                <TabsContent value="scheduled" className="pt-4">
+                    <AdminScheduledCampaigns />
                 </TabsContent>
 
                 <TabsContent value="config" className="pt-4 space-y-6">

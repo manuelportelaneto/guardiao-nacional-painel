@@ -33,7 +33,8 @@ import {
     Globe,
     RotateCcw,
     LayoutGrid,
-    Briefcase
+    Briefcase,
+    CalendarClock
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
@@ -139,6 +140,7 @@ export const CommandLayout: React.FC<CommandLayoutProps> = ({ children }) => {
             items: [
                 { label: 'Moderação de Ocorrências', icon: Users, path: '/admin/moderation', roles: ['super_admin', 'admin', 'moderator'] },
                 { label: 'Comunicação & Mensageria', icon: MessageSquare, path: '/admin/communication', roles: ['super_admin', 'admin'] },
+                { label: 'Campanhas Q4 (Agendadas)', icon: CalendarClock, path: '/admin/scheduled-campaigns', roles: ['super_admin', 'admin'] },
             ]
         },
         {
